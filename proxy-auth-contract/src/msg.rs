@@ -58,6 +58,16 @@ pub struct TemplatesResponse {
     pub templates: Vec<Template>,
 }
 
+#[cw_serde]
+pub struct FlowResponse {
+    pub flow: Flow,
+}
+
+#[cw_serde]
+pub struct TemplateResponse {
+    pub template: Template,
+}
+
 #[derive(QueryResponses)]
 #[cw_serde]
 pub enum QueryMsg {
@@ -65,6 +75,10 @@ pub enum QueryMsg {
     GetFlowsByRequester { requester_address: String },
     #[returns(TemplatesResponse)]
     GetTemplatesByPublisher { publisher_address: String },
+    #[returns(FlowResponse)]
+    GetFlowById { flow_id: String },
+    #[returns(TemplateResponse)]
+    GetTemplateById { template_id: String },
 }
 
 #[cw_serde]
