@@ -1,0 +1,16 @@
+{
+    "rust-analyzer.procMacro.enable": true,
+    "rust-analyzer.lens.enable": true,
+    "rust-analyzer.hover.documentation.enable": true,
+    "rust-analyzer.completion.autoimport.enable": true,
+    "rust-analyzer.assist.emitMustUse": true,
+    "rust-analyzer.diagnostics.disabled": [],
+    "rust-analyzer.checkOnSave.enable": true,
+    "rust-analyzer.checkOnSave.command": "check",
+    "rust-analyzer.cargo.loadOutDirsFromCheck": true,
+    "rust-analyzer.cargo.runBuildScripts": true,
+    "rust-analyzer.procMacro.ignored": [],
+    "rust-analyzer.cargo.buildScripts.overrideCommand": null,
+    "rust-analyzer.cargo.buildScripts.enable": true,
+    "rust-analyzer.cargo.buildScripts.allTargets": true
+} 
