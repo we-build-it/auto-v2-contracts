@@ -6,8 +6,9 @@ mod error;
 pub mod integration_tests;
 pub mod utils;
 pub mod msg;
-pub mod orca_msg;
 pub mod state;
+pub mod execute;
+pub mod query;
 
 // --- tests
 
