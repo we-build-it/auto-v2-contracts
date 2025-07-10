@@ -117,7 +117,7 @@ pub mod execute {
                 id: action_msg.id,
                 template_id: template.id.clone(),
                 message_template: action_msg.message_template,
-                contract_address: action_msg.contract_address,
+                target_contract: action_msg.contract_address,
                 allowed_denoms: action_msg.allowed_denoms,
             };
 

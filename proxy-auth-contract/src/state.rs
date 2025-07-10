@@ -15,7 +15,7 @@ pub struct Action {
     pub id: String,
     pub template_id: String,
     pub message_template: String,
-    pub contract_address: Addr,
+    pub target_contract: Addr,
     pub allowed_denoms: HashSet<String>,
 }
 
