@@ -21,6 +21,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c6cb57a04249c6480766f7f7cef5467412af1490f8d1e243141daddada3264f"
 
 [[package]]
+name = "anybuf"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ecb50559f19eb92f65279f9de03e4625ed0572e7564ef3de5253e13928c55266"
+
+[[package]]
 name = "anyhow"
 version = "1.0.86"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -806,6 +812,7 @@ dependencies = [
 name = "proxy-auth"
 version = "0.1.0"
 dependencies = [
+ "anybuf",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
@@ -813,6 +820,7 @@ dependencies = [
  "cw2",
  "schemars",
  "serde",
+ "serde_json",
  "thiserror",
 ]
 
@@ -984,9 +992,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.124"
+version = "1.0.140"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66ad62847a56b3dba58cc891acd13884b9c61138d330c0d7b6181713d4fce38d"
+checksum = "20068b6e96dc6c9bd23e01df8827e6c7e1f2fddd43c21810382803c136b99373"
 dependencies = [
  "itoa",
  "memchr",

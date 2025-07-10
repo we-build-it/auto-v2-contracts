@@ -4,7 +4,11 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 
-use crate::{error::ContractError, msg::{ExecuteMsg, InstantiateMsg, QueryMsg, TemplateMsg}, state::{Ownership, save_ownership}};
+use crate::{
+    error::ContractError,
+    msg::{ExecuteMsg, InstantiateMsg, QueryMsg, TemplateMsg},
+    state::{save_ownership, Ownership},
+};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:proxy-auth";
@@ -53,13 +57,21 @@ pub fn execute(
         ExecuteMsg::ApproveTemplate { template_id } => {
             execute::approve_template(deps, env, info, template_id)
         }
-        ExecuteMsg::RejectTemplate { template_id } => execute::reject_template(deps, env, info, template_id),
+        ExecuteMsg::RejectTemplate { template_id } => {
+            execute::reject_template(deps, env, info, template_id)
+        }
         ExecuteMsg::ExecuteFlow {
             flow_id,
             template_id,
             params,
         } => execute::execute_flow(deps, env, info, flow_id, template_id, params),
         ExecuteMsg::CancelFlow { flow_id } => execute::cancel_flow(deps, env, info, flow_id),
+        ExecuteMsg::ExecuteAction {
+            flow_id,
+            action_id,
+            params,
+            funds,
+        } => execute::execute_action(deps, env, info, flow_id, action_id, params, funds),
     }
 }
 
@@ -90,7 +102,13 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 }
 
 pub mod execute {
-    use crate::state::{save_template, save_template_action, load_template, remove_template, validate_sender_is_approver, Template, Action};
+    use crate::{utils::{render_template, build_authz_msg, AuthzMessageType}, state::{
+        load_flow, load_template, load_template_action, remove_template, save_flow, save_template,
+        save_template_action, validate_sender_is_admin, validate_sender_is_approver, Action, Flow,
+        Template,
+    }};
+    use cosmwasm_std::Coin;
+    use std::collections::HashMap;
 
     use super::*;
 
@@ -100,7 +118,6 @@ pub mod execute {
         info: MessageInfo,
         template: TemplateMsg,
     ) -> Result<Response, ContractError> {
-
         // Check if template already exists
         if load_template(deps.storage, &template.id).is_ok() {
             return Err(ContractError::TemplateAlreadyExists {
@@ -127,12 +144,7 @@ pub mod execute {
                 allowed_denoms: action_msg.allowed_denoms,
             };
 
-            save_template_action(
-                deps.storage,
-                &template.id,
-                &action.id,
-                &action,
-            )?;
+            save_template_action(deps.storage, &template.id, &action.id, &action)?;
         }
 
         Ok(Response::new()
@@ -201,38 +213,161 @@ pub mod execute {
     }
 
     pub fn execute_flow(
-        _deps: DepsMut,
+        deps: DepsMut,
         _env: Env,
         info: MessageInfo,
         flow_id: String,
         template_id: String,
         params: String,
     ) -> Result<Response, ContractError> {
+        // Check if flow already exists
+        if load_flow(deps.storage, &flow_id).is_ok() {
+            return Err(ContractError::FlowAlreadyExists {
+                flow_id: flow_id.clone(),
+            });
+        }
+
+        // Load and validate template exists
+        let template = load_template(deps.storage, &template_id).map_err(|_| {
+            ContractError::TemplateNotFound {
+                template_id: template_id.clone(),
+            }
+        })?;
+
+        // Check if template is approved
+        if !template.approved {
+            return Err(ContractError::TemplateNotApproved {
+                template_id: template_id.clone(),
+            });
+        }
+
+        // Check if template is private and sender is not the publisher
+        if template.private && info.sender != template.publisher {
+            return Err(ContractError::TemplatePrivateAccessDenied {
+                template_id: template_id.clone(),
+            });
+        }
+
+        // Create new flow
+        let new_flow = Flow {
+            id: flow_id.clone(),
+            template_id: template_id.clone(),
+            params,
+            requester: info.sender.clone(),
+        };
+
+        // Save the flow
+        save_flow(deps.storage, &new_flow)?;
+
         Ok(Response::new()
             .add_attribute("method", "execute_flow")
             .add_attribute("flow_id", flow_id)
             .add_attribute("template_id", template_id)
-            .add_attribute("params", params)
-            .add_attribute("executor", info.sender.to_string()))
+            .add_attribute("requester", info.sender.to_string()))
     }
 
     pub fn cancel_flow(
-        _deps: DepsMut,
+        deps: DepsMut,
         _env: Env,
         info: MessageInfo,
         flow_id: String,
     ) -> Result<Response, ContractError> {
+        // Load the flow
+        let flow = crate::state::load_flow(deps.storage, &flow_id).map_err(|_| {
+            ContractError::FlowNotFound {
+                flow_id: flow_id.clone(),
+            }
+        })?;
+
+        // Validate that the requester is the sender
+        if flow.requester != info.sender {
+            return Err(ContractError::FlowCancelUnauthorized { flow_id });
+        }
+
+        // Remove the flow
+        crate::state::remove_flow(deps.storage, &flow_id)?;
+
         Ok(Response::new()
             .add_attribute("method", "cancel_flow")
             .add_attribute("flow_id", flow_id)
             .add_attribute("canceller", info.sender.to_string()))
+    }
+
+    pub fn execute_action(
+        deps: DepsMut,
+        env: Env,
+        info: MessageInfo,
+        flow_id: String,
+        action_id: String,
+        params: Option<HashMap<String, String>>,
+        funds: Option<Vec<Coin>>,
+    ) -> Result<Response, ContractError> {
+        // Validate that sender is admin
+        validate_sender_is_admin(deps.storage, &info)?;
+
+        // 1) Validate that the flow exists
+        let flow = load_flow(deps.storage, &flow_id).map_err(|_| ContractError::FlowNotFound {
+            flow_id: flow_id.clone(),
+        })?;
+
+        // Validate that the template exists
+        load_template(deps.storage, &flow.template_id).map_err(|_| {
+            ContractError::TemplateNotFound {
+                template_id: flow.template_id.clone(),
+            }
+        })?;
+
+        // Validate that the action exists in the template
+        let action =
+            load_template_action(deps.storage, &flow.template_id, &action_id).map_err(|_| {
+                ContractError::ActionNotFound {
+                    template_id: flow.template_id.clone(),
+                    action_id: action_id.clone(),
+                }
+            })?;
+
+        // Validate denoms if funds are provided
+        if let Some(funds_vec) = &funds {
+            for coin in funds_vec {
+                if !action.allowed_denoms.contains(&coin.denom) {
+                    return Err(ContractError::InvalidDenom(coin.denom.clone()));
+                }
+            }
+        }
+
+        // Handle optional params
+        let params_map = params.unwrap_or_default();
+        
+        // Replace params in message template
+        let rendered = render_template(&action.message_template, &params_map)?;
+        // let value: serde_json::Value = serde_json::from_str(&rendered)
+        //     .map_err(|e| ContractError::GenericError(format!("JSON parsing error: {}", e)))?;
+        // let binary_msg: Binary = to_json_binary(&value)?;
+
+        // build authz message in name of the user (flow.requester)
+        let authz_msg = build_authz_msg(
+            env,
+            flow.requester.clone(),
+            AuthzMessageType::ExecuteContract {
+                contract_addr: action.target_contract.clone(),
+                msg_str: rendered,
+                funds: funds.unwrap_or_default(),
+            },
+        )?;
+
+        Ok(Response::new()
+            .add_message(authz_msg)
+            .add_attribute("method", "execute_action")
+            .add_attribute("flow_id", flow_id)
+            .add_attribute("action_id", action_id)
+            .add_attribute("executor", info.sender.to_string()))
     }
 }
 
 pub mod query {
     use super::*;
     use crate::{
-        msg::{FlowsResponse, TemplatesResponse, FlowResponse, TemplateResponse},
+        msg::{FlowResponse, FlowsResponse, TemplateResponse, TemplatesResponse},
         state::{load_flow, load_template},
     };
 
@@ -254,18 +389,12 @@ pub mod query {
         Ok(TemplatesResponse { templates })
     }
 
-    pub fn query_flow_by_id(
-        deps: Deps,
-        flow_id: String,
-    ) -> StdResult<FlowResponse> {
+    pub fn query_flow_by_id(deps: Deps, flow_id: String) -> StdResult<FlowResponse> {
         let flow = load_flow(deps.storage, &flow_id)?;
         Ok(FlowResponse { flow })
     }
 
-    pub fn query_template_by_id(
-        deps: Deps,
-        template_id: String,
-    ) -> StdResult<TemplateResponse> {
+    pub fn query_template_by_id(deps: Deps, template_id: String) -> StdResult<TemplateResponse> {
         let template = load_template(deps.storage, &template_id)?;
         Ok(TemplateResponse { template })
     }

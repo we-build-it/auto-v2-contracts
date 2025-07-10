@@ -58,6 +58,18 @@ pub fn validate_sender_is_approver(
     }
 }
 
+pub fn validate_sender_is_admin(
+    storage: &dyn Storage,
+    info: &cosmwasm_std::MessageInfo,
+) -> Result<(), crate::error::ContractError> {
+    let state = load_ownership(storage)?;
+    if info.sender != state.owner {
+        Err(crate::error::ContractError::Unauthorized {})
+    } else {
+        Ok(())
+    }
+}
+
 // ========== FLOWS ==========
 pub struct FlowIndexes<'a> {
     // <'a, index key type, struct value, primary key type>

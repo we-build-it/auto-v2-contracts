@@ -1,7 +1,7 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::Addr;
+use cosmwasm_std::{Addr, Coin};
 
 use crate::state::{Flow, Template};
 
@@ -46,6 +46,12 @@ pub enum ExecuteMsg {
     CancelFlow {
         flow_id: String,
     },
+    ExecuteAction {
+        flow_id: String,
+        action_id: String,
+        params: Option<HashMap<String, String>>,
+        funds: Option<Vec<Coin>>,
+    },
 }
 
 #[cw_serde]
@@ -68,8 +74,8 @@ pub struct TemplateResponse {
     pub template: Template,
 }
 
-#[derive(QueryResponses)]
 #[cw_serde]
+#[derive(QueryResponses)]
 pub enum QueryMsg {
     #[returns(FlowsResponse)]
     GetFlowsByRequester { requester_address: String },
