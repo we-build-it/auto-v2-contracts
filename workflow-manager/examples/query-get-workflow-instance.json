@@ -1,0 +1,6 @@
+{
+  "get_workflow_instance": {
+    "user_address": "osmo1user123456789abcdefghijklmnopqrstuvwxyz",
+    "instance_id": 123
+  }
+} 

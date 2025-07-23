@@ -1,6 +1,6 @@
 use cosmwasm_schema::write_api;
 
-use proxy_auth::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use workflow_manager::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 
 fn main() {
     write_api! {

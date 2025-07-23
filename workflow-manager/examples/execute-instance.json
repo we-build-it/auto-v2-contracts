@@ -1,0 +1,20 @@
+{
+  "execute_instance": {
+    "instance": {
+      "workflow_id": "staked-token-claimer-workflow",
+      "onchain_parameters": {
+        "user_wallet": {
+          "string": "osmo1user123456789abcdefghijklmnopqrstuvwxyz"
+        },
+        "stake_amount": {
+          "big_int": "5000000"
+        },
+        "reward_token": {
+          "string": "osmo1reward123456789abcdefghijklmnopqrstuvwxyz"
+        }
+      },
+      "execution_type": "oneshot",
+      "expiration_time": "2024-12-31T23:59:59Z"
+    }
+  }
+} 

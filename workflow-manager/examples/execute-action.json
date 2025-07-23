@@ -1,0 +1,11 @@
+{
+  "execute_action": {
+    "user_address": "osmo1user123456789abcdefghijklmnopqrstuvwxyz",
+    "instance_id": 123,
+    "action_id": "stake_tokens",
+    "params": {
+      "custom_amount": "2000000",
+      "custom_token": "osmo1custom123456789abcdefghijklmnopqrstuvwxyz"
+    }
+  }
+} 

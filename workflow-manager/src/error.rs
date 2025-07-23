@@ -29,33 +29,34 @@ pub enum ContractError {
     },
 
     #[error("Template {template_id} not found")]
-    TemplateNotFound {
+    WorkflowNotFound {
         template_id: String,
     },
 
     #[error("Template {template_id} is not approved")]
-    TemplateNotApproved {
+    WorkflowNotApproved {
         template_id: String,
     },
 
     #[error("Template {template_id} is private and can only be executed by its publisher")]
-    TemplatePrivateAccessDenied {
+    PrivateWorkflowExecutionDenied {
         template_id: String,
     },
 
     #[error("Flow {flow_id} already exists")]
-    FlowAlreadyExists {
+    InstanceAlreadyExists {
         flow_id: String,
     },
 
     #[error("Flow {flow_id} not found")]
-    FlowNotFound {
+    InstanceNotFound {
         flow_id: String,
     },
 
-    #[error("Only the requester can cancel flow {flow_id}")]
-    FlowCancelUnauthorized {
-        flow_id: String,
+    #[error("Only the requester can do {action} on instance {instance_id}")]
+    InstanceAccessUnauthorized {
+        action: String,
+        instance_id: String,
     },
 
     #[error("Action {action_id} not found in template {template_id}")]

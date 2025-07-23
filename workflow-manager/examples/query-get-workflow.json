@@ -1,0 +1,5 @@
+{
+  "get_workflow_by_id": {
+    "template_id": "staked-token-claimer-workflow"
+  }
+} 

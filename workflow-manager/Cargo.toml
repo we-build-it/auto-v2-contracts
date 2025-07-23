@@ -1,5 +1,5 @@
 [package]
-name = "proxy-auth"
+name = "workflow-manager"
 version = "0.1.0"
 authors = ["Gustavo Fuhr <gustavo@wbi.dev>"]
 edition = "2021"

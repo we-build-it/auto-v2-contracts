@@ -1,0 +1,40 @@
+{
+  "publish_workflow": {
+    "workflow": {
+      "id": "staked-token-claimer-workflow",
+      "start_action": "stake_tokens",
+      "visibility": "public",
+      "actions": {
+        "stake_tokens": {
+          "action_type": "TokenStaker",
+          "params": {
+            "amount": {
+              "string": "1000000"
+            },
+            "token_address": {
+              "string": "osmo1token123456789abcdefghijklmnopqrstuvwxyz"
+            },
+            "user_address": {
+              "string": "#ip.requester"
+            }
+          },
+          "next_actions": ["claim_rewards"],
+          "final_state": false
+        },
+        "claim_rewards": {
+          "action_type": "StakedTokenClaimer",
+          "params": {
+            "user_address": {
+              "string": "#ip.requester"
+            },
+            "staking_contract": {
+              "string": "osmo1staking123456789abcdefghijklmnopqrstuvwxyz"
+            }
+          },
+          "next_actions": [],
+          "final_state": true
+        }
+      }
+    }
+  }
+} 

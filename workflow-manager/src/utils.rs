@@ -237,12 +237,18 @@ pub fn build_authz_msg(
         .append_string(1, &env.contract.address.to_string()) // grantee (field 1)
         .append_repeated_message(2, &[msg_anybuf]); // msgs (field 2)
 
-    // before:     
-    //     let cosmos_msg = CosmosMsg::Stargate {
-    // changed because of warning, if this doesn't work try to use Stargate
-    let cosmos_msg = CosmosMsg::Any(cosmwasm_std::AnyMsg { 
+    // cosmwasm_2_0
+    // let cosmos_msg = CosmosMsg::Any(cosmwasm_std::AnyMsg { 
+    //     type_url: "/cosmos.authz.v1beta1.MsgExec".to_string(),
+    //     value: msg_exec_buf.as_bytes().into(),
+    // }); 
+
+    // cosmwasm_1_4
+    #[allow(deprecated)]
+    let cosmos_msg = CosmosMsg::Stargate {
         type_url: "/cosmos.authz.v1beta1.MsgExec".to_string(),
         value: msg_exec_buf.as_bytes().into(),
-    }); 
+    }; 
+
     Ok(cosmos_msg)
 }

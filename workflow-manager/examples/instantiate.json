@@ -1,0 +1,10 @@
+{
+  "allowed_publishers": [
+    "osmo1publisher123456789abcdefghijklmnopqrstuvwxyz",
+    "osmo1publisher987654321zyxwvutsrqponmlkjihgfedcba"
+  ],
+  "allowed_action_executors": [
+    "osmo1executor123456789abcdefghijklmnopqrstuvwxyz",
+    "osmo1executor987654321zyxwvutsrqponmlkjihgfedcba"
+  ]
+} 

@@ -6,12 +6,17 @@ use cw2::set_contract_version;
 
 use crate::{
     error::ContractError,
+    execute::{
+        cancel_instance, execute_instance, pause_instance, publish_workflow, resume_instance,
+    },
+    execute::execute_action,
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
+    query::{query_instances_by_requester, query_workflow_by_id, query_workflow_instance},
     state::{save_ownership, Ownership},
 };
 
 // version info for migration info
-const CONTRACT_NAME: &str = "crates.io:proxy-auth";
+const CONTRACT_NAME: &str = "crates.io:workflow-manager";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub fn validate_no_funds_received(info: &MessageInfo) -> Result<(), ContractError> {
@@ -31,7 +36,8 @@ pub fn instantiate(
 ) -> Result<Response, ContractError> {
     let state = Ownership {
         owner: info.sender.clone(),
-        approvers: msg.approvers,
+        allowed_publishers: msg.allowed_publishers,
+        allowed_action_executors: msg.allowed_action_executors,
     };
 
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -40,7 +46,10 @@ pub fn instantiate(
     Ok(Response::new()
         .add_attribute("method", "instantiate")
         .add_attribute("owner", info.sender)
-        .add_attribute("approvers_count", state.approvers.len().to_string()))
+        .add_attribute(
+            "approvers_count",
+            state.allowed_publishers.len().to_string(),
+        ))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -51,27 +60,25 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::RequestForApproval { template } => {
-            crate::execute::request_for_approval(deps, env, info, template)
-        }
-        ExecuteMsg::ApproveTemplate { template_id } => {
-            crate::execute::approve_template(deps, env, info, template_id)
-        }
-        ExecuteMsg::RejectTemplate { template_id } => {
-            crate::execute::reject_template(deps, env, info, template_id)
-        }
-        ExecuteMsg::ExecuteFlow {
-            flow_id,
-            template_id,
-            params,
-        } => crate::execute::execute_flow(deps, env, info, flow_id, template_id, params),
-        ExecuteMsg::CancelFlow { flow_id } => crate::execute::cancel_flow(deps, env, info, flow_id),
+        ExecuteMsg::PublishWorkflow { workflow } => publish_workflow(deps, env, info, workflow),
+        ExecuteMsg::ExecuteInstance { instance } => execute_instance(deps, env, info, instance),
+        ExecuteMsg::CancelInstance { instance_id } => cancel_instance(deps, env, info, instance_id),
+        ExecuteMsg::PauselInstance { instance_id } => pause_instance(deps, env, info, instance_id),
+        ExecuteMsg::ResumeInstance { instance_id } => resume_instance(deps, env, info, instance_id),
         ExecuteMsg::ExecuteAction {
-            flow_id,
+            user_address,
+            instance_id,
             action_id,
             params,
-            funds,
-        } => crate::execute::execute_action(deps, env, info, flow_id, action_id, params, funds),
+        } => execute_action(
+            deps,
+            env,
+            info,
+            user_address,
+            instance_id,
+            action_id,
+            params,
+        ),
     }
 }
 
@@ -86,17 +93,14 @@ pub fn execute(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetFlowsByRequester { requester_address } => {
-            to_json_binary(&crate::query::query_flows_by_requester(deps, requester_address)?)
+        QueryMsg::GetInstancesByRequester { requester_address } => {
+            to_json_binary(&query_instances_by_requester(deps, requester_address)?)
         }
-        QueryMsg::GetTemplatesByPublisher { publisher_address } => to_json_binary(
-            &crate::query::query_templates_by_publisher(deps, publisher_address)?,
-        ),
-        QueryMsg::GetFlowById { flow_id } => {
-            to_json_binary(&crate::query::query_flow_by_id(deps, flow_id)?)
+        QueryMsg::GetWorkflowById { template_id } => {
+            to_json_binary(&query_workflow_by_id(deps, template_id)?)
         }
-        QueryMsg::GetTemplateById { template_id } => {
-            to_json_binary(&crate::query::query_template_by_id(deps, template_id)?)
+        QueryMsg::GetWorkflowInstance { user_address, instance_id } => {
+            to_json_binary(&query_workflow_instance(deps, user_address, instance_id)?)
         }
     }
 }
