@@ -2,10 +2,16 @@ use std::collections::HashMap;
 
 use cosmwasm_std::{DepsMut, Env, MessageInfo, Response, SubMsg};
 
-use crate::{msg::NewInstanceMsg, state::{
-    load_workflow, load_workflow_instance, remove_workflow_instance, save_workflow, save_workflow_instance, validate_sender_is_publisher, Workflow, WorkflowInstance, WorkflowInstanceState, WorkflowState, WorkflowVisibility, get_next_instance_id, validate_sender_is_action_executor, ActionParamValue, ActionType
-}};
-use crate::{ContractError, msg::NewWorkflowMsg};
+use crate::{
+    msg::NewInstanceMsg,
+    state::{
+        get_next_instance_id, load_workflow, load_workflow_instance, remove_workflow_instance,
+        save_workflow, save_workflow_instance, validate_sender_is_action_executor,
+        validate_sender_is_publisher, ActionParamValue, ActionType, Workflow, WorkflowInstance,
+        WorkflowInstanceState, WorkflowState, WorkflowVisibility,
+    },
+};
+use crate::{msg::NewWorkflowMsg, ContractError};
 
 pub fn publish_workflow(
     deps: DepsMut,
@@ -46,11 +52,12 @@ pub fn execute_instance(
     instance: NewInstanceMsg,
 ) -> Result<Response, ContractError> {
     // Check if workflow exists
-    let workflow = load_workflow(deps.storage, &instance.workflow_id)
-        .map_err(|_| ContractError::WorkflowNotFound {
+    let workflow = load_workflow(deps.storage, &instance.workflow_id).map_err(|_| {
+        ContractError::WorkflowNotFound {
             template_id: instance.workflow_id.clone(),
-        })?;
-    
+        }
+    })?;
+
     // Check if workflow is approved
     if !matches!(workflow.state, WorkflowState::Approved) {
         return Err(ContractError::WorkflowNotApproved {
@@ -59,7 +66,9 @@ pub fn execute_instance(
     }
 
     // Check if workflow is private and sender is not the publisher
-    if matches!(workflow.visibility, WorkflowVisibility::Private) && info.sender != workflow.publisher {
+    if matches!(workflow.visibility, WorkflowVisibility::Private)
+        && info.sender != workflow.publisher
+    {
         return Err(ContractError::PrivateWorkflowExecutionDenied {
             template_id: instance.workflow_id.clone(),
         });
@@ -97,12 +106,19 @@ pub fn cancel_instance(
     instance_id: u64,
 ) -> Result<Response, ContractError> {
     // Load the instance
-    let instance = load_workflow_instance(deps.storage, info.sender.clone(), instance_id)
-        .map_err(|_| ContractError::InstanceNotFound { flow_id: instance_id.to_string() })?;
+    let instance =
+        load_workflow_instance(deps.storage, info.sender.clone(), instance_id).map_err(|_| {
+            ContractError::InstanceNotFound {
+                flow_id: instance_id.to_string(),
+            }
+        })?;
 
     // Validate that the requester is the sender
     if instance.requester != info.sender {
-        return Err(ContractError::InstanceAccessUnauthorized { action: "cancel".to_string(), instance_id: instance_id.to_string() });
+        return Err(ContractError::InstanceAccessUnauthorized {
+            action: "cancel".to_string(),
+            instance_id: instance_id.to_string(),
+        });
     }
 
     // Remove the instance
@@ -122,16 +138,23 @@ pub fn pause_instance(
 ) -> Result<Response, ContractError> {
     // Load the instance
     let mut instance = load_workflow_instance(deps.storage, info.sender.clone(), instance_id)
-        .map_err(|_| ContractError::InstanceNotFound { flow_id: instance_id.to_string() })?;
+        .map_err(|_| ContractError::InstanceNotFound {
+            flow_id: instance_id.to_string(),
+        })?;
 
     // Validate that the requester is the sender
     if instance.requester != info.sender {
-        return Err(ContractError::InstanceAccessUnauthorized { action: "pause".to_string(), instance_id: instance_id.to_string() });
+        return Err(ContractError::InstanceAccessUnauthorized {
+            action: "pause".to_string(),
+            instance_id: instance_id.to_string(),
+        });
     }
 
     // Check if instance is running
     if !matches!(instance.state, WorkflowInstanceState::Running) {
-        return Err(ContractError::GenericError("Instance is not running".to_string()));
+        return Err(ContractError::GenericError(
+            "Instance is not running".to_string(),
+        ));
     }
 
     // Pause the instance
@@ -154,16 +177,23 @@ pub fn resume_instance(
 ) -> Result<Response, ContractError> {
     // Load the instance
     let mut instance = load_workflow_instance(deps.storage, info.sender.clone(), instance_id)
-        .map_err(|_| ContractError::InstanceNotFound { flow_id: instance_id.to_string() })?;
+        .map_err(|_| ContractError::InstanceNotFound {
+            flow_id: instance_id.to_string(),
+        })?;
 
     // Validate that the requester is the sender
     if instance.requester != info.sender {
-        return Err(ContractError::InstanceAccessUnauthorized { action: "resume".to_string(), instance_id: instance_id.to_string() });
+        return Err(ContractError::InstanceAccessUnauthorized {
+            action: "resume".to_string(),
+            instance_id: instance_id.to_string(),
+        });
     }
 
     // Check if instance is paused
     if !matches!(instance.state, WorkflowInstanceState::Paused) {
-        return Err(ContractError::GenericError("Instance is not paused".to_string()));
+        return Err(ContractError::GenericError(
+            "Instance is not paused".to_string(),
+        ));
     }
 
     // Resume the instance
@@ -196,7 +226,9 @@ pub fn execute_action(
 
     // Validate instance expiration time
     if env.block.time >= user_instance.expiration_time {
-        return Err(ContractError::GenericError("Instance has expired".to_string()));
+        return Err(ContractError::GenericError(
+            "Instance has expired".to_string(),
+        ));
     }
 
     // Load workflow from user_instance.workflow_id
@@ -210,22 +242,31 @@ pub fn execute_action(
     };
 
     // Get the action to execute using the action_id parameter
-    let action_to_execute = workflow.actions.get(&action_id)
-        .ok_or_else(|| ContractError::ActionNotFound {
-            template_id: user_instance.workflow_id.clone(),
-            action_id: action_id.clone(),
-        })?;
+    let action_to_execute =
+        workflow
+            .actions
+            .get(&action_id)
+            .ok_or_else(|| ContractError::ActionNotFound {
+                template_id: user_instance.workflow_id.clone(),
+                action_id: action_id.clone(),
+            })?;
 
     // Check if the action can be executed based on workflow rules
-    let is_first_execution = user_instance.last_executed_action.is_none() && action_id == workflow.start_action;
-    
-    let is_valid_next_action = user_instance.last_executed_action.is_some() && 
-        last_executed_action.unwrap().next_actions.contains(&action_id);
-    
-    let is_recurrent_start_action = user_instance.execution_type == crate::state::ExecutionType::Recurrent &&
-        action_id == workflow.start_action &&
-        (user_instance.last_executed_action.is_none() || last_executed_action.unwrap().final_state);
-    
+    let is_first_execution =
+        user_instance.last_executed_action.is_none() && action_id == workflow.start_action;
+
+    let is_valid_next_action = user_instance.last_executed_action.is_some()
+        && last_executed_action
+            .unwrap()
+            .next_actions
+            .contains(&action_id);
+
+    let is_recurrent_start_action = user_instance.execution_type
+        == crate::state::ExecutionType::Recurrent
+        && action_id == workflow.start_action
+        && (user_instance.last_executed_action.is_none()
+            || last_executed_action.unwrap().final_state);
+
     let can_execute = is_first_execution || is_valid_next_action || is_recurrent_start_action;
 
     if !can_execute {
@@ -237,7 +278,7 @@ pub fn execute_action(
     // Get action parameters and create new HashMap
     let action_params = &action_to_execute.params;
     let mut resolved_params = HashMap::<String, ActionParamValue>::new();
-    
+
     for (key, value) in action_params {
         // si param.value es #ip.requester => busco user_instance.requester
         // si param.value comienza con #ip, busco en user_instance.params
@@ -258,9 +299,6 @@ pub fn execute_action(
     updated_instance.last_executed_action = Some(action_id.clone());
     save_workflow_instance(deps.storage, user_addr.clone(), &updated_instance)?;
 
-    
-    
-    
     Ok(Response::new()
         .add_submessages(sub_msgs)
         .add_attribute("method", "execute_action")
@@ -280,14 +318,19 @@ fn resolve_param_value(
     };
 
     if value_str == "#ip.requester" {
-        Ok(ActionParamValue::String(user_instance.requester.to_string()))
+        Ok(ActionParamValue::String(
+            user_instance.requester.to_string(),
+        ))
     } else if value_str.starts_with("#ip.") {
         // Extract the key after #ip.
         let key = &value_str[4..];
         if let Some(value) = user_instance.onchain_parameters.get(key) {
             Ok(value.clone())
         } else {
-            Err(ContractError::GenericError(format!("Parameter '{}' not found in instance parameters", key)))
+            Err(ContractError::GenericError(format!(
+                "Parameter '{}' not found in instance parameters",
+                key
+            )))
         }
     } else if value_str.starts_with("#cp.") {
         // Extract the key after #cp.
@@ -296,10 +339,15 @@ fn resolve_param_value(
             if let Some(value) = params.get(key) {
                 Ok(ActionParamValue::String(value.clone()))
             } else {
-                Err(ContractError::GenericError(format!("Parameter '{}' not found in execute action parameters", key)))
+                Err(ContractError::GenericError(format!(
+                    "Parameter '{}' not found in execute action parameters",
+                    key
+                )))
             }
         } else {
-            Err(ContractError::GenericError("Execute action parameters not provided".to_string()))
+            Err(ContractError::GenericError(
+                "Execute action parameters not provided".to_string(),
+            ))
         }
     } else {
         Ok(param_value.clone()) // Fixed value
@@ -307,7 +355,9 @@ fn resolve_param_value(
 }
 
 // Placeholder functions for action types
-fn staked_token_claimer(_params: HashMap<String, ActionParamValue>) -> Result<Vec<SubMsg>, ContractError> {
+fn staked_token_claimer(
+    _params: HashMap<String, ActionParamValue>,
+) -> Result<Vec<SubMsg>, ContractError> {
     // TODO: Implement staked token claimer logic
     Ok(vec![])
 }
