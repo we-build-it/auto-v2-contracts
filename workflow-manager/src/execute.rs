@@ -7,8 +7,8 @@ use crate::{
     state::{
         get_next_instance_id, load_workflow, load_workflow_instance, remove_workflow_instance,
         save_workflow, save_workflow_instance, validate_sender_is_action_executor,
-        validate_sender_is_publisher, ActionParamValue, ActionType, Workflow, WorkflowInstance,
-        WorkflowInstanceState, WorkflowState, WorkflowVisibility,
+        validate_sender_is_publisher, ActionParamValue, ActionType, ExecutionType, Workflow,
+        WorkflowInstance, WorkflowInstanceState, WorkflowState, WorkflowVisibility,
     },
 };
 use crate::{msg::NewWorkflowMsg, ContractError};
@@ -261,8 +261,7 @@ pub fn execute_action(
             .next_actions
             .contains(&action_id);
 
-    let is_recurrent_start_action = user_instance.execution_type
-        == crate::state::ExecutionType::Recurrent
+    let is_recurrent_start_action = user_instance.execution_type == ExecutionType::Recurrent
         && action_id == workflow.start_action
         && (user_instance.last_executed_action.is_none()
             || last_executed_action.unwrap().final_state);
@@ -309,7 +308,7 @@ pub fn execute_action(
 
 fn resolve_param_value(
     param_value: &ActionParamValue,
-    user_instance: &crate::state::WorkflowInstance,
+    user_instance: &WorkflowInstance,
     execute_action_params: &Option<HashMap<String, String>>,
 ) -> Result<ActionParamValue, ContractError> {
     let value_str = match param_value {
