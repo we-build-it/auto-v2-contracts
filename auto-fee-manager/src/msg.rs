@@ -55,6 +55,8 @@ pub enum QueryMsg {
     HasExceededDebtLimit { user: Addr },
     #[returns(UserBalancesResponse)]
     GetUserBalances { user: Addr },
+    #[returns(CreatorFeesResponse)]
+    GetCreatorFees { creator: Addr },
 }
 
 #[cw_serde]
@@ -91,4 +93,16 @@ pub struct Fee {
 pub enum FeeType {
     Execution,
     Creator,
+}
+
+#[cw_serde]
+pub struct CreatorFeesResponse {
+    pub creator: Addr,
+    pub fees: Vec<CreatorFeeBalance>,
+}
+
+#[cw_serde]
+pub struct CreatorFeeBalance {
+    pub denom: String,
+    pub balance: Uint128,
 }

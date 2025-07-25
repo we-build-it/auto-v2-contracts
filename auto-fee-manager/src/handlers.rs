@@ -644,3 +644,30 @@ pub fn get_user_balances(deps: Deps, user: Addr) -> StdResult<crate::msg::UserBa
         balances,
     })
 }
+
+pub fn get_creator_fees(deps: Deps, creator: Addr) -> StdResult<crate::msg::CreatorFeesResponse> {
+    // Get accepted denoms to know which balances to check
+    let accepted_denoms = ACCEPTED_DENOMS.load(deps.storage)?;
+    
+    let mut fees = Vec::new();
+    
+    // Get creator fees for each accepted denom
+    for denom in accepted_denoms {
+        let balance = CREATOR_FEES
+            .may_load(deps.storage, (&creator, denom.as_str()))?
+            .unwrap_or(Uint128::zero());
+        
+        // Only include denoms with non-zero balance
+        if balance > Uint128::zero() {
+            fees.push(crate::msg::CreatorFeeBalance {
+                denom,
+                balance,
+            });
+        }
+    }
+    
+    Ok(crate::msg::CreatorFeesResponse {
+        creator,
+        fees,
+    })
+}

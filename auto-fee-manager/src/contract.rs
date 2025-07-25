@@ -102,6 +102,10 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             let result = get_user_balances(deps, user)?;
             cosmwasm_std::to_json_binary(&result)
         }
+        QueryMsg::GetCreatorFees { creator } => {
+            let result = get_creator_fees(deps, creator)?;
+            cosmwasm_std::to_json_binary(&result)
+        }
     }
 }
 

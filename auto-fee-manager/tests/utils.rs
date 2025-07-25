@@ -69,6 +69,30 @@ pub fn create_test_user_fees(user: Addr) -> UserFees {
     }
 }
 
+/// Create a test UserFees struct with specific creator and denom
+pub fn create_test_user_fees_with_creator(
+    user: Addr,
+    creator: Addr,
+    denom: String,
+    amount: Uint128,
+) -> UserFees {
+    UserFees {
+        user,
+        fees: vec![
+            Fee {
+                workflow_instance_id: "test-instance-1".to_string(),
+                action_id: "test-action-1".to_string(),
+                description: "Test creator fee".to_string(),
+                timestamp: 1234567890,
+                amount,
+                denom,
+                fee_type: FeeType::Creator,
+                creator_address: Some(creator),
+            },
+        ],
+    }
+}
+
 /// Execute ChargeFeesFromUserBalance
 pub fn execute_charge_fees_from_user_balance(
     deps: DepsMut,
