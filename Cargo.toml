@@ -1,5 +1,5 @@
 [workspace]
-members = ["workflow-manager", "fee-collector"]
+members = ["workflow-manager", "auto-fee-manager"]
 
 # Resolver has to be set explicitely in workspaces, see https://github.com/rust-lang/cargo/issues/9956
 resolver = "2"
