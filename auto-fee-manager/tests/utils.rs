@@ -9,6 +9,8 @@ use auto_fee_manager::{
     ContractError,
 };
 
+use std::collections::HashMap;
+
 /// Initialize the contract with the given parameters
 pub fn instantiate_contract(
     deps: DepsMut,
@@ -16,20 +18,22 @@ pub fn instantiate_contract(
     admin: Addr,
     max_debt: Coin,
     min_balance_threshold: Coin,
-    gas_destination_address: Addr,
-    infra_destination_address: Addr,
+    execution_fees_destination_address: Addr,
+    distribution_fees_destination_address: Addr,
     accepted_denoms: Vec<String>,
     crank_authorized_address: Addr,
     workflow_manager_address: Addr,
+    creator_distribution_fee: Uint128,
 ) -> Result<Response, ContractError> {
-    let instantiate_msg = InstantiateMsg {
+    let instantiate_msg = auto_fee_manager::msg::InstantiateMsg {
         max_debt,
         min_balance_threshold,
-        gas_destination_address,
-        infra_destination_address,
+        execution_fees_destination_address,
+        distribution_fees_destination_address,
         accepted_denoms,
         crank_authorized_address,
         workflow_manager_address,
+        creator_distribution_fee,
     };
     let instantiate_info = message_info(&admin, &[]);
     instantiate(deps, env, instantiate_info, instantiate_msg)
@@ -83,13 +87,20 @@ pub fn execute_charge_fees_from_message_coins(
     env: Env,
     sender: Addr,
     fees: Vec<Fee>,
-    creator_address: Addr,
 ) -> Result<Response, ContractError> {
+    // Calculate expected funds from fees
+    let mut expected_funds: Vec<Coin> = Vec::new();
+    let mut by_denom: HashMap<String, Uint128> = HashMap::new();
+    for fee in &fees {
+        *by_denom.entry(fee.denom.clone()).or_insert(Uint128::zero()) += fee.amount;
+    }
+    for (denom, amount) in by_denom {
+        expected_funds.push(Coin { denom, amount });
+    }
     let execute_msg = ExecuteMsg::ChargeFeesFromMessageCoins {
         fees,
-        creator_address,
     };
-    let execute_info = message_info(&sender, &[]);
+    let execute_info = message_info(&sender, &expected_funds);
     execute(deps, env, execute_info, execute_msg)
 }
 
@@ -133,4 +144,43 @@ pub fn sudo_set_workflow_manager_address(
 ) -> Result<Response, ContractError> {
     let sudo_msg = SudoMsg::SetWorkflowManagerAddress { address };
     sudo(deps, env, sudo_msg)
+}
+
+/// Execute SetExecutionFeesDestinationAddress sudo
+pub fn sudo_set_execution_fees_destination_address(
+    deps: DepsMut,
+    env: Env,
+    address: Addr,
+) -> Result<Response, ContractError> {
+    let sudo_msg = SudoMsg::SetExecutionFeesDestinationAddress { address };
+    sudo(deps, env, sudo_msg)
+}
+
+/// Execute SetDistributionFeesDestinationAddress sudo
+pub fn sudo_set_distribution_fees_destination_address(
+    deps: DepsMut,
+    env: Env,
+    address: Addr,
+) -> Result<Response, ContractError> {
+    let sudo_msg = SudoMsg::SetDistributionFeesDestinationAddress { address };
+    sudo(deps, env, sudo_msg)
+}
+
+pub fn sudo_set_creator_distribution_fee(
+    deps: DepsMut,
+    env: Env,
+    admin: Addr,
+    fee: Uint128,
+) -> Result<Response, ContractError> {
+    let sudo_msg = auto_fee_manager::msg::SudoMsg::SetCreatorDistributionFee { fee };
+    sudo(deps, env, sudo_msg)
+}
+
+pub fn execute_claim_creator_fees(
+    deps: DepsMut,
+    env: Env,
+    sender: Addr,
+) -> Result<Response, ContractError> {
+    let info = message_info(&sender, &[]);
+    auto_fee_manager::handlers::handle_claim_creator_fees(deps, info)
 } 

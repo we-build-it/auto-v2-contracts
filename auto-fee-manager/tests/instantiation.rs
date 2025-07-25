@@ -15,8 +15,7 @@ fn test_instantiate_with_valid_parameters() {
 
     // Setup contract with parameters
     let admin_address = api.addr_make("admin");
-    let gas_destination_address = api.addr_make("gas_destination");
-    let infra_destination_address = api.addr_make("infra_destination");
+    let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
     
@@ -28,20 +27,21 @@ fn test_instantiate_with_valid_parameters() {
         denom: "uusdc".to_string(),
         amount: Uint128::from(100u128),
     };
-    let accepted_denoms = vec!["uusdc".to_string(), "uatom".to_string()];
+    let accepted_denoms = vec!["uusdc".to_string()];
     
-    // Initialize contract using utils function
+    let distribution_fees_destination_address = api.addr_make("distribution_destination");
     let response = instantiate_contract(
         deps.as_mut(),
         env.clone(),
-        admin_address.clone(),
-        max_debt.clone(),
-        min_balance_threshold.clone(),
-        gas_destination_address.clone(),
-        infra_destination_address.clone(),
-        accepted_denoms.clone(),
-        crank_authorized_address.clone(),
-        workflow_manager_address.clone(),
+        admin_address,
+        max_debt,
+        min_balance_threshold,
+        execution_fees_destination_address,
+        distribution_fees_destination_address,
+        accepted_denoms,
+        crank_authorized_address,
+        workflow_manager_address,
+        Uint128::from(5u128), // 5% distribution fee
     ).unwrap();
 
     // Verify response attributes
@@ -56,8 +56,7 @@ fn test_instantiate_with_zero_max_debt_succeeds() {
 
     // Setup contract with parameters
     let admin_address = api.addr_make("admin");
-    let gas_destination_address = api.addr_make("gas_destination");
-    let infra_destination_address = api.addr_make("infra_destination");
+    let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
     
@@ -71,6 +70,7 @@ fn test_instantiate_with_zero_max_debt_succeeds() {
     };
     let accepted_denoms = vec!["uusdc".to_string()];
     
+    let distribution_fees_destination_address = api.addr_make("distribution_destination");
     // Initialize contract using utils function
     let result = instantiate_contract(
         deps.as_mut(),
@@ -78,11 +78,12 @@ fn test_instantiate_with_zero_max_debt_succeeds() {
         admin_address,
         max_debt,
         min_balance_threshold,
-        gas_destination_address,
-        infra_destination_address,
+        execution_fees_destination_address,
+        distribution_fees_destination_address,
         accepted_denoms,
         crank_authorized_address,
         workflow_manager_address,
+        Uint128::from(5u128), // 5% distribution fee
     );
     
     // Verify that the operation succeeds
@@ -97,8 +98,7 @@ fn test_instantiate_with_empty_crank_authorized_address_fails() {
 
     // Setup contract with parameters
     let admin_address = api.addr_make("admin");
-    let gas_destination_address = api.addr_make("gas_destination");
-    let infra_destination_address = api.addr_make("infra_destination");
+    let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = Addr::unchecked(""); // Empty address
     let workflow_manager_address = api.addr_make("workflow_manager");
     
@@ -112,6 +112,7 @@ fn test_instantiate_with_empty_crank_authorized_address_fails() {
     };
     let accepted_denoms = vec!["uusdc".to_string()];
     
+    let distribution_fees_destination_address = api.addr_make("distribution_destination");
     // Initialize contract using utils function
     let result = instantiate_contract(
         deps.as_mut(),
@@ -119,11 +120,12 @@ fn test_instantiate_with_empty_crank_authorized_address_fails() {
         admin_address.clone(),
         max_debt.clone(),
         min_balance_threshold.clone(),
-        gas_destination_address.clone(),
-        infra_destination_address.clone(),
+        execution_fees_destination_address.clone(),
+        distribution_fees_destination_address,
         accepted_denoms.clone(),
         crank_authorized_address,
         workflow_manager_address.clone(),
+        Uint128::from(5u128), // 5% distribution fee
     );
 
     // Verify that the operation fails
@@ -146,8 +148,7 @@ fn test_instantiate_with_empty_workflow_manager_address_fails() {
 
     // Setup contract with parameters
     let admin_address = api.addr_make("admin");
-    let gas_destination_address = api.addr_make("gas_destination");
-    let infra_destination_address = api.addr_make("infra_destination");
+    let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = Addr::unchecked(""); // Empty address
     
@@ -161,6 +162,7 @@ fn test_instantiate_with_empty_workflow_manager_address_fails() {
     };
     let accepted_denoms = vec!["uusdc".to_string()];
     
+    let distribution_fees_destination_address = api.addr_make("distribution_destination");
     // Initialize contract using utils function
     let result = instantiate_contract(
         deps.as_mut(),
@@ -168,11 +170,12 @@ fn test_instantiate_with_empty_workflow_manager_address_fails() {
         admin_address.clone(),
         max_debt.clone(),
         min_balance_threshold.clone(),
-        gas_destination_address.clone(),
-        infra_destination_address.clone(),
+        execution_fees_destination_address.clone(),
+        distribution_fees_destination_address,
         accepted_denoms.clone(),
         crank_authorized_address,
         workflow_manager_address,
+        Uint128::from(5u128), // 5% distribution fee
     );
 
     // Verify that the operation fails

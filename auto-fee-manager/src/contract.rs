@@ -32,11 +32,11 @@ pub fn instantiate(
         });
     }
 
-    // Validate gas_destination_address is not empty and is a valid address
-    validate_address(&deps, &msg.gas_destination_address.as_str(), "gas_destination_address")?;
+    // Validate execution_fees_destination_address is not empty and is a valid address
+    validate_address(&deps, &msg.execution_fees_destination_address.as_str(), "execution_fees_destination_address")?;
 
-    // Validate infra_destination_address is not empty and is a valid address
-    validate_address(&deps, &msg.infra_destination_address.as_str(), "infra_destination_address")?;
+    // Validate distribution_fees_destination_address is not empty and is a valid address
+    validate_address(&deps, &msg.distribution_fees_destination_address.as_str(), "distribution_fees_destination_address")?;
 
     // Validate authorized_address is not empty and is a valid address
     validate_address(&deps, &msg.crank_authorized_address.as_str(), "authorized_address")?;
@@ -55,10 +55,11 @@ pub fn instantiate(
     let config = Config {
         max_debt: msg.max_debt,
         min_balance_threshold: msg.min_balance_threshold,
-        gas_destination_address: msg.gas_destination_address,
-        infra_destination_address: msg.infra_destination_address,
+        execution_fees_destination_address: msg.execution_fees_destination_address,
+        distribution_fees_destination_address: msg.distribution_fees_destination_address,
         crank_authorized_address: msg.crank_authorized_address,
         workflow_manager_address: msg.workflow_manager_address,
+        creator_distribution_fee: msg.creator_distribution_fee,
     };
     CONFIG.save(deps.storage, &config)?;
     Ok(Response::new())
@@ -79,8 +80,7 @@ pub fn execute(
         }
         ExecuteMsg::ChargeFeesFromMessageCoins {
             fees,
-            creator_address,
-        } => handle_charge_fees_from_message_coins(deps, env, info, fees, creator_address),
+        } => handle_charge_fees_from_message_coins(deps, env, info, fees),
         ExecuteMsg::ClaimCreatorFees {} => handle_claim_creator_fees(deps, info),
         ExecuteMsg::DistributeNonCreatorFees {} => {
             handle_distribute_non_creator_fees(deps, env, info)
@@ -98,49 +98,49 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             let result = has_exceeded_debt_limit(deps, user)?;
             cosmwasm_std::to_json_binary(&result)
         }
+        QueryMsg::GetUserBalances { user } => {
+            let result = get_user_balances(deps, user)?;
+            cosmwasm_std::to_json_binary(&result)
+        }
     }
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn sudo(deps: DepsMut, _env: Env, msg: SudoMsg) -> Result<Response, ContractError> {
     match msg {
-        SudoMsg::SetMaxDebt { denom: _, amount: _ } => {
-            // TODO: Implement SetMaxDebt logic
-            Ok(Response::new())
-        }
-        SudoMsg::SetReceiverAddress { fee_type: _, address: _ } => {
-            // TODO: Implement SetReceiverAddress logic
-            Ok(Response::new())
-        }
         SudoMsg::SetCrankAuthorizedAddress { address } => {
-            // Validate address is not empty
             validate_address(&deps, &address.as_str(), "authorized_address")?;
-            
-            // Load current config
             let mut config = CONFIG.load(deps.storage)?;
-            
-            // Update authorized_address
             config.crank_authorized_address = address;
-            
-            // Save updated config
             CONFIG.save(deps.storage, &config)?;
-            
-            Ok(Response::new())
+            Ok(Response::new().add_attribute("method", "sudo_set_crank_authorized_address"))
         }
         SudoMsg::SetWorkflowManagerAddress { address } => {
-            // Validate address is not empty
             validate_address(&deps, &address.as_str(), "workflow_manager_address")?;
-            
-            // Load current config
             let mut config = CONFIG.load(deps.storage)?;
-            
-            // Update workflow_manager_address
             config.workflow_manager_address = address;
-            
-            // Save updated config
             CONFIG.save(deps.storage, &config)?;
-            
-            Ok(Response::new())
+            Ok(Response::new().add_attribute("method", "sudo_set_workflow_manager_address"))
+        }
+        SudoMsg::SetExecutionFeesDestinationAddress { address } => {
+            validate_address(&deps, &address.as_str(), "execution_fees_destination_address")?;
+            let mut config = CONFIG.load(deps.storage)?;
+            config.execution_fees_destination_address = address;
+            CONFIG.save(deps.storage, &config)?;
+            Ok(Response::new().add_attribute("method", "sudo_set_execution_fees_destination_address"))
+        }
+        SudoMsg::SetDistributionFeesDestinationAddress { address } => {
+            validate_address(&deps, &address.as_str(), "distribution_fees_destination_address")?;
+            let mut config = CONFIG.load(deps.storage)?;
+            config.distribution_fees_destination_address = address;
+            CONFIG.save(deps.storage, &config)?;
+            Ok(Response::new().add_attribute("method", "sudo_set_distribution_fees_destination_address"))
+        }
+        SudoMsg::SetCreatorDistributionFee { fee } => {
+            let mut config = CONFIG.load(deps.storage)?;
+            config.creator_distribution_fee = fee;
+            CONFIG.save(deps.storage, &config)?;
+            Ok(Response::new().add_attribute("method", "sudo_set_creator_distribution_fee"))
         }
     }
 }

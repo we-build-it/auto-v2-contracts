@@ -24,6 +24,21 @@ pub enum ContractError {
     #[error("Invalid creator address: {reason}")]
     InvalidCreatorAddress { reason: String },
 
+    #[error("Invalid fee type: {reason}")]
+    InvalidFeeType { reason: String },
+
+    #[error("Invalid payment: {reason}")]
+    InvalidPayment { reason: String },
+
+    #[error("No creator fees available to claim")]
+    NoCreatorFeesToClaim {},
+
+    #[error("No execution fees available to distribute")]
+    NoExecutionFeesToDistribute {},
+
+    #[error("No creator fees available to distribute")]
+    NoCreatorFeesToDistribute {},
+
     #[error("Invalid max_debt: {reason}")]
     InvalidMaxDebt { reason: String },
 
