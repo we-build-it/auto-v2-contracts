@@ -3,7 +3,35 @@ use std::collections::{HashMap, HashSet};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Timestamp};
 
-use crate::state::{Action, ActionParamValue, ExecutionType, Workflow, WorkflowInstance, WorkflowVisibility};
+#[cw_serde]
+pub enum WorkflowVisibility {
+    Public,
+    Private,
+}
+
+#[cw_serde]
+pub enum ActionParamValue {
+    String(String),
+    BigInt(String), // Using String to represent BigInt for CosmWasm compatibility
+}
+
+#[cw_serde]
+pub enum ExecutionType {
+    OneShot,
+    Recurrent,
+}
+
+#[cw_serde]
+pub enum WorkflowState {
+    Approved,
+    Pending,
+}
+
+#[cw_serde]
+pub enum WorkflowInstanceState {
+    Running,
+    Paused,
+}
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -12,18 +40,36 @@ pub struct InstantiateMsg {
 }
 
 #[cw_serde]
-pub struct NewWorkflowMsg {
-    pub id: String,
-    pub start_action: String,
-    pub visibility: WorkflowVisibility,
-    // action_name -> action
-    pub actions: HashMap<String, Action>,
+pub enum ActionType {
+    StakedTokenClaimer,
+    TokenStaker,
 }
 
+pub type WorkflowId = String;
+pub type ActionId = String;
+pub type InstanceId = u64;
+pub type ParamId = String;
+
+#[cw_serde]
+pub struct ActionMsg {
+    pub action_type: ActionType,
+    pub params: HashMap<ParamId, ActionParamValue>,
+    pub next_actions: HashSet<ActionId>,
+    pub final_state: bool,
+}
+#[cw_serde]
+pub struct NewWorkflowMsg {
+    pub id: WorkflowId,
+    pub start_action: ActionId,
+    pub visibility: WorkflowVisibility,
+    // action_name -> action
+    pub actions: HashMap<ActionId, ActionMsg>,
+}
+  
 #[cw_serde]
 pub struct NewInstanceMsg {
-    pub workflow_id: String,
-    pub onchain_parameters: HashMap<String, ActionParamValue>,
+    pub workflow_id: WorkflowId,
+    pub onchain_parameters: HashMap<ParamId, ActionParamValue>,
     pub execution_type: ExecutionType,
     pub expiration_time: Timestamp,
 }
@@ -37,35 +83,53 @@ pub enum ExecuteMsg {
         instance: NewInstanceMsg,
     },
     CancelInstance {
-        instance_id: u64,
+        instance_id: InstanceId,
     },
     PauselInstance {
-        instance_id: u64,
+        instance_id: InstanceId,
     },
     ResumeInstance {
-        instance_id: u64,
+        instance_id: InstanceId,
     },
     ExecuteAction {
         user_address: String,
-        instance_id: u64,
-        action_id: String,
-        params: Option<HashMap<String, String>>
+        instance_id: InstanceId,
+        action_id: ActionId,
+        params: Option<HashMap<ParamId, ActionParamValue>>
     },
 }
 
 #[cw_serde]
-pub struct GetInstancesResponse {
-    pub flows: Vec<WorkflowInstance>,
+pub struct WorkflowResponse {
+    #[serde(flatten)]
+    pub base: NewWorkflowMsg,
+    pub publisher: Addr,
+    pub state: WorkflowState,
 }
 
 #[cw_serde]
 pub struct GetWorkflowResponse {
-    pub template: Workflow,
+    pub workflow: WorkflowResponse,
+}
+
+#[cw_serde]
+pub struct WorkflowInstanceResponse {
+    #[serde(flatten)]
+    pub base: NewInstanceMsg,
+    pub id: InstanceId,
+    pub state: WorkflowInstanceState,
+    pub requester: Addr,
+    pub last_executed_action: Option<String>,
+}
+
+#[cw_serde]
+pub struct GetInstancesResponse {
+    pub instances: Vec<WorkflowInstanceResponse>,
 }
 
 #[cw_serde]
 pub struct GetWorkflowInstanceResponse {
-    pub instance: WorkflowInstance,
+    pub instance: WorkflowInstanceResponse,
 }
 
 #[cw_serde]
