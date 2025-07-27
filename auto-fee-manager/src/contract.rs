@@ -6,7 +6,7 @@ use cw2::set_contract_version;
 use crate::error::ContractError;
 use crate::handlers::*;
 use crate::helpers::validate_address;
-use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, SudoMsg};
+use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, SudoMsg, MigrateMsg};
 use crate::state::{ACCEPTED_DENOMS, CONFIG, Config};
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -88,6 +88,12 @@ pub fn execute(
         ExecuteMsg::DistributeCreatorFees {} => {
             handle_distribute_creator_fees(deps, env, info)
         }
+        ExecuteMsg::EnableCreatorFeeDistribution {} => {
+            handle_enable_creator_fee_distribution(deps, info)
+        }
+        ExecuteMsg::DisableCreatorFeeDistribution {} => {
+            handle_disable_creator_fee_distribution(deps, info)
+        }
     }
 }
 
@@ -104,6 +110,18 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         }
         QueryMsg::GetCreatorFees { creator } => {
             let result = get_creator_fees(deps, creator)?;
+            cosmwasm_std::to_json_binary(&result)
+        }
+        QueryMsg::GetNonCreatorFees {} => {
+            let result = get_non_creator_fees(deps)?;
+            cosmwasm_std::to_json_binary(&result)
+        }
+        QueryMsg::IsCreatorSubscribed { creator } => {
+            let result = is_creator_subscribed(deps, creator)?;
+            cosmwasm_std::to_json_binary(&result)
+        }
+        QueryMsg::GetSubscribedCreators {} => {
+            let result = get_subscribed_creators(deps)?;
             cosmwasm_std::to_json_binary(&result)
         }
     }
@@ -147,4 +165,15 @@ pub fn sudo(deps: DepsMut, _env: Env, msg: SudoMsg) -> Result<Response, Contract
             Ok(Response::new().add_attribute("method", "sudo_set_creator_distribution_fee"))
         }
     }
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    // Update contract version
+    set_contract_version(deps.storage, crate::CONTRACT_NAME, crate::CONTRACT_VERSION)?;
+    
+    // No migration logic needed for this version
+    Ok(Response::new()
+        .add_attribute("method", "migrate")
+        .add_attribute("version", crate::CONTRACT_VERSION))
 }

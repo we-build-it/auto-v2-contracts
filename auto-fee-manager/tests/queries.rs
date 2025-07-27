@@ -6,6 +6,7 @@ mod utils;
 use utils::{
     instantiate_contract, execute_charge_fees_from_user_balance, create_test_user_fees_with_creator
 };
+use auto_fee_manager::msg::{UserFees, Fee, FeeType};
 
 #[test]
 fn test_get_creator_fees_with_balance() {
@@ -274,4 +275,102 @@ fn test_has_exceeded_debt_limit() {
     let result = auto_fee_manager::contract::query(deps.as_ref(), env, query_msg).unwrap();
     let has_exceeded: bool = cosmwasm_std::from_json(result).unwrap();
     assert_eq!(has_exceeded, true);
+}
+
+#[test]
+fn test_get_non_creator_fees() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api;
+
+    // Setup contract
+    let admin_address = api.addr_make("admin");
+    let execution_fees_destination_address = api.addr_make("execution_destination");
+    let crank_authorized_address = api.addr_make("crank_authorized");
+    let workflow_manager_address = api.addr_make("workflow_manager");
+    
+    let max_debt = Coin {
+        denom: "tcy".to_string(),
+        amount: Uint128::from(1000u128),
+    };
+    let min_balance_threshold = Coin {
+        denom: "tcy".to_string(),
+        amount: Uint128::from(100u128),
+    };
+    let accepted_denoms = vec!["tcy".to_string()];
+    
+    let distribution_fees_destination_address = api.addr_make("distribution_destination");
+    instantiate_contract(
+        deps.as_mut(),
+        env.clone(),
+        admin_address,
+        max_debt,
+        min_balance_threshold,
+        execution_fees_destination_address,
+        distribution_fees_destination_address,
+        accepted_denoms,
+        crank_authorized_address.clone(),
+        workflow_manager_address,
+        Uint128::from(5u128), // 5% distribution fee
+    ).unwrap();
+
+    // Query non-creator fees when there are no fees
+    let query_msg = auto_fee_manager::msg::QueryMsg::GetNonCreatorFees {};
+    let result = auto_fee_manager::contract::query(deps.as_ref(), env.clone(), query_msg).unwrap();
+    let response: auto_fee_manager::msg::NonCreatorFeesResponse = cosmwasm_std::from_json(result).unwrap();
+
+    // Verify response - should have no fees initially
+    assert_eq!(response.execution_fees.len(), 0);
+    assert_eq!(response.distribution_fees.len(), 0);
+
+    // Create a user and give them some balance
+    let user_address = api.addr_make("user");
+    let deposit_funds = vec![Coin {
+        denom: "tcy".to_string(),
+        amount: Uint128::from(1000u128),
+    }];
+    let deposit_info = cosmwasm_std::testing::message_info(&user_address, &deposit_funds);
+    auto_fee_manager::contract::execute(
+        deps.as_mut(),
+        env.clone(),
+        deposit_info,
+        auto_fee_manager::msg::ExecuteMsg::Deposit {},
+    ).unwrap();
+
+    // Create test fees with Execution type to generate execution fees
+    let creator_address = api.addr_make("creator");
+    let test_fees = UserFees {
+        user: user_address.clone(),
+        fees: vec![
+            Fee {
+                workflow_instance_id: "test-instance-1".to_string(),
+                action_id: "test-action-1".to_string(),
+                description: "Test execution fee".to_string(),
+                timestamp: 1234567890,
+                amount: Uint128::from(100u128),
+                denom: "tcy".to_string(),
+                fee_type: FeeType::Execution,
+                creator_address: None,
+            },
+        ],
+    };
+
+    // Charge fees from user balance to generate execution fees
+    execute_charge_fees_from_user_balance(
+        deps.as_mut(),
+        env.clone(),
+        crank_authorized_address.clone(),
+        vec![test_fees],
+    ).unwrap();
+
+    // Query non-creator fees again
+    let query_msg = auto_fee_manager::msg::QueryMsg::GetNonCreatorFees {};
+    let result = auto_fee_manager::contract::query(deps.as_ref(), env, query_msg).unwrap();
+    let response: auto_fee_manager::msg::NonCreatorFeesResponse = cosmwasm_std::from_json(result).unwrap();
+
+    // Verify response - should have execution fees now
+    assert_eq!(response.execution_fees.len(), 1);
+    assert_eq!(response.execution_fees[0].denom, "tcy");
+    assert!(response.execution_fees[0].balance > Uint128::zero());
+    assert_eq!(response.distribution_fees.len(), 0); // No distribution fees yet
 } 

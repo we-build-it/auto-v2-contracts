@@ -101,6 +101,18 @@ fn test_distribute_creator_fees_success() {
     let creator1 = api.addr_make("creator1");
     let creator2 = api.addr_make("creator2");
     
+    // Subscribe creators to fee distribution
+    auto_fee_manager::state::SUBSCRIBED_CREATORS.save(
+        deps.as_mut().storage, 
+        &creator1, 
+        &true
+    ).unwrap();
+    auto_fee_manager::state::SUBSCRIBED_CREATORS.save(
+        deps.as_mut().storage, 
+        &creator2, 
+        &true
+    ).unwrap();
+    
     auto_fee_manager::state::CREATOR_FEES.save(
         deps.as_mut().storage, 
         (&creator1, "uusdc"), 

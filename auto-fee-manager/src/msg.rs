@@ -37,6 +37,8 @@ pub enum ExecuteMsg {
     ClaimCreatorFees {},
     DistributeCreatorFees {},
     DistributeNonCreatorFees {},
+    EnableCreatorFeeDistribution {},
+    DisableCreatorFeeDistribution {},
 }
 
 #[cw_serde]
@@ -57,6 +59,12 @@ pub enum QueryMsg {
     GetUserBalances { user: Addr },
     #[returns(CreatorFeesResponse)]
     GetCreatorFees { creator: Addr },
+    #[returns(NonCreatorFeesResponse)]
+    GetNonCreatorFees {},
+    #[returns(bool)]
+    IsCreatorSubscribed { creator: Addr },
+    #[returns(SubscribedCreatorsResponse)]
+    GetSubscribedCreators {},
 }
 
 #[cw_serde]
@@ -96,6 +104,11 @@ pub enum FeeType {
 }
 
 #[cw_serde]
+pub struct MigrateMsg {
+    // Empty for now, can be extended in future migrations
+}
+
+#[cw_serde]
 pub struct CreatorFeesResponse {
     pub creator: Addr,
     pub fees: Vec<CreatorFeeBalance>,
@@ -105,4 +118,21 @@ pub struct CreatorFeesResponse {
 pub struct CreatorFeeBalance {
     pub denom: String,
     pub balance: Uint128,
+}
+
+#[cw_serde]
+pub struct NonCreatorFeesResponse {
+    pub execution_fees: Vec<FeeBalance>,
+    pub distribution_fees: Vec<FeeBalance>,
+}
+
+#[cw_serde]
+pub struct FeeBalance {
+    pub denom: String,
+    pub balance: Uint128,
+}
+
+#[cw_serde]
+pub struct SubscribedCreatorsResponse {
+    pub creators: Vec<Addr>,
 }

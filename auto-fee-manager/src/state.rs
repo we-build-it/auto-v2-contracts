@@ -29,3 +29,6 @@ pub const DISTRIBUTION_FEES: Map<&str, Uint128> = Map::new("distribution_fees");
 
 // Defines which tokens are accepted for deposits
 pub const ACCEPTED_DENOMS: Item<Vec<String>> = Item::new("accepted_denoms");
+
+// creator address → subscription status for fee distribution
+pub const SUBSCRIBED_CREATORS: Map<&Addr, bool> = Map::new("subscribed_creators");

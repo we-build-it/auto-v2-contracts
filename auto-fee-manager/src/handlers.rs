@@ -3,6 +3,7 @@ use crate::helpers::{verify_authorization, verify_workflow_manager};
 use crate::msg::{Fee, FeeType};
 use crate::state::{
     CONFIG, USER_BALANCES, CREATOR_FEES, EXECUTION_FEES, DISTRIBUTION_FEES, ACCEPTED_DENOMS,
+    SUBSCRIBED_CREATORS,
 };
 use crate::{error::ContractError, msg::UserFees};
 use cosmwasm_std::{
@@ -507,52 +508,79 @@ pub fn handle_distribute_creator_fees(
     // Get config to know destination address and distribution fee
     let config = CONFIG.load(deps.storage)?;
     
-    // Get all creator fees
-    let mut total_distributed = Vec::new();
-    let mut bank_messages = Vec::new();
-    let mut distribution_fees_accum = std::collections::HashMap::new();
-    
-    // Iterate through all creator fees
-    let creator_fees_iter = CREATOR_FEES
+    // Get all subscribed creators first
+    let subscribed_creators: Vec<Addr> = SUBSCRIBED_CREATORS
         .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
         .filter_map(|result| {
-            result.ok().and_then(|((creator, denom), amount)| {
-                if amount > Uint128::zero() {
-                    Some((creator, denom.to_string(), amount))
+            result.ok().and_then(|(creator, is_subscribed)| {
+                if is_subscribed {
+                    Some(creator)
                 } else {
                     None
                 }
             })
-        });
+        })
+        .collect();
     
-    // Process all creator fees
-    for (creator, denom, amount) in creator_fees_iter {
-        // Calculate distribution fee (creator_distribution_fee is in basis points, e.g., 5 = 0.05%)
-        let distribution_fee = amount
-            .checked_mul(config.creator_distribution_fee)
-            .map_err(|_| ContractError::Std(cosmwasm_std::StdError::generic_err("Overflow")))?
-            .checked_div(Uint128::from(100u128))
-            .map_err(|_| ContractError::Std(cosmwasm_std::StdError::generic_err("Divide by zero")))?;
+    // If no creators are subscribed, return error
+    if subscribed_creators.is_empty() {
+        return Err(ContractError::NoCreatorFeesToDistribute {});
+    }
+    
+    let mut total_distributed = Vec::new();
+    let mut bank_messages = Vec::new();
+    let mut distribution_fees_accum = std::collections::HashMap::new();
+    let mut creators_to_remove = Vec::new();
+    
+    // Process fees only for subscribed creators
+    for creator in subscribed_creators {
+        // Get all fees for this creator
+        let creator_fees: Vec<(String, Uint128)> = CREATOR_FEES
+            .prefix(&creator)
+            .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
+            .filter_map(|result| {
+                result.ok().and_then(|(denom, amount)| {
+                    if amount > Uint128::zero() {
+                        Some((denom.to_string(), amount))
+                    } else {
+                        None
+                    }
+                })
+            })
+            .collect();
         
-        // Calculate amount to send to creator (total - distribution fee)
-        let amount_to_creator = amount
-            .checked_sub(distribution_fee)
-            .map_err(|_| ContractError::Std(cosmwasm_std::StdError::generic_err("Overflow")))?;
-        
-        // Accumulate distribution fees
-        *distribution_fees_accum.entry(denom.clone()).or_insert(Uint128::zero()) += distribution_fee;
-        
-        // Create bank message to send to creator
-        if amount_to_creator > Uint128::zero() {
-            total_distributed.push(Coin {
-                denom: denom.clone(),
-                amount: amount_to_creator,
-            });
+        // Process each denom for this creator
+        for (denom, amount) in creator_fees {
+            // Calculate distribution fee (creator_distribution_fee is in basis points, e.g., 5 = 0.05%)
+            let distribution_fee = amount
+                .checked_mul(config.creator_distribution_fee)
+                .map_err(|_| ContractError::Std(cosmwasm_std::StdError::generic_err("Overflow")))?
+                .checked_div(Uint128::from(100u128))
+                .map_err(|_| ContractError::Std(cosmwasm_std::StdError::generic_err("Divide by zero")))?;
             
-            bank_messages.push(BankMsg::Send {
-                to_address: creator.to_string(),
-                amount: vec![Coin { denom, amount: amount_to_creator }],
-            });
+            // Calculate amount to send to creator (total - distribution fee)
+            let amount_to_creator = amount
+                .checked_sub(distribution_fee)
+                .map_err(|_| ContractError::Std(cosmwasm_std::StdError::generic_err("Overflow")))?;
+            
+            // Accumulate distribution fees
+            *distribution_fees_accum.entry(denom.clone()).or_insert(Uint128::zero()) += distribution_fee;
+            
+            // Create bank message to send to creator
+            if amount_to_creator > Uint128::zero() {
+                total_distributed.push(Coin {
+                    denom: denom.clone(),
+                    amount: amount_to_creator,
+                });
+                
+                bank_messages.push(BankMsg::Send {
+                    to_address: creator.to_string(),
+                    amount: vec![Coin { denom: denom.clone(), amount: amount_to_creator }],
+                });
+                
+                // Mark this creator's fees for removal
+                creators_to_remove.push((creator.clone(), denom));
+            }
         }
     }
     
@@ -570,21 +598,8 @@ pub fn handle_distribute_creator_fees(
         DISTRIBUTION_FEES.save(deps.storage, denom.as_str(), &new_total)?;
     }
     
-    // Clear all creator fees - collect keys first to avoid borrow issues
-    let keys_to_remove: Vec<_> = CREATOR_FEES
-        .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
-        .filter_map(|result| {
-            result.ok().and_then(|((creator, denom), amount)| {
-                if amount > Uint128::zero() {
-                    Some((creator, denom.to_string()))
-                } else {
-                    None
-                }
-            })
-        })
-        .collect();
-    
-    for (creator, denom) in keys_to_remove {
+    // Clear only the creator fees that were distributed
+    for (creator, denom) in creators_to_remove {
         CREATOR_FEES.remove(deps.storage, (&creator, denom.as_str()));
     }
     
@@ -670,4 +685,110 @@ pub fn get_creator_fees(deps: Deps, creator: Addr) -> StdResult<crate::msg::Crea
         creator,
         fees,
     })
+}
+
+pub fn get_non_creator_fees(deps: Deps) -> StdResult<crate::msg::NonCreatorFeesResponse> {
+    // Get accepted denoms to know which balances to check
+    let accepted_denoms = ACCEPTED_DENOMS.load(deps.storage)?;
+    
+    let mut execution_fees = Vec::new();
+    let mut distribution_fees = Vec::new();
+    
+    // Get execution and distribution fees for each accepted denom
+    for denom in accepted_denoms {
+        // Check execution fees
+        let execution_balance = EXECUTION_FEES
+            .may_load(deps.storage, denom.as_str())?
+            .unwrap_or(Uint128::zero());
+        
+        if execution_balance > Uint128::zero() {
+            execution_fees.push(crate::msg::FeeBalance {
+                denom: denom.clone(),
+                balance: execution_balance,
+            });
+        }
+        
+        // Check distribution fees
+        let distribution_balance = DISTRIBUTION_FEES
+            .may_load(deps.storage, denom.as_str())?
+            .unwrap_or(Uint128::zero());
+        
+        if distribution_balance > Uint128::zero() {
+            distribution_fees.push(crate::msg::FeeBalance {
+                denom,
+                balance: distribution_balance,
+            });
+        }
+    }
+    
+    Ok(crate::msg::NonCreatorFeesResponse {
+        execution_fees,
+        distribution_fees,
+    })
+}
+
+pub fn handle_enable_creator_fee_distribution(
+    deps: DepsMut,
+    info: MessageInfo,
+) -> Result<Response, ContractError> {
+    // Only the creator can enable their own fee distribution
+    let creator = info.sender;
+    
+    // Set the creator as subscribed
+    SUBSCRIBED_CREATORS.save(deps.storage, &creator, &true)?;
+    
+    let response = Response::new()
+        .add_attribute("method", "enable_creator_fee_distribution")
+        .add_attribute("creator", creator.to_string());
+    
+    Ok(response)
+}
+
+pub fn handle_disable_creator_fee_distribution(
+    deps: DepsMut,
+    info: MessageInfo,
+) -> Result<Response, ContractError> {
+    // Only the creator can disable their own fee distribution
+    let creator = info.sender;
+    
+    // Set the creator as unsubscribed
+    SUBSCRIBED_CREATORS.save(deps.storage, &creator, &false)?;
+    
+    let response = Response::new()
+        .add_attribute("method", "disable_creator_fee_distribution")
+        .add_attribute("creator", creator.to_string());
+    
+    Ok(response)
+}
+
+pub fn is_creator_subscribed(deps: Deps, creator: Addr) -> StdResult<bool> {
+    // Check if the creator is subscribed to fee distribution
+    let is_subscribed = SUBSCRIBED_CREATORS
+        .may_load(deps.storage, &creator)?
+        .unwrap_or(false);
+    
+    Ok(is_subscribed)
+}
+
+pub fn get_subscribed_creators(deps: Deps) -> StdResult<crate::msg::SubscribedCreatorsResponse> {
+    let mut creators = Vec::new();
+    
+    // Iterate through all subscribed creators
+    let subscribed_creators_iter = SUBSCRIBED_CREATORS
+        .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
+        .filter_map(|result| {
+            result.ok().and_then(|(creator, is_subscribed)| {
+                if is_subscribed {
+                    Some(creator)
+                } else {
+                    None
+                }
+            })
+        });
+    
+    for creator in subscribed_creators_iter {
+        creators.push(creator);
+    }
+    
+    Ok(crate::msg::SubscribedCreatorsResponse { creators })
 }
