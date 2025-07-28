@@ -1,28 +1,61 @@
-use cosmwasm_std::{Deps, StdResult};
+use cosmwasm_std::{Addr, Deps, StdResult};
 use crate::{
-    msg::{GetInstancesResponse, GetWorkflowResponse, GetWorkflowInstanceResponse}, state::{get_workflow_instances_by_requester, load_workflow, load_workflow_instance},
+    msg::{ActionMsg, GetInstancesResponse, GetWorkflowInstanceResponse, GetWorkflowResponse, InstanceId, NewInstanceMsg, NewWorkflowMsg, WorkflowInstanceResponse, WorkflowResponse}, 
+    state::{load_workflow, load_workflow_action_params, load_workflow_actions, load_workflow_instance, load_workflow_instance_params, load_workflow_instances_by_requester, WorkflowInstance},
 };
+
+pub fn query_workflow_by_id(deps: Deps, template_id: String) -> StdResult<GetWorkflowResponse> {
+    let template = load_workflow(deps.storage, &template_id)?;
+    Ok(GetWorkflowResponse { workflow: WorkflowResponse {
+        base: NewWorkflowMsg {
+            id: template_id.clone(),
+            start_action: template.start_action,
+            visibility: template.visibility,
+            actions: load_workflow_actions(deps.storage, &template_id)?.iter().map(|(action_id, action)| (action_id.clone(), ActionMsg {
+                action_type: action.action_type.clone(),
+                params: load_workflow_action_params(deps.storage, &template_id, &action_id).unwrap_or_default(),
+                next_actions: action.next_actions.clone(),
+                final_state: action.final_state,
+            })).collect(),
+        },
+        publisher: template.publisher.clone(),
+        state: template.state,
+    } })
+}
 
 pub fn query_instances_by_requester(
     deps: Deps,
     requester_address: String,
 ) -> StdResult<GetInstancesResponse> {
     let requester = deps.api.addr_validate(&requester_address)?;
-    let flows = get_workflow_instances_by_requester(deps.storage, requester)?;
-    Ok(GetInstancesResponse { flows: flows.values().cloned().collect() })
-}
-
-pub fn query_workflow_by_id(deps: Deps, template_id: String) -> StdResult<GetWorkflowResponse> {
-    let template = load_workflow(deps.storage, &template_id)?;
-    Ok(GetWorkflowResponse { template })
+    let instances = load_workflow_instances_by_requester(deps.storage, &requester)?;
+    Ok(GetInstancesResponse { 
+        instances: instances.iter().map(|(instance_id, instance)| 
+            to_workflow_instance_response(deps, &requester, instance_id, &instance)
+    ).collect() })
 }
 
 pub fn query_workflow_instance(
     deps: Deps,
     user_address: String,
-    instance_id: u64,
+    instance_id: InstanceId,
 ) -> StdResult<GetWorkflowInstanceResponse> {
     let user_addr = deps.api.addr_validate(&user_address)?;
-    let instance = load_workflow_instance(deps.storage, user_addr, instance_id)?;
-    Ok(GetWorkflowInstanceResponse { instance })
-} 
+    let instance = load_workflow_instance(deps.storage, &user_addr, &instance_id)?;
+    Ok(GetWorkflowInstanceResponse { instance: to_workflow_instance_response(deps, &user_addr, &instance_id, &instance) })
+}
+
+fn to_workflow_instance_response(deps: Deps, requester: &Addr, instance_id: &InstanceId, instance: &WorkflowInstance) -> WorkflowInstanceResponse {
+    WorkflowInstanceResponse {
+        base: NewInstanceMsg {
+            workflow_id: instance.workflow_id.clone(),
+            execution_type: instance.execution_type.clone(),
+            expiration_time: instance.expiration_time,
+            onchain_parameters: load_workflow_instance_params(deps.storage, &requester, &instance_id).unwrap_or_default(),
+        },
+        id: instance_id.clone(),
+        state: instance.state.clone(),
+        requester: requester.clone(),
+        last_executed_action: instance.last_executed_action.clone(),
+    }
+}

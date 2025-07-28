@@ -1,9 +1,11 @@
 use std::collections::{HashMap, HashSet};
 
-use cosmwasm_std::{Addr, StdResult, Storage, Timestamp};
+use cosmwasm_std::{Addr, Order, StdResult, Storage, Timestamp};
 use cw_storage_plus::{Item, Map};
 
 use cosmwasm_schema::cw_serde;
+
+use crate::msg::{ActionId, ActionParamValue, ActionType, ExecutionType, InstanceId, ParamId, WorkflowId, WorkflowInstanceState, WorkflowState, WorkflowVisibility};
 
 use crate::ContractError;
 
@@ -15,88 +17,91 @@ pub struct Ownership {
 }
 
 #[cw_serde]
-pub enum ActionParamValue {
-    String(String),
-    BigInt(String), // Using String to represent BigInt for CosmWasm compatibility
-}
-
-#[cw_serde]
-pub enum WorkflowVisibility {
-    Public,
-    Private,
-}
-
-#[cw_serde]
-pub enum WorkflowState {
-    Approved,
-    Pending,
-}
-
-#[cw_serde]
-pub enum ExecutionType {
-    OneShot,
-    Recurrent,
-}
-
-#[cw_serde]
-pub enum WorkflowInstanceState {
-    Running,
-    Paused,
-}
-
-#[cw_serde]
-pub enum ActionType {
-    StakedTokenClaimer,
-    TokenStaker,
-}
-
-#[cw_serde]
 pub struct Action {
     pub action_type: ActionType,
-    pub params: HashMap<String, ActionParamValue>,
     pub next_actions: HashSet<String>,
     pub final_state: bool,
 }
 
 #[cw_serde]
 pub struct Workflow {
-    pub id: String,
     pub start_action: String,
     pub visibility: WorkflowVisibility,
     pub state: WorkflowState,
     pub publisher: Addr,
-    // action_name -> action
-    pub actions: HashMap<String, Action>,
 }
+
 
 #[cw_serde]
 pub struct WorkflowInstance {
-    pub id: u64,
+    pub workflow_id: WorkflowId,
     pub state: WorkflowInstanceState,
-    pub requester: Addr,
     pub last_executed_action: Option<String>,
-    pub workflow_id: String,
-    pub onchain_parameters: HashMap<String, ActionParamValue>,
     pub execution_type: ExecutionType,
     pub expiration_time: Timestamp,
 }
+
 
 // =============================== 
 // ========== WORKFLOWS ==========
 // =============================== 
 
-pub const WORKFLOWS: Map<String, Workflow> = Map::new("workflows");
+pub const WORKFLOWS: Map<WorkflowId, Workflow> = Map::new("w");
+pub const WORKFLOW_ACTIONS: Map<(WorkflowId, ActionId), Action> = Map::new("wa");
+pub const WORKFLOW_ACTION_PARAMS: Map<(WorkflowId, ActionId), HashMap<ParamId, ActionParamValue>> = Map::new("wap");
 
-pub fn save_workflow(storage: &mut dyn Storage, workflow: &Workflow) -> StdResult<()> {
-    WORKFLOWS.save(storage, workflow.id.clone(), workflow)
+pub fn save_workflow(storage: &mut dyn Storage, id: &WorkflowId, workflow: &Workflow) -> StdResult<()> {
+    WORKFLOWS.save(storage, id.clone(), workflow)
 }
 
-pub fn load_workflow(storage: &dyn Storage, workflow_id: &str) -> StdResult<Workflow> {
-    WORKFLOWS.load(storage, workflow_id.to_string())
+pub fn load_workflow(storage: &dyn Storage, workflow_id: &WorkflowId) -> StdResult<Workflow> {
+    WORKFLOWS.load(storage, workflow_id.clone())
 }
 
-pub fn remove_workflow(storage: &mut dyn Storage, workflow_id: &str) -> StdResult<()> {
-    WORKFLOWS.remove(storage, workflow_id.to_string());
+pub fn remove_workflow(storage: &mut dyn Storage, workflow_id: &WorkflowId) -> StdResult<()> {
+    WORKFLOWS.remove(storage, workflow_id.clone());
+    // Remove all actions for this workflow
+    let actions = WORKFLOW_ACTIONS.prefix(workflow_id.clone()).keys(storage, None, None, Order::Ascending).collect::<StdResult<Vec<_>>>()?;
+    for action_id in actions {
+        remove_workflow_action(storage, workflow_id, &action_id)?;
+    }
+    Ok(())
+}
+
+pub fn save_workflow_action(storage: &mut dyn Storage, id: &WorkflowId, action_id: &ActionId, action: &Action) -> StdResult<()> {
+    WORKFLOW_ACTIONS.save(storage, (id.clone(), action_id.clone()), action)
+}
+
+pub fn load_workflow_action(storage: &dyn Storage, workflow_id: &WorkflowId, action_id: &ActionId) -> StdResult<Action> {
+    WORKFLOW_ACTIONS.load(storage, (workflow_id.clone(), action_id.clone()))
+}
+
+pub fn load_workflow_actions(storage: &dyn Storage, workflow_id: &WorkflowId) -> StdResult<HashMap<ActionId, Action>> {
+    let actions = WORKFLOW_ACTIONS.prefix(workflow_id.clone()).keys(storage, None, None, Order::Ascending).collect::<StdResult<Vec<_>>>()?;
+    let mut actions_map = HashMap::new();
+    for action_id in actions {
+        let action = load_workflow_action(storage, workflow_id, &action_id)?;
+        actions_map.insert(action_id, action);
+    }
+    Ok(actions_map)
+}
+
+pub fn remove_workflow_action(storage: &mut dyn Storage, workflow_id: &WorkflowId, action_id: &ActionId) -> StdResult<()> {
+    WORKFLOW_ACTIONS.remove(storage, (workflow_id.clone(), action_id.clone()));
+    remove_workflow_action_params(storage, workflow_id, action_id)?;
+    Ok(())
+}
+
+pub fn save_workflow_action_params(storage: &mut dyn Storage, id: &WorkflowId, action_id: &ActionId, params: &HashMap<ParamId, ActionParamValue>) -> StdResult<()> {
+    WORKFLOW_ACTION_PARAMS.save(storage, (id.clone(), action_id.clone()), params)
+}
+
+pub fn load_workflow_action_params(storage: &dyn Storage, workflow_id: &WorkflowId, action_id: &ActionId) -> StdResult<HashMap<ParamId, ActionParamValue>> {
+    WORKFLOW_ACTION_PARAMS.load(storage, (workflow_id.clone(), action_id.clone()))
+}
+
+pub fn remove_workflow_action_params(storage: &mut dyn Storage, workflow_id: &WorkflowId, action_id: &ActionId) -> StdResult<()> {
+    WORKFLOW_ACTION_PARAMS.remove(storage, (workflow_id.clone(), action_id.clone()));
     Ok(())
 }
 
@@ -104,31 +109,48 @@ pub fn remove_workflow(storage: &mut dyn Storage, workflow_id: &str) -> StdResul
 // ========== WORKFLOW INSTANCES ==========
 // ========================================
 
+pub const WORKFLOW_INSTANCES: Map<(Addr, InstanceId), WorkflowInstance> = Map::new("wi");
+pub const WORKFLOW_INSTANCE_PARAMS: Map<(Addr, InstanceId), HashMap<ParamId, ActionParamValue>>= Map::new("wip");
+
 // requester_addr -> HashMap<instance_id, WorkflowInstance>
-pub const WORKFLOW_INSTANCES: Map<Addr, HashMap<u64, WorkflowInstance>> = Map::new("workflow_instances");
 
-pub fn save_workflow_instance(storage: &mut dyn Storage, requester: Addr, instance: &WorkflowInstance) -> StdResult<()> {
-    let mut instances = WORKFLOW_INSTANCES.load(storage, requester.clone()).unwrap_or_default();
-    instances.insert(instance.id, instance.clone());
-    WORKFLOW_INSTANCES.save(storage, requester, &instances)
+pub fn save_workflow_instance(storage: &mut dyn Storage, requester: &Addr, instance_id: &InstanceId, instance: &WorkflowInstance) -> StdResult<()> {
+    WORKFLOW_INSTANCES.save(storage, (requester.clone(), instance_id.clone()), instance)
 }
 
-pub fn load_workflow_instance(storage: &dyn Storage, requester: Addr, instance_id: u64) -> StdResult<WorkflowInstance> {
-    let instances = WORKFLOW_INSTANCES.load(storage, requester)?;
-    instances.get(&instance_id)
-        .cloned()
-        .ok_or_else(|| cosmwasm_std::StdError::not_found(format!("WorkflowInstance with id {}", instance_id)))
+pub fn load_workflow_instance(storage: &dyn Storage, requester: &Addr, instance_id: &InstanceId) -> StdResult<WorkflowInstance> {
+    WORKFLOW_INSTANCES.load(storage, (requester.clone(), instance_id.clone()))
 }
 
-pub fn remove_workflow_instance(storage: &mut dyn Storage, requester: Addr, instance_id: u64) -> StdResult<()> {
-    let mut instances = WORKFLOW_INSTANCES.load(storage, requester.clone())?;
-    instances.remove(&instance_id);
-    WORKFLOW_INSTANCES.save(storage, requester, &instances)
+pub fn remove_workflow_instance(storage: &mut dyn Storage, requester: &Addr, instance_id: &InstanceId) -> StdResult<()> {
+    WORKFLOW_INSTANCES.remove(storage, (requester.clone(), instance_id.clone()));
+    remove_workflow_instance_params(storage, requester, instance_id)?;
+    Ok(())
 }
 
-pub fn get_workflow_instances_by_requester(storage: &dyn Storage, requester: Addr) -> StdResult<HashMap<u64, WorkflowInstance>> {
-    WORKFLOW_INSTANCES.load(storage, requester)
+pub fn load_workflow_instances_by_requester(storage: &dyn Storage, requester: &Addr) -> StdResult<HashMap<InstanceId, WorkflowInstance>> {
+    let instances = WORKFLOW_INSTANCES.prefix(requester.clone()).keys(storage, None, None, Order::Ascending).collect::<StdResult<Vec<_>>>()?;
+    let mut instances_map = HashMap::new();
+    for instance_id in instances {
+        let instance = load_workflow_instance(storage, requester, &instance_id)?;
+        instances_map.insert(instance_id, instance);
+    }
+    Ok(instances_map)
 }
+
+pub fn save_workflow_instance_params(storage: &mut dyn Storage, requester: &Addr, instance_id: &InstanceId, params: &HashMap<ParamId, ActionParamValue>) -> StdResult<()> {
+    WORKFLOW_INSTANCE_PARAMS.save(storage, (requester.clone(), instance_id.clone()), params)
+}
+
+pub fn load_workflow_instance_params(storage: &dyn Storage, requester: &Addr, instance_id: &InstanceId) -> StdResult<HashMap<ParamId, ActionParamValue>> {
+    WORKFLOW_INSTANCE_PARAMS.load(storage, (requester.clone(), instance_id.clone()))
+}
+
+pub fn remove_workflow_instance_params(storage: &mut dyn Storage, requester: &Addr, instance_id: &InstanceId) -> StdResult<()> {
+    WORKFLOW_INSTANCE_PARAMS.remove(storage, (requester.clone(), instance_id.clone()));
+    Ok(())
+}
+
 
 // =============================== 
 // ========== COUNTERS ==========
@@ -136,7 +158,7 @@ pub fn get_workflow_instances_by_requester(storage: &dyn Storage, requester: Add
 
 pub const INSTANCE_COUNTER: Item<u64> = Item::new("instance_counter");
 
-pub fn get_next_instance_id(storage: &mut dyn Storage) -> StdResult<u64> {
+pub fn load_next_instance_id(storage: &mut dyn Storage) -> StdResult<u64> {
     let current = INSTANCE_COUNTER.load(storage).unwrap_or(0);
     let next = current + 1;
     INSTANCE_COUNTER.save(storage, &next)?;

@@ -6,8 +6,7 @@ use std::collections::{HashMap, HashSet};
 
 use workflow_manager::{
     contract::{execute, instantiate},
-    msg::{ExecuteMsg, InstantiateMsg, NewWorkflowMsg},
-    state::{Action, ActionType, WorkflowVisibility},
+    msg::{ExecuteMsg, InstantiateMsg, NewWorkflowMsg, ActionType, WorkflowVisibility, ActionMsg, ActionParamValue},
 };
 
 /// Initialize the contract with the given parameters
@@ -35,16 +34,16 @@ pub fn create_test_workflow() -> NewWorkflowMsg {
         actions: HashMap::from([
             (
                 "stake_tokens".to_string(),
-                Action {
+                ActionMsg {
                     action_type: ActionType::TokenStaker,
                     params: HashMap::from([
                         (
                             "amount".to_string(),
-                            workflow_manager::state::ActionParamValue::String("1000000".to_string()),
+                            ActionParamValue::String("1000000".to_string()),
                         ),
                         (
                             "token_address".to_string(),
-                            workflow_manager::state::ActionParamValue::String(
+                            ActionParamValue::String(
                                 "osmo1token123456789abcdefghijklmnopqrstuvwxyz".to_string(),
                             ),
                         ),
@@ -55,11 +54,11 @@ pub fn create_test_workflow() -> NewWorkflowMsg {
             ),
             (
                 "claim_rewards".to_string(),
-                Action {
+                ActionMsg {
                     action_type: ActionType::StakedTokenClaimer,
                     params: HashMap::from([(
                         "staking_contract".to_string(),
-                        workflow_manager::state::ActionParamValue::String(
+                        ActionParamValue::String(
                             "osmo1staking123456789abcdefghijklmnopqrstuvwxyz".to_string(),
                         ),
                     )]),
@@ -78,11 +77,11 @@ pub fn create_simple_test_workflow() -> NewWorkflowMsg {
         visibility: WorkflowVisibility::Public,
         actions: HashMap::from([(
             "stake_tokens".to_string(),
-            Action {
+            ActionMsg {
                 action_type: ActionType::TokenStaker,
                 params: HashMap::from([(
                     "amount".to_string(),
-                    workflow_manager::state::ActionParamValue::String("1000000".to_string()),
+                    ActionParamValue::String("1000000".to_string()),
                 )]),
                 next_actions: HashSet::new(),
                 final_state: true,

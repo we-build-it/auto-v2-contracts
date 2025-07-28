@@ -43,14 +43,14 @@ pub enum ContractError {
         template_id: String,
     },
 
-    #[error("Flow {flow_id} already exists")]
+    #[error("Instance {instance_id} already exists")]
     InstanceAlreadyExists {
-        flow_id: String,
+        instance_id: String,
     },
 
-    #[error("Flow {flow_id} not found")]
+    #[error("Instance {instance_id} not found")]
     InstanceNotFound {
-        flow_id: String,
+        instance_id: String,
     },
 
     #[error("Only the requester can do {action} on instance {instance_id}")]
@@ -59,9 +59,9 @@ pub enum ContractError {
         instance_id: String,
     },
 
-    #[error("Action {action_id} not found in template {template_id}")]
+    #[error("Action {action_id} not found in workflow {workflow_id}")]
     ActionNotFound {
-        template_id: String,
+        workflow_id: String,
         action_id: String,
     },
 
