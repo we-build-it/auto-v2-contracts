@@ -20,6 +20,7 @@ pub fn instantiate_contract(
     let instantiate_msg = InstantiateMsg {
         allowed_publishers,
         allowed_action_executors,
+        referral_memo: "test-referral-memo".to_string(),
     };
     
     let instantiate_info = message_info(&admin, &[]);

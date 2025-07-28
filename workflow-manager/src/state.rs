@@ -10,10 +10,11 @@ use crate::msg::{ActionId, ActionParamValue, ActionType, ExecutionType, Instance
 use crate::ContractError;
 
 #[cw_serde]
-pub struct Ownership {
+pub struct Config {
     pub owner: Addr,
     pub allowed_publishers: HashSet<Addr>,
     pub allowed_action_executors: HashSet<Addr>,
+    pub referral_memo: String,
 }
 
 #[cw_serde]
@@ -166,24 +167,24 @@ pub fn load_next_instance_id(storage: &mut dyn Storage) -> StdResult<u64> {
 }
 
 // =============================== 
-// ========== OWNERSHIP ==========
+// ========== CONFIG =============
 // =============================== 
 
-pub const OWNERSHIP: Item<Ownership> = Item::new("ownership");
+pub const CONFIG: Item<Config> = Item::new("conf");
 
-pub fn save_ownership(storage: &mut dyn Storage, ownership: &Ownership) -> StdResult<()> {
-    OWNERSHIP.save(storage, ownership)
+pub fn save_config(storage: &mut dyn Storage, config: &Config) -> StdResult<()> {
+    CONFIG.save(storage, config)
 }
 
-pub fn load_ownership(storage: &dyn Storage) -> StdResult<Ownership> {
-    OWNERSHIP.load(storage)
+pub fn load_config(storage: &dyn Storage) -> StdResult<Config> {
+    CONFIG.load(storage)
 }
 
 pub fn validate_sender_is_publisher(
     storage: &dyn Storage,
     info: &cosmwasm_std::MessageInfo,
 ) -> Result<(), ContractError> {
-    let state = load_ownership(storage)?;
+    let state = load_config(storage)?;
     if !state.allowed_publishers.contains(&info.sender) {
         Err(ContractError::Unauthorized {})
     } else {
@@ -195,7 +196,7 @@ pub fn validate_sender_is_action_executor(
     storage: &dyn Storage,
     info: &cosmwasm_std::MessageInfo,
 ) -> Result<(), ContractError> {
-    let state = load_ownership(storage)?;
+    let state = load_config(storage)?;
     if !state.allowed_action_executors.contains(&info.sender) {
         Err(ContractError::Unauthorized {})
     } else {
@@ -207,7 +208,7 @@ pub fn validate_sender_is_admin(
     storage: &dyn Storage,
     info: &cosmwasm_std::MessageInfo,
 ) -> Result<(), ContractError> {
-    let state = load_ownership(storage)?;
+    let state = load_config(storage)?;
     if info.sender != state.owner {
         Err(ContractError::Unauthorized {})
     } else {

@@ -10,9 +10,9 @@ use crate::{
         cancel_instance, execute_instance, pause_instance, publish_workflow, resume_instance,
     },
     execute::execute_action,
-    msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
+    msg::{ExecuteMsg, InstantiateMsg, QueryMsg, SudoMsg},
     query::{query_instances_by_requester, query_workflow_by_id, query_workflow_instance},
-    state::{save_ownership, Ownership},
+    state::{load_config, save_config, Config},
 };
 
 // version info for migration info
@@ -34,14 +34,15 @@ pub fn instantiate(
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
-    let state = Ownership {
+    let state = Config {
         owner: info.sender.clone(),
         allowed_publishers: msg.allowed_publishers,
         allowed_action_executors: msg.allowed_action_executors,
+        referral_memo: msg.referral_memo,
     };
 
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    save_ownership(deps.storage, &state)?;
+    save_config(deps.storage, &state)?;
 
     Ok(Response::new()
         .add_attribute("method", "instantiate")
@@ -81,6 +82,28 @@ pub fn execute(
         ),
     }
 }
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn sudo(deps: DepsMut, _env: Env, msg: SudoMsg) -> Result<Response, ContractError> {
+    let mut config = load_config(deps.storage)?;
+    match msg {
+        SudoMsg::SetOwner(owner) => {
+            config.owner = owner;
+        },
+        SudoMsg::SetAllowedPublishers(allowed_publishers) => {
+            config.allowed_publishers = allowed_publishers;
+        },
+        SudoMsg::SetAllowedActionExecutors(allowed_action_executors) => {
+            config.allowed_action_executors = allowed_action_executors;
+        },
+        SudoMsg::SetReferralMemo(referral_memo) => {
+            config.referral_memo = referral_memo;
+        },
+    }
+    save_config(deps.storage, &config)?;
+    Ok(Response::default())
+}
+
 
 // #[cfg_attr(not(feature = "library"), entry_point)]
 // pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {

@@ -37,6 +37,7 @@ pub enum WorkflowInstanceState {
 pub struct InstantiateMsg {
     pub allowed_publishers: HashSet<Addr>,
     pub allowed_action_executors: HashSet<Addr>,
+    pub referral_memo: String,
 }
 
 #[cw_serde]
@@ -97,6 +98,14 @@ pub enum ExecuteMsg {
         action_id: ActionId,
         params: Option<HashMap<ParamId, ActionParamValue>>
     },
+}
+
+#[cw_serde]
+pub enum SudoMsg {
+    SetOwner(Addr),
+    SetAllowedPublishers(HashSet<Addr>),
+    SetAllowedActionExecutors(HashSet<Addr>),
+    SetReferralMemo(String),
 }
 
 #[cw_serde]
