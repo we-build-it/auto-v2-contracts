@@ -20,8 +20,8 @@ pub fn publish_workflow(
 
     // Check if workflow already exists
     if load_workflow(deps.storage, &input_workflow.id).is_ok() {
-        return Err(ContractError::TemplateAlreadyExists {
-            template_id: input_workflow.id.clone(),
+        return Err(ContractError::WorkflowAlreadyExists {
+            workflow_id: input_workflow.id.clone(),
         });
     }
 
@@ -58,14 +58,14 @@ pub fn execute_instance(
     // Check if workflow exists
     let workflow = load_workflow(deps.storage, &instance.workflow_id).map_err(|_| {
         ContractError::WorkflowNotFound {
-            template_id: instance.workflow_id.clone(),
+            workflow_id: instance.workflow_id.clone(),
         }
     })?;
 
     // Check if workflow is approved
     if !matches!(workflow.state, WorkflowState::Approved) {
         return Err(ContractError::WorkflowNotApproved {
-            template_id: instance.workflow_id.clone(),
+            workflow_id: instance.workflow_id.clone(),
         });
     }
 
@@ -74,7 +74,7 @@ pub fn execute_instance(
         && info.sender != workflow.publisher
     {
         return Err(ContractError::PrivateWorkflowExecutionDenied {
-            template_id: instance.workflow_id.clone(),
+            workflow_id: instance.workflow_id.clone(),
         });
     }
 

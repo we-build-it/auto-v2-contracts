@@ -18,29 +18,29 @@ pub enum ContractError {
     #[error("{0}")]
 	GenericError(String) ,
 
-    #[error("Template {template_id} is already approved")]
-    TemplateAlreadyApproved {
-        template_id: String,
+    #[error("Workflow {workflow_id} is already approved")]
+    WorkflowAlreadyApproved {
+        workflow_id: String,
     },
 
-    #[error("Template {template_id} already exists")]
-    TemplateAlreadyExists {
-        template_id: String,
+    #[error("Workflow {workflow_id} already exists")]
+    WorkflowAlreadyExists {
+        workflow_id: String,
     },
 
-    #[error("Template {template_id} not found")]
+    #[error("Workflow {workflow_id} not found")]
     WorkflowNotFound {
-        template_id: String,
+        workflow_id: String,
     },
 
-    #[error("Template {template_id} is not approved")]
+    #[error("Workflow {workflow_id} is not approved")]
     WorkflowNotApproved {
-        template_id: String,
+        workflow_id: String,
     },
 
-    #[error("Template {template_id} is private and can only be executed by its publisher")]
+    #[error("Workflow {workflow_id} is private and can only be executed by its publisher")]
     PrivateWorkflowExecutionDenied {
-        template_id: String,
+        workflow_id: String,
     },
 
     #[error("Instance {instance_id} already exists")]

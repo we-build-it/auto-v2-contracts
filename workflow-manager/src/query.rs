@@ -4,22 +4,22 @@ use crate::{
     state::{load_workflow, load_workflow_action_params, load_workflow_actions, load_workflow_instance, load_workflow_instance_params, load_workflow_instances_by_requester, WorkflowInstance},
 };
 
-pub fn query_workflow_by_id(deps: Deps, template_id: String) -> StdResult<GetWorkflowResponse> {
-    let template = load_workflow(deps.storage, &template_id)?;
+pub fn query_workflow_by_id(deps: Deps, workflow_id: String) -> StdResult<GetWorkflowResponse> {
+    let workflow = load_workflow(deps.storage, &workflow_id)?;
     Ok(GetWorkflowResponse { workflow: WorkflowResponse {
         base: NewWorkflowMsg {
-            id: template_id.clone(),
-            start_action: template.start_action,
-            visibility: template.visibility,
-            actions: load_workflow_actions(deps.storage, &template_id)?.iter().map(|(action_id, action)| (action_id.clone(), ActionMsg {
+            id: workflow_id.clone(),
+            start_action: workflow.start_action,
+            visibility: workflow.visibility,
+            actions: load_workflow_actions(deps.storage, &workflow_id)?.iter().map(|(action_id, action)| (action_id.clone(), ActionMsg {
                 action_type: action.action_type.clone(),
-                params: load_workflow_action_params(deps.storage, &template_id, &action_id).unwrap_or_default(),
+                params: load_workflow_action_params(deps.storage, &workflow_id, &action_id).unwrap_or_default(),
                 next_actions: action.next_actions.clone(),
                 final_state: action.final_state,
             })).collect(),
         },
-        publisher: template.publisher.clone(),
-        state: template.state,
+        publisher: workflow.publisher.clone(),
+        state: workflow.state,
     } })
 }
 

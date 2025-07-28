@@ -138,7 +138,7 @@ pub enum QueryMsg {
     #[returns(GetInstancesResponse)]
     GetInstancesByRequester { requester_address: String },
     #[returns(GetWorkflowResponse)]
-    GetWorkflowById { template_id: String },
+    GetWorkflowById { workflow_id: String },
     #[returns(GetWorkflowInstanceResponse)]
     GetWorkflowInstance { user_address: String, instance_id: u64 },
 }

@@ -96,8 +96,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::GetInstancesByRequester { requester_address } => {
             to_json_binary(&query_instances_by_requester(deps, requester_address)?)
         }
-        QueryMsg::GetWorkflowById { template_id } => {
-            to_json_binary(&query_workflow_by_id(deps, template_id)?)
+        QueryMsg::GetWorkflowById { workflow_id } => {
+            to_json_binary(&query_workflow_by_id(deps, workflow_id)?)
         }
         QueryMsg::GetWorkflowInstance { user_address, instance_id } => {
             to_json_binary(&query_workflow_instance(deps, user_address, instance_id)?)
