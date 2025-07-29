@@ -1,6 +1,5 @@
 use cosmwasm_std::{
-    testing::{message_info},
-    Addr, DepsMut, Env, Response,
+    testing::{message_info, mock_dependencies, mock_env, MockApi, MockQuerier, MockStorage}, Addr, DepsMut, Empty, Env, OwnedDeps, Response
 };
 use std::collections::{HashMap, HashSet};
 
@@ -103,4 +102,29 @@ pub fn publish_workflow(
 
     let execute_info = message_info(&publisher, &[]);
     execute(deps, env, execute_info, execute_msg)
+}
+
+pub fn create_test_environment() -> (OwnedDeps<MockStorage, MockApi, MockQuerier, Empty>, Env, MockApi, Addr, Addr, Addr) {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api;
+
+    // Setup contract with parameters
+    let admin_address = api.addr_make("admin");
+    let publisher_address = api.addr_make("publisher");
+    let executor_address = api.addr_make("executor");
+    
+    let allowed_publishers = HashSet::from([publisher_address.clone()]);
+    let allowed_action_executors = HashSet::from([executor_address.clone()]);
+
+    // Initialize contract using utils function
+    instantiate_contract(
+        deps.as_mut(),
+        env.clone(),
+        admin_address.clone(),
+        allowed_publishers,
+        allowed_action_executors,
+    ).unwrap();
+
+    (deps, env, api, admin_address.clone(), publisher_address.clone(), executor_address.clone())
 }

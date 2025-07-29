@@ -3,10 +3,8 @@ use auto_fee_manager::ContractError;
 use cosmwasm_std::{Coin, Uint128};
 use cosmwasm_std::{CosmosMsg, BankMsg};
 mod utils;
-use utils::{
-    instantiate_contract, execute_charge_fees_from_user_balance, create_test_user_fees,
-    execute_distribute_non_creator_fees,
-};
+use crate::utils::*;
+
 #[test]
 fn test_charge_fees_from_user_balance_success() {
     let mut deps = mock_dependencies();

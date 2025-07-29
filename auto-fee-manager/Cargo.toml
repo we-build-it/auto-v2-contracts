@@ -6,6 +6,10 @@ edition.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[[bin]]
+name = "schema_fee"
+path = "src/bin/schema.rs"
+
 [lib]
 crate-type = ["cdylib", "rlib"]
 

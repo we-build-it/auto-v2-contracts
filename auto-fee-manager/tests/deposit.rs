@@ -2,9 +2,8 @@ use cosmwasm_std::{testing::{mock_dependencies, mock_env, message_info}};
 use auto_fee_manager::ContractError;
 use cosmwasm_std::{Coin, Uint128};
 mod utils;
-use utils::{
-    instantiate_contract
-};
+use crate::utils::*;
+
 #[test]
 fn test_deposit_with_valid_funds() {
     let mut deps = mock_dependencies();

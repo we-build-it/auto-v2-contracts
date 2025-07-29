@@ -3,9 +3,8 @@ use auto_fee_manager::ContractError;
 use cosmwasm_std::{Addr, Coin, Uint128};
 
 mod utils;
-use utils::{
-    instantiate_contract
-};
+use crate::utils::*;
+
 
 #[test]
 fn test_instantiate_with_valid_parameters() {

@@ -2,13 +2,8 @@ use cosmwasm_std::{testing::{mock_dependencies, mock_env}};
 use auto_fee_manager::ContractError;
 use cosmwasm_std::{Coin, Uint128};
 mod utils;
-use utils::{
-    instantiate_contract, execute_charge_fees_from_user_balance, 
-    execute_charge_fees_from_message_coins, execute_distribute_creator_fees,
-    execute_distribute_non_creator_fees, sudo_set_crank_authorized_address,
-    sudo_set_workflow_manager_address, sudo_set_execution_fees_destination_address,
-    sudo_set_distribution_fees_destination_address, create_test_user_fees
-};
+use crate::utils::*;
+
 #[test]
 fn test_crank_authorized_functions_require_authorization() {
     let mut deps = mock_dependencies();

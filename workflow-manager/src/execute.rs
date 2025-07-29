@@ -408,11 +408,11 @@ fn staked_token_claimer_reply(
 pub const STAKE_ACTION_ID: u64 = 2;
 
 fn token_staker(_params: HashMap<String, ActionParamValue>) -> Result<Vec<SubMsg>, ContractError> {
-    let provider = extract_str_param(&_params, "provider")?;
-    let contract_addr = extract_str_param(&_params, "contractAddress")?;
-    let user_address = extract_str_param(&_params, "userAddress")?;
-    let amount = extract_bigint_param(&_params, "amount")?;
-    let denom = extract_str_param(&_params, "denom")?;
+    let _provider = extract_str_param(&_params, "provider")?;
+    let _contract_addr = extract_str_param(&_params, "contractAddress")?;
+    let _user_address = extract_str_param(&_params, "userAddress")?;
+    let _amount = extract_bigint_param(&_params, "amount")?;
+    let _denom = extract_str_param(&_params, "denom")?;
 
     // TODO: Implement token staker logic
     Ok(vec![])

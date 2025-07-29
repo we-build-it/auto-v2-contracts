@@ -1,10 +1,10 @@
 use cosmwasm_std::testing::{mock_dependencies, mock_env, message_info};
-use cosmwasm_std::{Addr, Coin, Uint128, CosmosMsg, BankMsg};
+use cosmwasm_std::{Coin, Uint128, CosmosMsg, BankMsg};
 use auto_fee_manager::contract::{execute, query};
 use auto_fee_manager::msg::{ExecuteMsg, QueryMsg};
 
 mod utils;
-use utils::*;
+use crate::utils::*;
 
 #[test]
 fn test_enable_creator_fee_distribution() {

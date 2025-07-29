@@ -25,7 +25,7 @@ pub fn instantiate_contract(
     workflow_manager_address: Addr,
     creator_distribution_fee: Uint128,
 ) -> Result<Response, ContractError> {
-    let instantiate_msg = auto_fee_manager::msg::InstantiateMsg {
+    let instantiate_msg = InstantiateMsg {
         max_debt,
         min_balance_threshold,
         execution_fees_destination_address,
@@ -40,6 +40,7 @@ pub fn instantiate_contract(
 }
 
 /// Create a test UserFees struct
+#[allow(dead_code)]
 pub fn create_test_user_fees(user: Addr) -> UserFees {
     let user_clone = user.clone();
     UserFees {
@@ -70,6 +71,7 @@ pub fn create_test_user_fees(user: Addr) -> UserFees {
 }
 
 /// Create a test UserFees struct with specific creator and denom
+#[allow(dead_code)]
 pub fn create_test_user_fees_with_creator(
     user: Addr,
     creator: Addr,
@@ -94,6 +96,7 @@ pub fn create_test_user_fees_with_creator(
 }
 
 /// Execute ChargeFeesFromUserBalance
+#[allow(dead_code)]
 pub fn execute_charge_fees_from_user_balance(
     deps: DepsMut,
     env: Env,
@@ -106,6 +109,7 @@ pub fn execute_charge_fees_from_user_balance(
 }
 
 /// Execute ChargeFeesFromMessageCoins
+#[allow(dead_code)]
 pub fn execute_charge_fees_from_message_coins(
     deps: DepsMut,
     env: Env,
@@ -129,6 +133,7 @@ pub fn execute_charge_fees_from_message_coins(
 }
 
 /// Execute DistributeCreatorFees
+#[allow(dead_code)]
 pub fn execute_distribute_creator_fees(
     deps: DepsMut,
     env: Env,
@@ -140,6 +145,7 @@ pub fn execute_distribute_creator_fees(
 }
 
 /// Execute DistributeNonCreatorFees
+#[allow(dead_code)]
 pub fn execute_distribute_non_creator_fees(
     deps: DepsMut,
     env: Env,
@@ -151,6 +157,7 @@ pub fn execute_distribute_non_creator_fees(
 }
 
 /// Execute SetCrankAuthorizedAddress sudo
+#[allow(dead_code)]
 pub fn sudo_set_crank_authorized_address(
     deps: DepsMut,
     env: Env,
@@ -161,6 +168,7 @@ pub fn sudo_set_crank_authorized_address(
 }
 
 /// Execute SetWorkflowManagerAddress sudo
+#[allow(dead_code)]
 pub fn sudo_set_workflow_manager_address(
     deps: DepsMut,
     env: Env,
@@ -171,6 +179,7 @@ pub fn sudo_set_workflow_manager_address(
 }
 
 /// Execute SetExecutionFeesDestinationAddress sudo
+#[allow(dead_code)]
 pub fn sudo_set_execution_fees_destination_address(
     deps: DepsMut,
     env: Env,
@@ -181,6 +190,7 @@ pub fn sudo_set_execution_fees_destination_address(
 }
 
 /// Execute SetDistributionFeesDestinationAddress sudo
+#[allow(dead_code)]
 pub fn sudo_set_distribution_fees_destination_address(
     deps: DepsMut,
     env: Env,
@@ -190,19 +200,21 @@ pub fn sudo_set_distribution_fees_destination_address(
     sudo(deps, env, sudo_msg)
 }
 
-pub fn sudo_set_creator_distribution_fee(
+#[allow(dead_code)]
+pub fn _sudo_set_creator_distribution_fee(
     deps: DepsMut,
     env: Env,
-    admin: Addr,
+    _admin: Addr,
     fee: Uint128,
 ) -> Result<Response, ContractError> {
     let sudo_msg = auto_fee_manager::msg::SudoMsg::SetCreatorDistributionFee { fee };
     sudo(deps, env, sudo_msg)
 }
 
+#[allow(dead_code)]
 pub fn execute_claim_creator_fees(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     sender: Addr,
 ) -> Result<Response, ContractError> {
     let info = message_info(&sender, &[]);

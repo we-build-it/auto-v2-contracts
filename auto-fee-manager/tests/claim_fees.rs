@@ -1,11 +1,10 @@
-use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-use cosmwasm_std::{Addr, Coin, Uint128};
+use cosmwasm_std::testing::{mock_dependencies, mock_env};
+use cosmwasm_std::{Coin, Uint128};
 use auto_fee_manager::ContractError;
 use cosmwasm_std::{CosmosMsg, BankMsg};
 mod utils;
-use utils::{
-    instantiate_contract, execute_claim_creator_fees,
-};
+use crate::utils::*;
+
 #[test]
 fn test_claim_creator_fees_no_fees() {
     let mut deps = mock_dependencies();

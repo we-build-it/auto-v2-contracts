@@ -1,11 +1,9 @@
 use cosmwasm_std::{testing::{mock_dependencies, mock_env}};
-use auto_fee_manager::ContractError;
-use cosmwasm_std::{Addr, Coin, Uint128};
+use cosmwasm_std::{Coin, Uint128};
 
 mod utils;
-use utils::{
-    instantiate_contract, execute_charge_fees_from_user_balance, create_test_user_fees_with_creator
-};
+use crate::utils::*;
+
 use auto_fee_manager::msg::{UserFees, Fee, FeeType};
 
 #[test]
@@ -338,7 +336,6 @@ fn test_get_non_creator_fees() {
     ).unwrap();
 
     // Create test fees with Execution type to generate execution fees
-    let creator_address = api.addr_make("creator");
     let test_fees = UserFees {
         user: user_address.clone(),
         fees: vec![

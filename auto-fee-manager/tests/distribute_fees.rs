@@ -4,9 +4,8 @@ use auto_fee_manager::ContractError;
 use cosmwasm_std::{CosmosMsg, BankMsg};
 
 mod utils;
-use utils::{
-    instantiate_contract, execute_distribute_creator_fees,
-};
+use crate::utils::*;
+
 
 #[test]
 fn test_distribute_creator_fees_no_fees() {
