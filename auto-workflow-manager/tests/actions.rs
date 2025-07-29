@@ -299,6 +299,7 @@ fn test_execute_action_invalid_action_sequence() {
             ]),
             next_actions: std::collections::HashSet::new(),
             final_state: true,
+            fees: None,
         },
     );
     // Update the first action to have next_actions
