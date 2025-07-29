@@ -26,6 +26,7 @@ pub fn instantiate_contract(
     instantiate(deps, env, instantiate_info, instantiate_msg)
 }
 
+#[allow(dead_code)]
 pub fn create_test_workflow() -> NewWorkflowMsg {
     NewWorkflowMsg {
         id: "test-workflow".to_string(),
@@ -70,6 +71,7 @@ pub fn create_test_workflow() -> NewWorkflowMsg {
     }
 }
 
+#[allow(dead_code)]
 pub fn create_simple_test_workflow() -> NewWorkflowMsg {
     NewWorkflowMsg {
         id: "simple-test-workflow".to_string(),
@@ -90,6 +92,7 @@ pub fn create_simple_test_workflow() -> NewWorkflowMsg {
     }
 }
 
+#[allow(dead_code)]
 pub fn publish_workflow(
     deps: DepsMut,
     env: Env,
@@ -104,6 +107,7 @@ pub fn publish_workflow(
     execute(deps, env, execute_info, execute_msg)
 }
 
+#[allow(dead_code)]
 pub fn create_test_environment() -> (OwnedDeps<MockStorage, MockApi, MockQuerier, Empty>, Env, MockApi, Addr, Addr, Addr) {
     let mut deps = mock_dependencies();
     let env = mock_env();
