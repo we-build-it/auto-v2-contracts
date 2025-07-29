@@ -13,6 +13,7 @@ The Auto Workflow Manager is the core component of the AUTO automation system th
 - **Visibility Control**: Support for both public and private workflows with appropriate access controls.
 - **Action Orchestration**: Define complex workflows with multiple actions, dependencies, and execution paths.
 - **Parameter Resolution**: Dynamic parameter resolution with support for instance parameters, user context, and execution-time parameters.
+- **Fee Collection**: Configurable fee collection with support for multiple fee types and targets.
 
 ### ⚡ Instance Execution
 - **Instance Lifecycle**: Complete lifecycle management from creation to completion or cancellation.
@@ -25,6 +26,7 @@ The Auto Workflow Manager is the core component of the AUTO automation system th
 - **Parameter Validation**: Comprehensive parameter validation and resolution.
 - **Execution Control**: Enforce proper action sequencing and workflow state validation.
 - **External Integration**: Secure integration with external contracts and services.
+- **Fee Calculation**: Automatic fee calculation and collection during action execution.
 
 ### 🔐 Authorization & Security
 - **Role-based Access**: Separate roles for publishers and action executors.
@@ -108,6 +110,7 @@ pub struct NewWorkflowMsg {
     pub id: WorkflowId,
     pub start_action: ActionId,
     pub visibility: WorkflowVisibility,
+    pub fee_collector: Option<Addr>,
     pub actions: HashMap<ActionId, ActionMsg>,
 }
 
@@ -116,6 +119,12 @@ pub struct ActionMsg {
     pub params: HashMap<ParamId, ActionParamValue>,
     pub next_actions: HashSet<ActionId>,
     pub final_state: bool,
+    pub fees: Option<Vec<ActionFee>>,
+}
+
+pub struct ActionFee {
+    pub percentage: Decimal,
+    pub target: Option<String>,
 }
 
 pub struct NewInstanceMsg {
@@ -176,6 +185,7 @@ let workflow = NewWorkflowMsg {
     id: "staking_workflow".to_string(),
     start_action: "stake_tokens".to_string(),
     visibility: WorkflowVisibility::Public,
+    fee_collector: Some(Addr::unchecked("fee_collector_address")),
     actions: HashMap::from([
         (
             "stake_tokens".to_string(),
@@ -190,6 +200,16 @@ let workflow = NewWorkflowMsg {
                 ]),
                 next_actions: HashSet::new(),
                 final_state: true,
+                fees: Some(vec![
+                    ActionFee {
+                        percentage: Decimal::percent(5), // 5% fee
+                        target: Some("staked".to_string()),
+                    },
+                    ActionFee {
+                        percentage: Decimal::percent(1), // 1% fee
+                        target: Some("extra".to_string()),
+                    },
+                ]),
             },
         ),
     ]),
