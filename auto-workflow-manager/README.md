@@ -1,85 +1,324 @@
-# CosmWasm Starter Pack
+# Auto Workflow Manager
 
-This is a template to build smart contracts in Rust to run inside a
-[Cosmos SDK](https://github.com/cosmos/cosmos-sdk) module on all chains that enable it.
-To understand the framework better, please read the overview in the
-[cosmwasm repo](https://github.com/CosmWasm/cosmwasm/blob/master/README.md),
-and dig into the [cosmwasm docs](https://www.cosmwasm.com).
-This assumes you understand the theory and just want to get coding.
+A CosmWasm smart contract for managing automated workflows, workflow execution, and action orchestration in the AUTO automation system.
 
-## Creating a new repo from template
+## Overview
 
-Assuming you have a recent version of Rust and Cargo installed
-(via [rustup](https://rustup.rs/)),
-then the following should get you a new repo to start a contract:
+The Auto Workflow Manager is the core component of the AUTO automation system that handles workflow lifecycle management, instance execution, and action orchestration. It provides a secure and flexible platform for publishing, executing, and managing automated workflows with support for both public and private workflows.
 
-Install [cargo-generate](https://github.com/ashleygwilliams/cargo-generate) and cargo-run-script.
-Unless you did that before, run this line now:
+## Features
 
-```sh
-cargo install cargo-generate --features vendored-openssl
-cargo install cargo-run-script
+### 📋 Workflow Management
+- **Workflow Publishing**: Authorized publishers can create and publish workflows with defined actions and parameters.
+- **Visibility Control**: Support for both public and private workflows with appropriate access controls.
+- **Action Orchestration**: Define complex workflows with multiple actions, dependencies, and execution paths.
+- **Parameter Resolution**: Dynamic parameter resolution with support for instance parameters, user context, and execution-time parameters.
+
+### ⚡ Instance Execution
+- **Instance Lifecycle**: Complete lifecycle management from creation to completion or cancellation.
+- **Execution Types**: Support for both one-shot and recurrent workflow executions.
+- **State Management**: Track instance states (Running, Paused) with appropriate state transitions.
+- **Expiration Control**: Configurable expiration times for workflow instances.
+
+### 🔧 Action Execution
+- **Action Types**: Support for different action types including TokenStaker and StakedTokenClaimer.
+- **Parameter Validation**: Comprehensive parameter validation and resolution.
+- **Execution Control**: Enforce proper action sequencing and workflow state validation.
+- **External Integration**: Secure integration with external contracts and services.
+
+### 🔐 Authorization & Security
+- **Role-based Access**: Separate roles for publishers and action executors.
+- **Workflow Access Control**: Private workflows restricted to authorized users.
+- **Instance Ownership**: Users can only manage their own workflow instances.
+- **Sudo Administration**: Admin capabilities for contract configuration updates.
+
+## Quick Start
+
+1. **Instantiate** the contract with authorized publishers and executors
+2. **Publish** workflows with defined actions and parameters
+3. **Execute** workflow instances with appropriate parameters
+4. **Manage** instance lifecycle (pause, resume, cancel)
+5. **Execute** individual actions within workflow instances
+
+## Messages
+
+### Instantiate
+
+```rust
+pub struct InstantiateMsg {
+    pub allowed_publishers: HashSet<Addr>,
+    pub allowed_action_executors: HashSet<Addr>,
+    pub referral_memo: String,
+}
 ```
 
-Now, use it to create your new contract.
-Go to the folder in which you want to place it and run:
+### Execute
 
-**Latest**
-
-```sh
-cargo generate --git https://github.com/CosmWasm/cw-template.git --name PROJECT_NAME
+```rust
+pub enum ExecuteMsg {
+    PublishWorkflow {
+        workflow: NewWorkflowMsg,
+    },
+    ExecuteInstance {
+        instance: NewInstanceMsg,
+    },
+    CancelInstance {
+        instance_id: InstanceId,
+    },
+    PauseInstance {
+        instance_id: InstanceId,
+    },
+    ResumeInstance {
+        instance_id: InstanceId,
+    },
+    ExecuteAction {
+        user_address: String,
+        instance_id: InstanceId,
+        action_id: ActionId,
+        params: Option<HashMap<ParamId, ActionParamValue>>
+    },
+}
 ```
 
-For cloning minimal code repo:
+### Query
 
-```sh
-cargo generate --git https://github.com/CosmWasm/cw-template.git --name PROJECT_NAME -d minimal=true
+```rust
+pub enum QueryMsg {
+    GetInstancesByRequester { requester_address: String },
+    GetWorkflowById { workflow_id: String },
+    GetWorkflowInstance { user_address: String, instance_id: u64 },
+}
 ```
 
-You will now have a new folder called `PROJECT_NAME` (I hope you changed that to something else)
-containing a simple working contract and build system that you can customize.
+### Sudo
 
-## Create a Repo
-
-After generating, you have a initialized local git repo, but no commits, and no remote.
-Go to a server (eg. github) and create a new upstream repo (called `YOUR-GIT-URL` below).
-Then run the following:
-
-```sh
-# this is needed to create a valid Cargo.lock file (see below)
-cargo check
-git branch -M main
-git add .
-git commit -m 'Initial Commit'
-git remote add origin YOUR-GIT-URL
-git push -u origin main
+```rust
+pub enum SudoMsg {
+    SetOwner(Addr),
+    SetAllowedPublishers(HashSet<Addr>),
+    SetAllowedActionExecutors(HashSet<Addr>),
+    SetReferralMemo(String),
+}
 ```
 
-## CI Support
+## Data Structures
 
-We have template configurations for both [GitHub Actions](.github/workflows/Basic.yml)
-and [Circle CI](.circleci/config.yml) in the generated project, so you can
-get up and running with CI right away.
+```rust
+pub struct NewWorkflowMsg {
+    pub id: WorkflowId,
+    pub start_action: ActionId,
+    pub visibility: WorkflowVisibility,
+    pub actions: HashMap<ActionId, ActionMsg>,
+}
 
-One note is that the CI runs all `cargo` commands
-with `--locked` to ensure it uses the exact same versions as you have locally. This also means
-you must have an up-to-date `Cargo.lock` file, which is not auto-generated.
-The first time you set up the project (or after adding any dep), you should ensure the
-`Cargo.lock` file is updated, so the CI will test properly. This can be done simply by
-running `cargo check` or `cargo unit-test`.
+pub struct ActionMsg {
+    pub action_type: ActionType,
+    pub params: HashMap<ParamId, ActionParamValue>,
+    pub next_actions: HashSet<ActionId>,
+    pub final_state: bool,
+}
 
-## Using your project
+pub struct NewInstanceMsg {
+    pub workflow_id: WorkflowId,
+    pub onchain_parameters: HashMap<ParamId, ActionParamValue>,
+    pub execution_type: ExecutionType,
+    pub expiration_time: Timestamp,
+}
 
-Once you have your custom repo, you should check out [Developing](./Developing.md) to explain
-more on how to run tests and develop code. Or go through the
-[online tutorial](https://docs.cosmwasm.com/) to get a better feel
-of how to develop.
+pub enum WorkflowVisibility {
+    Public,
+    Private,
+}
 
-[Publishing](./Publishing.md) contains useful information on how to publish your contract
-to the world, once you are ready to deploy it on a running blockchain. And
-[Importing](./Importing.md) contains information about pulling in other contracts or crates
-that have been published.
+pub enum ExecutionType {
+    OneShot,
+    Recurrent,
+}
 
-Please replace this README file with information about your specific project. You can keep
-the `Developing.md` and `Publishing.md` files as useful references, but please set some
-proper description in the README.
+pub enum WorkflowState {
+    Approved,
+    Pending,
+}
+
+pub enum WorkflowInstanceState {
+    Running,
+    Paused,
+}
+
+pub enum ActionParamValue {
+    String(String),
+    BigInt(String),
+}
+
+pub enum ActionType {
+    StakedTokenClaimer,
+    TokenStaker,
+}
+```
+
+## Events
+
+- `publish_workflow` — When a workflow is successfully published.
+- `execute_instance` — When a workflow instance is created and started.
+- `cancel_instance` — When a workflow instance is cancelled.
+- `pause_instance` — When a workflow instance is paused.
+- `resume_instance` — When a workflow instance is resumed.
+- `execute_action` — When an action within a workflow instance is executed.
+
+## Usage Examples
+
+> **📖 Thornode Usage Examples**: For complete usage examples with the Thornode CLI on Thorchain Stagenet, see [THORNODE_EXAMPLES.md](./THORNODE_EXAMPLES.md).
+
+### 1. Publish a workflow
+
+```rust
+let workflow = NewWorkflowMsg {
+    id: "staking_workflow".to_string(),
+    start_action: "stake_tokens".to_string(),
+    visibility: WorkflowVisibility::Public,
+    actions: HashMap::from([
+        (
+            "stake_tokens".to_string(),
+            ActionMsg {
+                action_type: ActionType::TokenStaker,
+                params: HashMap::from([
+                    ("provider".to_string(), ActionParamValue::String("daodao".to_string())),
+                    ("contractAddress".to_string(), ActionParamValue::String("osmo1contract123456789".to_string())),
+                    ("userAddress".to_string(), ActionParamValue::String("#ip.requester".to_string())),
+                    ("amount".to_string(), ActionParamValue::BigInt("1000000".to_string())),
+                    ("denom".to_string(), ActionParamValue::String("uosmo".to_string())),
+                ]),
+                next_actions: HashSet::new(),
+                final_state: true,
+            },
+        ),
+    ]),
+};
+
+let msg = ExecuteMsg::PublishWorkflow { workflow };
+```
+
+### 2. Execute a workflow instance
+
+```rust
+let instance = NewInstanceMsg {
+    workflow_id: "staking_workflow".to_string(),
+    onchain_parameters: HashMap::new(),
+    execution_type: ExecutionType::OneShot,
+    expiration_time: Timestamp::from_seconds(1000000000),
+};
+
+let msg = ExecuteMsg::ExecuteInstance { instance };
+```
+
+### 3. Execute an action within a workflow instance
+
+```rust
+let msg = ExecuteMsg::ExecuteAction {
+    user_address: "user123".to_string(),
+    instance_id: 1,
+    action_id: "stake_tokens".to_string(),
+    params: Some(HashMap::from([
+        ("extra_param".to_string(), ActionParamValue::String("extra_value".to_string())),
+    ])),
+};
+```
+
+### 4. Pause a workflow instance
+
+```rust
+let msg = ExecuteMsg::PauseInstance { instance_id: 1 };
+```
+
+### 5. Resume a workflow instance
+
+```rust
+let msg = ExecuteMsg::ResumeInstance { instance_id: 1 };
+```
+
+### 6. Cancel a workflow instance
+
+```rust
+let msg = ExecuteMsg::CancelInstance { instance_id: 1 };
+```
+
+### 7. Query workflow instances by requester
+
+```rust
+let msg = QueryMsg::GetInstancesByRequester {
+    requester_address: "user123".to_string(),
+};
+```
+
+### 8. Query workflow by ID
+
+```rust
+let msg = QueryMsg::GetWorkflowById {
+    workflow_id: "staking_workflow".to_string(),
+};
+```
+
+### 9. Query specific workflow instance
+
+```rust
+let msg = QueryMsg::GetWorkflowInstance {
+    user_address: "user123".to_string(),
+    instance_id: 1,
+};
+```
+
+## Parameter Resolution
+
+The contract supports dynamic parameter resolution with the following patterns:
+
+- `#ip.requester` - Resolves to the user address executing the action
+- `#ip.param_name` - Resolves to instance parameters
+- `#cp.param_name` - Resolves to execution-time parameters
+- Fixed values - Used as-is without resolution
+
+## Building
+
+```bash
+# Build contract
+cargo build --target wasm32-unknown-unknown --release
+
+# Optimize for deployment
+cargo run-script optimize
+```
+
+## Testing
+
+```bash
+# Unit tests
+cargo test
+
+# Specific test suites
+cargo test workflows
+cargo test instances
+cargo test actions
+```
+
+## Security
+
+The contract implements comprehensive security measures:
+
+- **Authorization Controls**: Strict role-based access for publishers and executors
+- **Instance Isolation**: Users can only access their own workflow instances
+- **Parameter Validation**: All parameters are validated before execution
+- **State Validation**: Proper state transitions are enforced
+- **Expiration Control**: Instances expire automatically to prevent resource exhaustion
+- **Action Sequencing**: Proper action execution order is enforced
+
+For security questions or vulnerability disclosures, contact the development team.
+
+## Integration
+
+The Auto Workflow Manager integrates with:
+
+- **Auto Fee Manager**: For fee collection and distribution
+- **External Contracts**: For executing specific actions (staking, claiming, etc.)
+- **AUTO Engine**: For workflow orchestration and execution
+
+## License
+
+This project is licensed under the same terms as the AUTO automation system.
