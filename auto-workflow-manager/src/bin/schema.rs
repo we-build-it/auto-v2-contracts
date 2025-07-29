@@ -1,6 +1,6 @@
 use cosmwasm_schema::write_api;
 
-use workflow_manager::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use auto_workflow_manager::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 
 fn main() {
     write_api! {

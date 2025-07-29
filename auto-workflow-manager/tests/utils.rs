@@ -3,7 +3,7 @@ use cosmwasm_std::{
 };
 use std::collections::{HashMap, HashSet};
 
-use workflow_manager::{
+use auto_workflow_manager::{
     contract::{execute, instantiate},
     msg::{ExecuteMsg, InstantiateMsg, NewWorkflowMsg, ActionType, WorkflowVisibility, ActionMsg, ActionParamValue},
 };
@@ -15,7 +15,7 @@ pub fn instantiate_contract(
     admin: Addr,
     allowed_publishers: HashSet<Addr>,
     allowed_action_executors: HashSet<Addr>,
-) -> Result<Response, workflow_manager::error::ContractError> {
+) -> Result<Response, auto_workflow_manager::error::ContractError> {
     let instantiate_msg = InstantiateMsg {
         allowed_publishers,
         allowed_action_executors,
@@ -95,7 +95,7 @@ pub fn publish_workflow(
     env: Env,
     publisher: Addr,
     workflow_msg: NewWorkflowMsg,
-) -> Result<Response, workflow_manager::error::ContractError> {
+) -> Result<Response, auto_workflow_manager::error::ContractError> {
     let execute_msg = ExecuteMsg::PublishWorkflow {
         workflow: workflow_msg,
     };

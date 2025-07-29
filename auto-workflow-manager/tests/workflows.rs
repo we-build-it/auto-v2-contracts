@@ -1,4 +1,4 @@
-use workflow_manager::ContractError;
+use auto_workflow_manager::ContractError;
 
 mod utils;
 use utils::{create_simple_test_workflow, create_test_workflow, publish_workflow};

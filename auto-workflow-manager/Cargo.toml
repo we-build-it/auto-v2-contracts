@@ -1,5 +1,5 @@
 [package]
-name = "workflow-manager"
+name = "auto-workflow-manager"
 version.workspace = true
 authors = ["Gustavo Fuhr <gustavo@wbi.dev>"]
 edition.workspace = true
