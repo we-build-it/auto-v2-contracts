@@ -86,7 +86,7 @@ pub enum ExecuteMsg {
     CancelInstance {
         instance_id: InstanceId,
     },
-    PauselInstance {
+    PauseInstance {
         instance_id: InstanceId,
     },
     ResumeInstance {

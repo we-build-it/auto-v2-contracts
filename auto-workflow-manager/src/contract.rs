@@ -64,7 +64,7 @@ pub fn execute(
         ExecuteMsg::PublishWorkflow { workflow } => publish_workflow(deps, env, info, workflow),
         ExecuteMsg::ExecuteInstance { instance } => execute_instance(deps, env, info, instance),
         ExecuteMsg::CancelInstance { instance_id } => cancel_instance(deps, env, info, instance_id),
-        ExecuteMsg::PauselInstance { instance_id } => pause_instance(deps, env, info, instance_id),
+        ExecuteMsg::PauseInstance { instance_id } => pause_instance(deps, env, info, instance_id),
         ExecuteMsg::ResumeInstance { instance_id } => resume_instance(deps, env, info, instance_id),
         ExecuteMsg::ExecuteAction {
             user_address,
