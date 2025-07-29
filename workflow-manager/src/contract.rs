@@ -1,3 +1,4 @@
+use cosmwasm_std::Reply;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::{
     entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
@@ -7,9 +8,8 @@ use cw2::set_contract_version;
 use crate::{
     error::ContractError,
     execute::{
-        cancel_instance, execute_instance, pause_instance, publish_workflow, resume_instance,
+        cancel_instance, execute_action, execute_instance, execute_reply, pause_instance, publish_workflow, resume_instance
     },
-    execute::execute_action,
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg, SudoMsg},
     query::{query_instances_by_requester, query_workflow_by_id, query_workflow_instance},
     state::{load_config, save_config, Config},
@@ -81,6 +81,11 @@ pub fn execute(
             params,
         ),
     }
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractError> {
+    execute_reply(&deps, &env, &msg)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

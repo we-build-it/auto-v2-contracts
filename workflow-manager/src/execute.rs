@@ -1,6 +1,7 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
-use cosmwasm_std::{Addr, DepsMut, Env, MessageInfo, Response, SubMsg};
+use cosmwasm_std::{from_json, to_json_binary, Addr, DepsMut, Env, MessageInfo, Reply, Response, SubMsg, Uint128, WasmMsg};
+use serde_json::json;
 
 use crate::{
     msg::{NewInstanceMsg, ParamId},
@@ -319,15 +320,100 @@ fn resolve_param_value(
     }
 }
 
-// Placeholder functions for action types
+fn extract_str_param(params: &HashMap<String, ActionParamValue>, key: &str) -> Result<String, ContractError> {
+    if let Some(value) = params.get(key) {
+        match value {
+            ActionParamValue::String(s) => Ok(s.clone()),
+            _ => Err(ContractError::GenericError(format!("Parameter '{}' is not a string", key))),
+        }
+    } else {
+        Err(ContractError::GenericError(format!("Parameter '{}' not found in parameters", key)))
+    }
+}
+
+fn extract_bigint_param(params: &HashMap<String, ActionParamValue>, key: &str) -> Result<Uint128, ContractError> {
+    if let Some(value) = params.get(key) {
+        match value {
+            ActionParamValue::BigInt(s) => Ok(Uint128::from_str(s)?),
+            _ => Err(ContractError::GenericError(format!("Parameter '{}' is not a bigint", key))),
+        }
+    } else {
+        Err(ContractError::GenericError(format!("Parameter '{}' not found in parameters", key)))
+    }
+}
+
+pub fn execute_reply(deps: &DepsMut, env: &Env, msg: &Reply) -> Result<Response, ContractError> {
+    match msg.id {
+        CLAIM_ACTION_ID => staked_token_claimer_reply(deps, env, msg),
+        _ => Err(ContractError::GenericError("Unknown reply".to_string())),
+    }
+}
+
+//=========== STAKED TOKENS CLAIMER ACTION ============
+pub const CLAIM_ACTION_ID: u64 = 1;
+
 fn staked_token_claimer(
     _params: HashMap<String, ActionParamValue>,
 ) -> Result<Vec<SubMsg>, ContractError> {
-    // TODO: Implement staked token claimer logic
-    Ok(vec![])
+    let provider = extract_str_param(&_params, "provider")?;
+    let contract_addr = extract_str_param(&_params, "contractAddress")?;
+    let user_address = extract_str_param(&_params, "userAddress")?;
+    let amount = extract_bigint_param(&_params, "amount")?;
+
+    if provider != "daodao" {
+        return Err(ContractError::GenericError(format!("Provider '{}' not supported", provider)));
+    }
+    
+    let claim_msg = WasmMsg::Execute {
+        contract_addr: contract_addr.clone(),
+        msg: to_json_binary(&json!({
+            // TODO: call to daodao contract
+            "user_address": user_address.clone(),
+            "amount": amount.clone(),
+        }))?,
+        funds: vec![],
+    };
+
+    Ok(vec![
+        SubMsg::
+        reply_always(claim_msg, CLAIM_ACTION_ID)
+        .with_payload(to_json_binary(&json!({
+            "provider": provider.clone(),
+            "user_address": user_address.clone(),
+        }))?)
+    ])
 }
 
+fn staked_token_claimer_reply(
+    _deps: &DepsMut,
+    _env: &Env,
+    msg: &Reply,
+) -> Result<Response, ContractError> {
+    let payload: HashMap<String, String> = from_json(&msg.payload)?;
+    let provider = payload.get("provider").unwrap();
+
+    if provider != "daodao" {
+        return Err(ContractError::GenericError(format!("Provider '{}' not supported", provider)));
+    }
+
+    let _user_address = payload.get("user_address").unwrap();
+
+    // TODO: call fee manager contract
+
+    Ok(Response::default())
+}
+//=========== STAKED TOKENS CLAIMER ACTION (END) ============
+
+//=========== TOKEN STAKER ACTION ============
+pub const STAKE_ACTION_ID: u64 = 2;
+
 fn token_staker(_params: HashMap<String, ActionParamValue>) -> Result<Vec<SubMsg>, ContractError> {
+    let provider = extract_str_param(&_params, "provider")?;
+    let contract_addr = extract_str_param(&_params, "contractAddress")?;
+    let user_address = extract_str_param(&_params, "userAddress")?;
+    let amount = extract_bigint_param(&_params, "amount")?;
+    let denom = extract_str_param(&_params, "denom")?;
+
     // TODO: Implement token staker logic
     Ok(vec![])
 }
