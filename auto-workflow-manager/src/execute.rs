@@ -1,10 +1,10 @@
 use std::{collections::HashMap, str::FromStr};
 
-use cosmwasm_std::{from_json, to_json_binary, Addr, Coin, Decimal, DepsMut, Env, MessageInfo, Reply, Response, SubMsg, Uint128, WasmMsg};
+use cosmwasm_std::{from_json, to_json_binary, Addr, DepsMut, Env, MessageInfo, Reply, Response, SubMsg, Uint128, WasmMsg};
 use serde_json::json;
 
 use crate::{
-    msg::{ActionFee, NewInstanceMsg, ParamId},
+    msg::{NewInstanceMsg, ParamId},
     state::{
         load_next_instance_id, load_workflow, load_workflow_action, load_workflow_action_params, load_workflow_instance, load_workflow_instance_params, remove_workflow_instance, save_workflow, save_workflow_action, save_workflow_action_params, save_workflow_instance, save_workflow_instance_params, validate_sender_is_action_executor, validate_sender_is_publisher, Action, Workflow, WorkflowInstance
     },
@@ -257,7 +257,7 @@ pub fn execute_action(
 
     // Create sub messages based on action type
     let sub_msgs: Vec<SubMsg> = match action_to_execute.action_type {
-        ActionType::StakedTokenClaimer => staked_token_claimer(&instance_id, &action_id, &workflow.fee_collector, &action_to_execute.fees, &resolved_params)?,
+        ActionType::StakedTokenClaimer => staked_token_claimer(resolved_params)?,
         ActionType::TokenStaker => token_staker(resolved_params)?,
     };
 
@@ -355,30 +355,23 @@ pub fn execute_reply(deps: &DepsMut, env: &Env, msg: &Reply) -> Result<Response,
 pub const CLAIM_ACTION_ID: u64 = 1;
 
 fn staked_token_claimer(
-    instance_id: &u64,
-    action_id: &String,
-    fee_collector: &Option<Addr>,
-    fees: &Option<Vec<ActionFee>>,
-    params: &HashMap<String, ActionParamValue>,
+    _params: HashMap<String, ActionParamValue>,
 ) -> Result<Vec<SubMsg>, ContractError> {
-    let provider = extract_str_param(params, "provider")?;
-    let contract_addr = extract_str_param(params, "contractAddress")?;
-    let user_address = extract_str_param(params, "userAddress")?;
-    let distribution = extract_bigint_param(params, "distribution")?;
+    let provider = extract_str_param(&_params, "provider")?;
+    let contract_addr = extract_str_param(&_params, "contractAddress")?;
+    let user_address = extract_str_param(&_params, "userAddress")?;
+    let amount = extract_bigint_param(&_params, "amount")?;
 
     if provider != "daodao" {
         return Err(ContractError::GenericError(format!("Provider '{}' not supported", provider)));
     }
     
-    // TODO: add auth message to impersonate user address
-
-    // TODO: validate daodao claim contract
     let claim_msg = WasmMsg::Execute {
         contract_addr: contract_addr.clone(),
         msg: to_json_binary(&json!({
-            "claim": {
-                "id": distribution.clone()
-            }
+            // TODO: call to daodao contract
+            "user_address": user_address.clone(),
+            "amount": amount.clone(),
         }))?,
         funds: vec![],
     };
@@ -387,11 +380,7 @@ fn staked_token_claimer(
         SubMsg::
         reply_always(claim_msg, CLAIM_ACTION_ID)
         .with_payload(to_json_binary(&json!({
-            "instance_id": instance_id.to_string(),
-            "action_id": action_id.clone(),
-            "fee_collector": fee_collector.clone(),
             "provider": provider.clone(),
-            "fees": fees.clone(),
             "user_address": user_address.clone(),
         }))?)
     ])
@@ -409,46 +398,11 @@ fn staked_token_claimer_reply(
         return Err(ContractError::GenericError(format!("Provider '{}' not supported", provider)));
     }
 
-    let instance_id = payload.get("instance_id").unwrap();
-    let action_id = payload.get("action_id").unwrap();
-    let fee_collector = payload.get("fee_collector").unwrap();
-    
-    let fees_str = payload.get("fees").unwrap();
-    let fees_vec: Vec<ActionFee> = from_json(fees_str)?;
-    let fee_percentage = fees_vec[0].percentage;
-
     let _user_address = payload.get("user_address").unwrap();
 
-    // TODO: obtain claimed amount
-    let claimed_amount = 0u128;
-    let claimed_denom = "stake".to_string();
-    let fee_amount = (Decimal::from_atomics(claimed_amount, 0).unwrap() * fee_percentage).to_uint_ceil();
+    // TODO: call fee manager contract
 
-    // TODO: add auto_fee_manager_contract_addr as contract configuration and receive it as parameter
-    let auto_fee_manager_contract_addr = "auto_fee_manager_contract_addr".to_string();
-
-    let claim_msg = WasmMsg::Execute {
-        contract_addr: auto_fee_manager_contract_addr,
-        msg: to_json_binary(&json!({
-            "charge_fees_from_message_coins": {
-                "fees": [
-                    {
-                        "workflow_instance_id": instance_id.clone(),
-                        "action_id": action_id.clone(),
-                        "description": ("claimed amount: ".to_string() + &claimed_amount.to_string()).to_string(),
-                        "amount": fee_amount.clone(),
-                        "denom": claimed_denom.clone(),
-                        "fee_type": "execution".to_string(),
-                        "creator_address": fee_collector.clone(),
-                    }
-                ]
-            }
-        }))?,
-        funds: vec![Coin::new(claimed_amount, claimed_denom)],
-    };
-
-
-    Ok(Response::default().add_message(claim_msg))
+    Ok(Response::default())
 }
 //=========== STAKED TOKENS CLAIMER ACTION (END) ============
 
