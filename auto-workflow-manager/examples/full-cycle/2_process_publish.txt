@@ -1,0 +1,64 @@
+------------------
+proceso de publish
+------------------
+
+- post a workflow-backend/workflows con
+    - input
+        - json (autoclaimer-workflow.json)
+        - hash
+    - process
+        - validar input.hash = hash(input.json)
+        - se guarda en una tabla PendingApprovalWorkflows (input.hash, JSON completo)
+    - output
+        - success/error
+
+- ejecutar workflow-manager/publish
+    - input
+        {
+            "workflow_id": hash(json),
+            "start_action": "claim",
+            "visibility": "public",
+            "actions": 
+                {
+                    "claim": {
+                        "template_hashes": ["hash1", "hash2"],
+                        "params: {
+                            "templateHash": "#ip.claimTemplateHash",
+                            "contractAddress": "#ip.contractAddress",
+                            "distributionId": "#ip.distributionId"
+                        },
+                        "next_actions": ["stake"],
+                        "final_state": false
+                    },
+                    "stake": {
+                        "template_hashes": ["hash3", "hash4"],
+                        "params": {
+                            "amount": "#cp.amount",
+                            "denom": "#cp.denom"
+                        },
+                        "next_actions": [],
+                        "final_state": true
+                    }
+                }
+        }
+    - process
+        - store in contract state
+            - workflow.publisher = sender.address
+            - workflow.state = approved
+            - input.*
+    - output
+        - tienen que quedar en la transaccion input.workflow_id
+        - event.workflow_state = approved
+
+- event listener
+    - input: tx del contrato workflow-backend/publish
+    - process: normalizar y enviar a workflow-backkend
+        - publisher
+        - workflow_id (hash)
+        - approved
+
+- workflow-backend
+    - input evento generado por event-listener
+    - output: modelo de datos populado
+
+

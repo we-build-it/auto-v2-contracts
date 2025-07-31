@@ -5,7 +5,7 @@ use cw_storage_plus::{Item, Map};
 
 use cosmwasm_schema::cw_serde;
 
-use crate::msg::{ActionId, ActionParamValue, ActionType, ExecutionType, InstanceId, ParamId, WorkflowId, WorkflowInstanceState, WorkflowState, WorkflowVisibility};
+use crate::msg::{ActionId, ActionParamValue, ExecutionType, InstanceId, ParamId, WorkflowId, WorkflowInstanceState, WorkflowState, WorkflowVisibility, TemplateId, Template};
 
 use crate::ContractError;
 
@@ -19,7 +19,6 @@ pub struct Config {
 
 #[cw_serde]
 pub struct Action {
-    pub action_type: ActionType,
     pub next_actions: HashSet<String>,
     pub final_state: bool,
 }
@@ -50,6 +49,7 @@ pub struct WorkflowInstance {
 pub const WORKFLOWS: Map<WorkflowId, Workflow> = Map::new("w");
 pub const WORKFLOW_ACTIONS: Map<(WorkflowId, ActionId), Action> = Map::new("wa");
 pub const WORKFLOW_ACTION_PARAMS: Map<(WorkflowId, ActionId), HashMap<ParamId, ActionParamValue>> = Map::new("wap");
+pub const WORKFLOW_ACTION_TEMPLATES: Map<(WorkflowId, ActionId, TemplateId), Template> = Map::new("wat");
 
 pub fn save_workflow(storage: &mut dyn Storage, id: &WorkflowId, workflow: &Workflow) -> StdResult<()> {
     WORKFLOWS.save(storage, id.clone(), workflow)
@@ -90,6 +90,7 @@ pub fn load_workflow_actions(storage: &dyn Storage, workflow_id: &WorkflowId) ->
 pub fn remove_workflow_action(storage: &mut dyn Storage, workflow_id: &WorkflowId, action_id: &ActionId) -> StdResult<()> {
     WORKFLOW_ACTIONS.remove(storage, (workflow_id.clone(), action_id.clone()));
     remove_workflow_action_params(storage, workflow_id, action_id)?;
+    remove_workflow_action_templates(storage, workflow_id, action_id)?;
     Ok(())
 }
 
@@ -103,6 +104,35 @@ pub fn load_workflow_action_params(storage: &dyn Storage, workflow_id: &Workflow
 
 pub fn remove_workflow_action_params(storage: &mut dyn Storage, workflow_id: &WorkflowId, action_id: &ActionId) -> StdResult<()> {
     WORKFLOW_ACTION_PARAMS.remove(storage, (workflow_id.clone(), action_id.clone()));
+    Ok(())
+}
+
+pub fn save_workflow_action_templates(storage: &mut dyn Storage, workflow_id: &WorkflowId, action_id: &ActionId, templates: &HashMap<   TemplateId, Template>) -> StdResult<()> {
+    for (template_id, template) in templates {
+        WORKFLOW_ACTION_TEMPLATES.save(storage, (workflow_id.clone(), action_id.clone(), template_id.clone()), template)?;
+    }
+    Ok(())
+}
+
+pub fn load_workflow_action_template(storage: &dyn Storage, workflow_id: &WorkflowId, action_id: &ActionId, template_id: &TemplateId) -> StdResult<Template> {
+    WORKFLOW_ACTION_TEMPLATES.load(storage, (workflow_id.clone(), action_id.clone(), template_id.clone()))
+}
+
+pub fn load_workflow_action_templates(storage: &dyn Storage, workflow_id: &WorkflowId, action_id: &ActionId) -> StdResult<HashMap<TemplateId, Template>> {
+    let templates = WORKFLOW_ACTION_TEMPLATES.prefix((workflow_id.clone(), action_id.clone())).keys(storage, None, None, Order::Ascending).collect::<StdResult<Vec<_>>>()?;
+    let mut templates_map = HashMap::new();
+    for template_id in templates {
+        let template = load_workflow_action_template(storage, workflow_id, action_id, &template_id)?;
+        templates_map.insert(template_id, template);
+    }
+    Ok(templates_map)
+}
+
+pub fn remove_workflow_action_templates(storage: &mut dyn Storage, workflow_id: &WorkflowId, action_id: &ActionId) -> StdResult<()> {
+    let templates = WORKFLOW_ACTION_TEMPLATES.prefix((workflow_id.clone(), action_id.clone())).keys(storage, None, None, Order::Ascending).collect::<StdResult<Vec<_>>>()?;
+    for template_id in templates {
+        WORKFLOW_ACTION_TEMPLATES.remove(storage, (workflow_id.clone(), action_id.clone(), template_id.clone()));
+    }
     Ok(())
 }
 

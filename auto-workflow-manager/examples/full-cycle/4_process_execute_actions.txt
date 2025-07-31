@@ -1,0 +1,152 @@
+-----------------------------------
+proceso de execute-workflow-actions
+-----------------------------------
+
+- temporal detecta que hay que ejecutar
+
+- comienza a ejecutar el interprete
+
+- dia1: el interprete ejecuta el startAction de check
+    - ejecutar check
+        - buscar inputs
+        - ejecutar llamada al contrato contractAddress y recibir los tokens pendientes de claim
+        - comparacion tokens > minAmountToClaim?
+            - "noTokens" => nextAction=null
+        - interprete modifica el contexto de ejecucion con
+            - check.tokensToClaim = { .... }
+            - si soy recurrente, y no es mi ultima ejecucion:
+                - nextState = initialAction
+                - NOTA: en workflow manager va a dejar ejecutar SIEMPRE el startAction si:
+                    - isRecurrent() && notExpired(env.block.time) && (lastAction == None || lastAction.final_state == true)
+            - else:
+                - nextState = null
+
+- dia2: temporal detecta que hay que ejecutar nuevamente
+    - interprete temporal ejecutar check
+        - buscar inputs
+        - ejecutar llamada al contrato contractAddress y recibir los tokens pendientes de claim
+        - comparacion tokens > minAmountToClaim?
+            - "hasTokens" => nextAction=claim
+            - supongamos que hay 600000000 de tokens
+        - interprete modifica el contexto de ejecucion con
+            - check.tokensToClaim = { .... }
+            - nextState = claim
+    - interprete temporal ejecutar claim
+        - ejecutar accion a traves de workflow-manager
+            - armar mapa params
+                - descarto todos los inputs que empicen con #ip.
+                - para cada input que empiece con {{ armo un key ("#cp." + param.name) y resuelvo el value en el contexto
+            - ejecutar workflow-manager/execute-action (ver APPENDIX execute action)
+                - input
+                {
+                    user: temporal.context.requester,
+                    instance_id: temporal.context.instanceId,
+                    action_id: "claim",
+                    "template_content": [
+                        "{{contractAddress}}", "{\"claim\":{ \"id\": {{distributionId}} }}", []
+                    ]
+                    // contract, message y funds del hash1
+                    params: {}
+                }
+        - luego de ejecutar accion on-chain se actualiza el contexto por transicion "success"
+            - claim.claimedTokens = { "utokens": 599990000, "denom": "auto", ... } (la diferencia entre 60000000 y 59999000 es por fees)
+            - nextState = stake
+    - interprete temporal ejecuta stake
+        - ejecutar accion a traves de workflow-manager
+            - armar mapa params
+                - descarto todos los inputs que empicen con #ip.
+                - para cada input que empiece con {{ armo un key ("#cp." + param.name) y resuelvo el value en el contexto
+                - en concreto para esta accion queda:
+                    "#cp.amount" = 599990000
+                    "#cp.denom" = "auto"
+            - ejecutar workflow-manager/execute-action (ver APPENDIX execute action)
+                - input
+                {
+                    user: temporal.context.requester,
+                    instance_id: temporal.context.instanceId,
+                    action_id: "stake",
+                    params: {
+                        "amount": 599990000,
+                        "denom" = "auto"
+                    }
+                }
+
+
+    - TODO: workflow-manager ejecuta stake
+    - TODO: workflow-manager ejecuta notifiy
+    - TODO: termina el workflow y esperamos dia3
+
+
+
+
+
+
+APPENDIX: execute action
+    exectue_generico (user, instance_id, action_id, template_hash, template_content, execute_action_params) {
+
+        assert(sender.address, auto_engine_wallet_address)
+
+        user_instances = state.instances.get(user)
+        user_instance = user_instances.get(instance_id)
+
+        assert(notExpired(user_instance, env.block.time))
+
+        workflow = state.workflows.get(user_instance.workflow_id)
+        last_executed_action = workflow.actions.get(user_instance.last_action)
+        workflow_action = workflow.actions.get(action_id)
+
+        // TODO: mejorar IF
+        if (   
+
+                // es la primera vez que ejecuto y me piden ejecutar el start_action
+                (last_executed_action == None && action_id = workflow.start_action) ||              
+
+                // last_executed_action es distinto de None, entonces el siguiente action debe estar incluido en next_actions del ultimo action ejecutado 
+                (last_executed_action != None && last_executed_action.nextActions.includes(action_id)) ||                         
+
+                // para recurrentes, solo puedo re-ejecutar la primera accion cuando no se ejecuto ninguna accion o la ultima accion ejecutada fue un estado final
+                (user_instance.execution_type == "recurrent" 
+                    && action_id = workflow.start_action 
+                    && (last_executed_action == None || last_executed_action.final_state == true)) 
+                ) {
+                
+                resolved_params: Map<String, Value>
+                foreach (param in workflow_action.params) {
+                    // si param.value es #ip.requester => busco user_instance.requester
+                    // si param.value comienza con #ip, busco en user_instance.params
+                    // si param.value comienza con #cp, busco en execute_action_params
+                    // else es un valor fijo
+                    resolved_value = resolve(param.value, user_instance, execute_action_params)
+                    resolved_params.put(param.key, resolved_value)
+                }
+
+                let sub_msgs: !vec[SubMsg] = switch (workflow_action.type) 
+                    case "stakedTokenClaimer": stakedTokenClaimer(resolved_params)
+                    case "tokenStaker": tokenStaker(resolved_params)
+                    default: ContractError::InvalidOperation(workflow_action.type);
+
+                user_instance.last_action = action_id
+                save_instance(user_instance)
+
+                Ok(Response::new.add_submessages(sub_msgs))
+
+        } else {
+            Unauthorized(action_id)
+        }
+
+
+
+
+    }
+
+
+
+
+
+
+ExecuteAction(
+  user="Marcos",
+  instanceId="auto_claimer_1",
+  actionId="claim_tokens",
+  params=Map<[key: "amount", val: 5000000]>)
+  

@@ -1,15 +1,14 @@
 use std::{collections::HashMap, str::FromStr};
 
-use cosmwasm_std::{from_json, to_json_binary, Addr, DepsMut, Env, MessageInfo, Reply, Response, SubMsg, Uint128, WasmMsg};
-use serde_json::json;
+use cosmwasm_std::{to_json_binary, Addr, DepsMut, Env, MessageInfo, Response, SubMsg, Uint128, WasmMsg};
 
 use crate::{
-    msg::{NewInstanceMsg, ParamId},
+    msg::{NewInstanceMsg, ParamId, TemplateId},
     state::{
-        load_next_instance_id, load_workflow, load_workflow_action, load_workflow_action_params, load_workflow_instance, load_workflow_instance_params, remove_workflow_instance, save_workflow, save_workflow_action, save_workflow_action_params, save_workflow_instance, save_workflow_instance_params, validate_sender_is_action_executor, validate_sender_is_publisher, Action, Workflow, WorkflowInstance
+        load_next_instance_id, load_workflow, load_workflow_action, load_workflow_action_params, load_workflow_action_template, load_workflow_instance, load_workflow_instance_params, remove_workflow_instance, save_workflow, save_workflow_action, save_workflow_action_params, save_workflow_action_templates, save_workflow_instance, save_workflow_instance_params, validate_sender_is_action_executor, validate_sender_is_publisher, Action, Workflow, WorkflowInstance
     },
 };
-use crate::{msg::{ActionParamValue, ActionType, ExecutionType, NewWorkflowMsg, WorkflowInstanceState, WorkflowState, WorkflowVisibility}, ContractError};
+use crate::{msg::{ActionParamValue, ExecutionType, NewWorkflowMsg, WorkflowInstanceState, WorkflowState, WorkflowVisibility}, ContractError};
 
 pub fn publish_workflow(
     deps: DepsMut,
@@ -36,12 +35,12 @@ pub fn publish_workflow(
     save_workflow(deps.storage, &input_workflow.id, &new_workflow)?;
     for (action_id, action) in input_workflow.actions {
         let new_action = Action {
-            action_type: action.action_type,
             next_actions: action.next_actions,
             final_state: action.final_state,
         };
         save_workflow_action(deps.storage, &input_workflow.id, &action_id, &new_action)?;
         save_workflow_action_params(deps.storage, &input_workflow.id, &action_id, &action.params)?;
+        save_workflow_action_templates(deps.storage, &input_workflow.id, &action_id, &action.templates)?;
     }
 
     Ok(Response::new()
@@ -194,6 +193,7 @@ pub fn execute_action(
     user_address: String,
     instance_id: u64,
     action_id: String,
+    template_id: TemplateId,
     params: Option<HashMap<String, ActionParamValue>>,
 ) -> Result<Response, ContractError> {
     // Validate sender is action executor
@@ -213,8 +213,8 @@ pub fn execute_action(
     // Load workflow from user_instance.workflow_id
     let workflow = load_workflow(deps.storage, &user_instance.workflow_id)?;
 
-    // Get the action to execute using the action_id parameter
-    let action_to_execute = load_workflow_action(deps.storage, &user_instance.workflow_id, &action_id)
+    // Ensure the action exists
+    let _action_to_execute = load_workflow_action(deps.storage, &user_instance.workflow_id, &action_id)
         .map_err(|_| ContractError::ActionNotFound {
             workflow_id: user_instance.workflow_id.clone(),
             action_id: action_id.clone(),
@@ -253,11 +253,15 @@ pub fn execute_action(
         resolved_params.insert(key.clone(), resolved_value);
     }
 
-    // Create sub messages based on action type
-    let sub_msgs: Vec<SubMsg> = match action_to_execute.action_type {
-        ActionType::StakedTokenClaimer => staked_token_claimer(resolved_params)?,
-        ActionType::TokenStaker => token_staker(resolved_params)?,
-    };
+    // Execute template-based action
+    let sub_msgs: Vec<SubMsg> = execute_dynamic_template(
+        deps.storage,
+        &user_instance.workflow_id,
+        &action_id,
+        &template_id,
+        &resolved_params,
+        &params,
+    )?;
 
     // Update instance with last executed action
     let mut updated_instance = user_instance;
@@ -320,100 +324,94 @@ fn resolve_param_value(
     }
 }
 
-fn extract_str_param(params: &HashMap<String, ActionParamValue>, key: &str) -> Result<String, ContractError> {
-    if let Some(value) = params.get(key) {
-        match value {
-            ActionParamValue::String(s) => Ok(s.clone()),
-            _ => Err(ContractError::GenericError(format!("Parameter '{}' is not a string", key))),
-        }
-    } else {
-        Err(ContractError::GenericError(format!("Parameter '{}' not found in parameters", key)))
-    }
-}
 
-fn extract_bigint_param(params: &HashMap<String, ActionParamValue>, key: &str) -> Result<Uint128, ContractError> {
-    if let Some(value) = params.get(key) {
-        match value {
-            ActionParamValue::BigInt(s) => Ok(Uint128::from_str(s)?),
-            _ => Err(ContractError::GenericError(format!("Parameter '{}' is not a bigint", key))),
-        }
-    } else {
-        Err(ContractError::GenericError(format!("Parameter '{}' not found in parameters", key)))
-    }
-}
-
-pub fn execute_reply(deps: &DepsMut, env: &Env, msg: &Reply) -> Result<Response, ContractError> {
-    match msg.id {
-        CLAIM_ACTION_ID => staked_token_claimer_reply(deps, env, msg),
-        _ => Err(ContractError::GenericError("Unknown reply".to_string())),
-    }
-}
-
-//=========== STAKED TOKENS CLAIMER ACTION ============
-pub const CLAIM_ACTION_ID: u64 = 1;
-
-fn staked_token_claimer(
-    _params: HashMap<String, ActionParamValue>,
+//=========== DYNAMIC TEMPLATE ACTION ============
+fn execute_dynamic_template(
+    storage: &dyn cosmwasm_std::Storage,
+    workflow_id: &str,
+    action_id: &str,
+    template_id: &TemplateId,
+    resolved_params: &HashMap<String, ActionParamValue>,
+    execute_action_params: &Option<HashMap<String, ActionParamValue>>,
 ) -> Result<Vec<SubMsg>, ContractError> {
-    let provider = extract_str_param(&_params, "provider")?;
-    let contract_addr = extract_str_param(&_params, "contractAddress")?;
-    let user_address = extract_str_param(&_params, "userAddress")?;
-    let amount = extract_bigint_param(&_params, "amount")?;
+    // Load template for this action
+    let template = load_workflow_action_template(storage, &workflow_id.to_string(), &action_id.to_string(), &template_id.to_string()).map_err(|_| {
+        ContractError::TemplateNotFound {
+            workflow_id: workflow_id.to_string(),
+            action_id: action_id.to_string(),
+            template_id: template_id.to_string(),
+        }
+    })?;
 
-    if provider != "daodao" {
-        return Err(ContractError::GenericError(format!("Provider '{}' not supported", provider)));
-    }
-    
-    let claim_msg = WasmMsg::Execute {
-        contract_addr: contract_addr.clone(),
-        msg: to_json_binary(&json!({
-            // TODO: call to daodao contract
-            "user_address": user_address.clone(),
-            "amount": amount.clone(),
-        }))?,
-        funds: vec![],
+    // Resolve template parameters
+    let resolved_contract = resolve_template_parameter(&template.contract, resolved_params, execute_action_params)?;
+    let resolved_message = resolve_template_parameter(&template.message, resolved_params, execute_action_params)?;
+    let resolved_funds = resolve_template_funds(&template.funds, resolved_params, execute_action_params)?;
+
+    // Create the WasmMsg
+    let wasm_msg = WasmMsg::Execute {
+        contract_addr: resolved_contract,
+        msg: to_json_binary(&resolved_message)?,
+        funds: resolved_funds,
     };
 
     Ok(vec![
-        SubMsg::
-        reply_always(claim_msg, CLAIM_ACTION_ID)
-        .with_payload(to_json_binary(&json!({
-            "provider": provider.clone(),
-            "user_address": user_address.clone(),
-        }))?)
+        SubMsg::reply_never(wasm_msg)
     ])
 }
 
-fn staked_token_claimer_reply(
-    _deps: &DepsMut,
-    _env: &Env,
-    msg: &Reply,
-) -> Result<Response, ContractError> {
-    let payload: HashMap<String, String> = from_json(&msg.payload)?;
-    let provider = payload.get("provider").unwrap();
-
-    if provider != "daodao" {
-        return Err(ContractError::GenericError(format!("Provider '{}' not supported", provider)));
+fn resolve_template_parameter(
+    template_param: &str,
+    resolved_params: &HashMap<String, ActionParamValue>,
+    execute_action_params: &Option<HashMap<String, ActionParamValue>>,
+) -> Result<String, ContractError> {
+    let mut result = template_param.to_string();
+    
+    // Replace {{param}} placeholders with resolved values
+    for (key, value) in resolved_params {
+        let placeholder = format!("{{{{{}}}}}", key);
+        let value_str = match value {
+            ActionParamValue::String(s) => s.clone(),
+            ActionParamValue::BigInt(s) => s.clone(),
+        };
+        result = result.replace(&placeholder, &value_str);
     }
 
-    let _user_address = payload.get("user_address").unwrap();
+    // Replace #cp.param placeholders with execute action params
+    if let Some(params) = execute_action_params {
+        for (key, value) in params {
+            let placeholder = format!("#cp.{}", key);
+            let value_str = match value {
+                ActionParamValue::String(s) => s.clone(),
+                ActionParamValue::BigInt(s) => s.clone(),
+            };
+            result = result.replace(&placeholder, &value_str);
+        }
+    }
 
-    // TODO: call fee manager contract
-
-    Ok(Response::default())
+    Ok(result)
 }
-//=========== STAKED TOKENS CLAIMER ACTION (END) ============
 
-//=========== TOKEN STAKER ACTION ============
-pub const STAKE_ACTION_ID: u64 = 2;
-
-fn token_staker(_params: HashMap<String, ActionParamValue>) -> Result<Vec<SubMsg>, ContractError> {
-    let _provider = extract_str_param(&_params, "provider")?;
-    let _contract_addr = extract_str_param(&_params, "contractAddress")?;
-    let _user_address = extract_str_param(&_params, "userAddress")?;
-    let _amount = extract_bigint_param(&_params, "amount")?;
-    let _denom = extract_str_param(&_params, "denom")?;
-
-    // TODO: Implement token staker logic
-    Ok(vec![])
+fn resolve_template_funds(
+    template_funds: &[(String, String)],
+    resolved_params: &HashMap<String, ActionParamValue>,
+    execute_action_params: &Option<HashMap<String, ActionParamValue>>,
+) -> Result<Vec<cosmwasm_std::Coin>, ContractError> {
+    let mut resolved_funds = Vec::new();
+    
+    for (amount_template, denom_template) in template_funds {
+        let resolved_amount = resolve_template_parameter(amount_template, resolved_params, execute_action_params)?;
+        let resolved_denom = resolve_template_parameter(denom_template, resolved_params, execute_action_params)?;
+        
+        let amount = Uint128::from_str(&resolved_amount)?;
+        resolved_funds.push(cosmwasm_std::Coin {
+            amount,
+            denom: resolved_denom,
+        });
+    }
+    
+    Ok(resolved_funds)
 }
+
+
+//=========== DYNAMIC TEMPLATE ACTION (END) ============

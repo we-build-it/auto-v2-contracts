@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 
 use auto_workflow_manager::{
     contract::{execute, instantiate},
-    msg::{ExecuteMsg, InstantiateMsg, NewWorkflowMsg, ActionType, WorkflowVisibility, ActionMsg, ActionParamValue},
+    msg::{ExecuteMsg, InstantiateMsg, NewWorkflowMsg, WorkflowVisibility, ActionMsg, ActionParamValue, Template},
 };
 
 /// Initialize the contract with the given parameters
@@ -36,7 +36,6 @@ pub fn create_test_workflow() -> NewWorkflowMsg {
             (
                 "stake_tokens".to_string(),
                 ActionMsg {
-                    action_type: ActionType::TokenStaker,
                     params: HashMap::from([
                         (
                             "amount".to_string(),
@@ -51,12 +50,21 @@ pub fn create_test_workflow() -> NewWorkflowMsg {
                     ]),
                     next_actions: HashSet::from(["claim_rewards".to_string()]),
                     final_state: false,
+                    templates: HashMap::from([
+                        (
+                            "default".to_string(),
+                            Template {
+                                contract: "{{token_address}}".to_string(),
+                                message: "{\"stake\":{ \"amount\": {{amount}} }}".to_string(),
+                                funds: vec![],
+                            },
+                        ),
+                    ]),
                 },
             ),
             (
                 "claim_rewards".to_string(),
                 ActionMsg {
-                    action_type: ActionType::StakedTokenClaimer,
                     params: HashMap::from([(
                         "staking_contract".to_string(),
                         ActionParamValue::String(
@@ -65,6 +73,16 @@ pub fn create_test_workflow() -> NewWorkflowMsg {
                     )]),
                     next_actions: HashSet::new(),
                     final_state: true,
+                    templates: HashMap::from([
+                        (
+                            "default".to_string(),
+                            Template {
+                                contract: "{{staking_contract}}".to_string(),
+                                message: "{\"claim\":{}}".to_string(),
+                                funds: vec![],
+                            },
+                        ),
+                    ]),
                 },
             ),
         ]),
@@ -80,15 +98,70 @@ pub fn create_simple_test_workflow() -> NewWorkflowMsg {
         actions: HashMap::from([(
             "stake_tokens".to_string(),
             ActionMsg {
-                action_type: ActionType::TokenStaker,
                 params: HashMap::from([(
                     "amount".to_string(),
                     ActionParamValue::String("1000000".to_string()),
                 )]),
                 next_actions: HashSet::new(),
                 final_state: true,
+                templates: HashMap::from([
+                    (
+                        "default".to_string(),
+                        Template {
+                            contract: "osmo1token123456789abcdefghijklmnopqrstuvwxyz".to_string(),
+                            message: "{\"stake\":{ \"amount\": {{amount}} }}".to_string(),
+                            funds: vec![],
+                        },
+                    ),
+                ]),
             },
         )]),
+    }
+}
+
+#[allow(dead_code)]
+pub fn create_template_test_workflow() -> NewWorkflowMsg {
+    NewWorkflowMsg {
+        id: "template-test-workflow".to_string(),
+        start_action: "claim_tokens".to_string(),
+        visibility: WorkflowVisibility::Public,
+        actions: HashMap::from([
+            (
+                "claim_tokens".to_string(),
+                ActionMsg {
+                    params: HashMap::from([
+                        (
+                            "contractAddress".to_string(),
+                            ActionParamValue::String("osmo1contract123456789abcdefghijklmnopqrstuvwxyz".to_string()),
+                        ),
+                        (
+                            "distributionId".to_string(),
+                            ActionParamValue::String("123".to_string()),
+                        ),
+                    ]),
+                    next_actions: HashSet::new(),
+                    final_state: true,
+                    templates: HashMap::from([
+                        (
+                            "daodao".to_string(),
+                            Template {
+                                contract: "{{contractAddress}}".to_string(),
+                                message: "{\"claim\":{ \"id\": {{distributionId}} }}".to_string(),
+                                funds: vec![],
+                            },
+                        ),
+                        (
+                            "rujira".to_string(),
+                            Template {
+                                contract: "{{contractAddress}}".to_string(),
+                                message: "{\"claim\":{ \"otherId\": {{distributionId}} }}".to_string(),
+                                funds: vec![],
+                            },
+                        ),
+                    ]),
+                },
+            ),
+        ]),
     }
 }
 

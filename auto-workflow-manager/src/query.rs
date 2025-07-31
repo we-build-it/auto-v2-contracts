@@ -1,7 +1,7 @@
 use cosmwasm_std::{Addr, Deps, StdResult};
 use crate::{
     msg::{ActionMsg, GetInstancesResponse, GetWorkflowInstanceResponse, GetWorkflowResponse, InstanceId, NewInstanceMsg, NewWorkflowMsg, WorkflowInstanceResponse, WorkflowResponse}, 
-    state::{load_workflow, load_workflow_action_params, load_workflow_actions, load_workflow_instance, load_workflow_instance_params, load_workflow_instances_by_requester, WorkflowInstance},
+    state::{load_workflow, load_workflow_action_params, load_workflow_action_templates, load_workflow_actions, load_workflow_instance, load_workflow_instance_params, load_workflow_instances_by_requester, WorkflowInstance},
 };
 
 pub fn query_workflow_by_id(deps: Deps, workflow_id: String) -> StdResult<GetWorkflowResponse> {
@@ -12,10 +12,10 @@ pub fn query_workflow_by_id(deps: Deps, workflow_id: String) -> StdResult<GetWor
             start_action: workflow.start_action,
             visibility: workflow.visibility,
             actions: load_workflow_actions(deps.storage, &workflow_id)?.iter().map(|(action_id, action)| (action_id.clone(), ActionMsg {
-                action_type: action.action_type.clone(),
                 params: load_workflow_action_params(deps.storage, &workflow_id, &action_id).unwrap_or_default(),
                 next_actions: action.next_actions.clone(),
                 final_state: action.final_state,
+                templates: load_workflow_action_templates(deps.storage, &workflow_id, &action_id).unwrap_or_default(),
             })).collect(),
         },
         publisher: workflow.publisher.clone(),

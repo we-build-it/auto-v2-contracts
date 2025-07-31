@@ -1,0 +1,46 @@
+-----------------------------------
+proceso de launch-workflow-instance
+-----------------------------------
+
+- suponemos que el ejecutor elije daodao
+- ejecutar workflow-manager/launch-workflow
+    - input
+        {
+            "workflow_id": "dslkfjds....",
+            "onchain_parameters": {
+                "claim_template_hash": "hash1",
+                "claim_contract_address": "sthor11111111111111111111",
+                "stake_contract_address": "sthor22222222222222222222",
+                "distribution_id": "12"
+            },
+            "offchain_parameters": {
+                "min_amount_to_claim": "100",
+                "protocol_name": "AUTO",
+                "notification_type": "telegram",
+                "notification_address": "tg1234567890"
+            },
+            "execution_parameters": {
+                "cron_expression": "0 0 * * *",
+            },
+            "execution_type": "recurrent",
+            "expiration_time": "3443534805435"
+        }
+    - process
+        - validate
+            workflow.private == false || sender.address == workflow.publisher
+        - store in contract state
+            - instance.id (generado)
+            - instance.state = RUNNING
+            - instance.requester = sender.address
+            - instance.lastAction = NONE
+            - input.workflow_id
+            - input.onchain_parameters
+            - input.execution_type
+            - input.expiration_time
+    - output
+        - tx con el input completo
+        - eventos que agreguen:
+            - instnace.id
+            - instance.state
+
+- event-listener -> backend -> lanzar flujo temporal + modelo de datos populado

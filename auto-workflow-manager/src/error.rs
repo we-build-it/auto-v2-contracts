@@ -65,6 +65,18 @@ pub enum ContractError {
         action_id: String,
     },
 
+    #[error("Template {template_id} not found in action {action_id} of workflow {workflow_id}")]
+    TemplateNotFound {
+        workflow_id: String,
+        action_id: String,
+        template_id: String,
+    },
+
+    #[error("Invalid template: {reason}")]
+    InvalidTemplate {
+        reason: String,
+    },
+
     #[error("Denom {0} is not allowed for this action")]
     InvalidDenom(String),
 }

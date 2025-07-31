@@ -1,0 +1,110 @@
+{
+    "name": "Auto Claimer",
+    "description": "This workflow is used to automate the process of claiming and restaking tokens.",
+    "creationTimestamp": "2025-07-21T12:00:00Z",
+    "feeCollector": "0x489534dfgjf09ouetu3409tjrljg",
+    "constants": {
+        "example1": "value1"
+    },
+    "initialAction": "check",
+    "visibility": "public",
+    "actions": [
+        {
+            "name": "check",
+            "type": "claimableStakedTokensChecker",
+            "params": {
+                "provider": "#ip.provider",
+                "contractAddress": "#ip.contractAddress",
+                "userAddress": "#ip.requester",
+                "minimumTokens": "#ip.minAmountToClaim"
+            },
+            "transitions": {
+                "noTokens": {
+                    "nextAction": null
+                },
+                "hasTokens": {
+                    "nextAction": "claim"
+                }
+            }
+        },
+        {
+            "name": "claim",
+            "type": "stakedTokenClaimer",
+            "params": {
+                "templateHash": "#ip.claimTemplateHash",
+                "contractAddress": "#ip.claimContractAddress",
+                "distributionId": "#ip.distributionId"
+            },
+            "transitions": {
+                "success": {
+                    "nextAction": "stake"
+                }
+            },
+            "fees": [
+                {
+                    "percentage": "0.01"
+                }
+            ],
+            "templates": {
+                "daodao": {
+                    "hash": "hash1 -> hash(contract, message, funds)",
+                    "contract": "{{contractAddress}}",
+                    "message": "{\"claim\":{ \"id\": {{distributionId}}, \"otherId\": {{otherId}} }}",
+                    "funds": []
+                },
+                "rujira": {
+                    "hash": "hash2 -> hash(contract, message, funds)",
+                    "contract": "{{contractAddress}}",
+                    "message": "{\"claim\":{ \"otherId\": {{distributionId}} }}",
+                    "funds": []
+                }
+            }
+        },
+        {
+            "name": "stake",
+            "type": "tokenStaker",
+            "params": {
+                "amount": "{{claim.claimedTokens.utokens}}",
+                "denom": "{{claim.claimedTokens.denom}}"
+            },
+            "transitions": {
+                "success": {
+                    "nextAction": "notify"
+                }
+            },
+            "fees": [
+                {
+                    "percentage": "0.01"
+                }
+            ],
+            "templates": {
+                "daodao": {
+                    "hash": "hash3 -> hash(contract, message, funds)",
+                    "contract": "shtor1daodao",
+                    "message": "{\"stakeDaoDao\":{ }}",
+                    "funds": [[ "{{amount}}", "{{denom}}" ]]
+                },
+                "cwrewards": {
+                    "hash": "hash4 -> hash(contract, message, funds)",
+                    "contract": "sthor1cwrewards",
+                    "message": "{\"stakeCw\":{ }}",
+                    "funds": [[ "{{amount}}", "{{denom}}" ]]
+                }
+            }
+        },
+        {
+            "name": "notify",
+            "type": "notifier",
+            "params": {
+                "template": "🤖 New Auto Claim 🤖\n\nWallet: {{instance.requester}}\nWhen: {{now}}\nProtocol: {{instance.params.protocolName}}\n\nDetails:\n\n🟢 Tokens claimed: {{claim.claimedTokens.amount}} {{params.claimDenom}} (${{claim.claimedTokens.usdAmount}})\n💰 Fee payed: 0.000 AUTO ($0.000)\n🔒 Tokens staked: {{stake.stakedTokens.amount}} {{params.stakeDenom}} (${{stake.stakedTokens.usdAmount}}) ✨ Manage AutoClaimer preferences here: 👉 AutoClaimer",
+                "type": "#ip.notificationType",
+                "address": "#ip.notificationAddress"
+            },
+            "transitions": {
+                "success": {
+                    "nextAction": null
+                }
+            }
+        }
+    ]
+}

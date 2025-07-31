@@ -40,23 +40,25 @@ pub struct InstantiateMsg {
     pub referral_memo: String,
 }
 
-#[cw_serde]
-pub enum ActionType {
-    StakedTokenClaimer,
-    TokenStaker,
-}
-
 pub type WorkflowId = String;
 pub type ActionId = String;
 pub type InstanceId = u64;
 pub type ParamId = String;
+pub type TemplateId = String;
+
+#[cw_serde]
+pub struct Template {
+    pub contract: String,
+    pub message: String,
+    pub funds: Vec<(String, String)>, // (amount, denom)
+}
 
 #[cw_serde]
 pub struct ActionMsg {
-    pub action_type: ActionType,
     pub params: HashMap<ParamId, ActionParamValue>,
     pub next_actions: HashSet<ActionId>,
     pub final_state: bool,
+    pub templates: HashMap<TemplateId, Template>, // Now required, not optional
 }
 #[cw_serde]
 pub struct NewWorkflowMsg {
@@ -96,6 +98,7 @@ pub enum ExecuteMsg {
         user_address: String,
         instance_id: InstanceId,
         action_id: ActionId,
+        template_id: TemplateId, // Now required, not optional
         params: Option<HashMap<ParamId, ActionParamValue>>
     },
 }
