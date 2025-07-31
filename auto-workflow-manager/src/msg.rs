@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Decimal, Timestamp};
+use cosmwasm_std::{Addr, Timestamp};
 
 #[cw_serde]
 pub enum WorkflowVisibility {
@@ -57,21 +57,13 @@ pub struct ActionMsg {
     pub params: HashMap<ParamId, ActionParamValue>,
     pub next_actions: HashSet<ActionId>,
     pub final_state: bool,
-    pub fees: Option<Vec<ActionFee>>,
 }
-
-#[cw_serde]
-pub struct ActionFee {
-    pub percentage: Decimal,
-    pub target: Option<String>,
-}
-
 #[cw_serde]
 pub struct NewWorkflowMsg {
     pub id: WorkflowId,
     pub start_action: ActionId,
     pub visibility: WorkflowVisibility,
-    pub fee_collector: Option<Addr>,
+    // action_name -> action
     pub actions: HashMap<ActionId, ActionMsg>,
 }
   

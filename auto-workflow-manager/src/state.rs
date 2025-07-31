@@ -5,7 +5,7 @@ use cw_storage_plus::{Item, Map};
 
 use cosmwasm_schema::cw_serde;
 
-use crate::msg::{ActionFee, ActionId, ActionParamValue, ActionType, ExecutionType, InstanceId, ParamId, WorkflowId, WorkflowInstanceState, WorkflowState, WorkflowVisibility};
+use crate::msg::{ActionId, ActionParamValue, ActionType, ExecutionType, InstanceId, ParamId, WorkflowId, WorkflowInstanceState, WorkflowState, WorkflowVisibility};
 
 use crate::ContractError;
 
@@ -22,7 +22,6 @@ pub struct Action {
     pub action_type: ActionType,
     pub next_actions: HashSet<String>,
     pub final_state: bool,
-    pub fees: Option<Vec<ActionFee>>,
 }
 
 #[cw_serde]
@@ -31,7 +30,6 @@ pub struct Workflow {
     pub visibility: WorkflowVisibility,
     pub state: WorkflowState,
     pub publisher: Addr,
-    pub fee_collector: Option<Addr>,
 }
 
 

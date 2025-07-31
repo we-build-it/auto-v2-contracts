@@ -31,7 +31,6 @@ pub fn publish_workflow(
         visibility: input_workflow.visibility,
         publisher: info.sender.clone(),
         state: WorkflowState::Approved,
-        fee_collector: input_workflow.fee_collector,
     };
 
     save_workflow(deps.storage, &input_workflow.id, &new_workflow)?;
@@ -40,7 +39,6 @@ pub fn publish_workflow(
             action_type: action.action_type,
             next_actions: action.next_actions,
             final_state: action.final_state,
-            fees: action.fees,
         };
         save_workflow_action(deps.storage, &input_workflow.id, &action_id, &new_action)?;
         save_workflow_action_params(deps.storage, &input_workflow.id, &action_id, &action.params)?;

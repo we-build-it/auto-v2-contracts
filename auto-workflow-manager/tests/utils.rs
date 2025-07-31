@@ -51,7 +51,6 @@ pub fn create_test_workflow() -> NewWorkflowMsg {
                     ]),
                     next_actions: HashSet::from(["claim_rewards".to_string()]),
                     final_state: false,
-                    fees: None,
                 },
             ),
             (
@@ -66,11 +65,9 @@ pub fn create_test_workflow() -> NewWorkflowMsg {
                     )]),
                     next_actions: HashSet::new(),
                     final_state: true,
-                    fees: None,
                 },
             ),
         ]),
-        fee_collector: None,
     }
 }
 
@@ -90,10 +87,8 @@ pub fn create_simple_test_workflow() -> NewWorkflowMsg {
                 )]),
                 next_actions: HashSet::new(),
                 final_state: true,
-                fees: None,
             },
         )]),
-        fee_collector: None,
     }
 }
 
