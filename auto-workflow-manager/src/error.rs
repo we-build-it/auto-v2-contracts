@@ -79,4 +79,10 @@ pub enum ContractError {
 
     #[error("Denom {0} is not allowed for this action")]
     InvalidDenom(String),
+
+    #[error("Contract {contract} is not whitelisted for workflow {workflow_id}")]
+    ContractNotWhitelisted {
+        contract: String,
+        workflow_id: String,
+    },
 }

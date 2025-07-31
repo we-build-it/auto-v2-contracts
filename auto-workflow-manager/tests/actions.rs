@@ -318,6 +318,9 @@ fn test_execute_action_invalid_action_sequence() {
                     },
                 ),
             ]),
+            whitelisted_contracts: HashSet::from([
+                "osmo1contract123456789".to_string(),
+            ]),
         },
     );
     // Update the first action to have next_actions
@@ -505,6 +508,9 @@ fn test_execute_action_with_dynamic_template() {
                             },
                         ),
                     ]),
+                    whitelisted_contracts: HashSet::from([
+                        "osmo1contract123456789abcdefghijklmnopqrstuvwxyz".to_string(),
+                    ]),
                 },
             ),
         ]),
@@ -582,6 +588,9 @@ fn test_execute_action_template_not_found() {
                                 funds: vec![],
                             },
                         ),
+                    ]),
+                    whitelisted_contracts: HashSet::from([
+                        "osmo1contract123456789abcdefghijklmnopqrstuvwxyz".to_string(),
                     ]),
                 },
             ),

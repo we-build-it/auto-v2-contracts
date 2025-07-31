@@ -59,6 +59,7 @@ pub struct ActionMsg {
     pub next_actions: HashSet<ActionId>,
     pub final_state: bool,
     pub templates: HashMap<TemplateId, Template>, // Now required, not optional
+    pub whitelisted_contracts: HashSet<String>, // Lista de contratos whitelisted por acción
 }
 #[cw_serde]
 pub struct NewWorkflowMsg {

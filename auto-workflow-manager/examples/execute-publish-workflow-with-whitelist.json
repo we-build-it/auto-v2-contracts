@@ -1,0 +1,58 @@
+{
+  "publish_workflow": {
+    "workflow": {
+      "id": "staked-token-claimer-workflow",
+      "start_action": "stake_tokens",
+      "visibility": "public",
+      "actions": {
+        "stake_tokens": {
+          "params": {
+            "amount": {
+              "string": "1000000"
+            },
+            "token_address": {
+              "string": "osmo1token123456789abcdefghijklmnopqrstuvwxyz"
+            },
+            "user_address": {
+              "string": "#ip.requester"
+            }
+          },
+          "next_actions": ["claim_rewards"],
+          "final_state": false,
+          "templates": {
+            "stake_template": {
+              "contract": "{{token_address}}",
+              "message": "{\"stake\": {\"amount\": \"{{amount}}\", \"user\": \"{{user_address}}\"}}",
+              "funds": []
+            }
+          },
+          "whitelisted_contracts": [
+            "osmo1token123456789abcdefghijklmnopqrstuvwxyz"
+          ]
+        },
+        "claim_rewards": {
+          "params": {
+            "user_address": {
+              "string": "#ip.requester"
+            },
+            "staking_contract": {
+              "string": "osmo1staking123456789abcdefghijklmnopqrstuvwxyz"
+            }
+          },
+          "next_actions": [],
+          "final_state": true,
+          "templates": {
+            "claim_template": {
+              "contract": "{{staking_contract}}",
+              "message": "{\"claim_rewards\": {\"user\": \"{{user_address}}\"}}",
+              "funds": []
+            }
+          },
+          "whitelisted_contracts": [
+            "osmo1staking123456789abcdefghijklmnopqrstuvwxyz"
+          ]
+        }
+      }
+    }
+  }
+} 

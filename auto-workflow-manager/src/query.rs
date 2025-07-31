@@ -1,7 +1,7 @@
 use cosmwasm_std::{Addr, Deps, StdResult};
 use crate::{
     msg::{ActionMsg, GetInstancesResponse, GetWorkflowInstanceResponse, GetWorkflowResponse, InstanceId, NewInstanceMsg, NewWorkflowMsg, WorkflowInstanceResponse, WorkflowResponse}, 
-    state::{load_workflow, load_workflow_action_params, load_workflow_action_templates, load_workflow_actions, load_workflow_instance, load_workflow_instance_params, load_workflow_instances_by_requester, WorkflowInstance},
+    state::{load_workflow, load_workflow_action_params, load_workflow_action_templates, load_workflow_action_contracts, load_workflow_actions, load_workflow_instance, load_workflow_instance_params, load_workflow_instances_by_requester, WorkflowInstance},
 };
 
 pub fn query_workflow_by_id(deps: Deps, workflow_id: String) -> StdResult<GetWorkflowResponse> {
@@ -16,6 +16,7 @@ pub fn query_workflow_by_id(deps: Deps, workflow_id: String) -> StdResult<GetWor
                 next_actions: action.next_actions.clone(),
                 final_state: action.final_state,
                 templates: load_workflow_action_templates(deps.storage, &workflow_id, &action_id).unwrap_or_default(),
+                whitelisted_contracts: load_workflow_action_contracts(deps.storage, &workflow_id, &action_id).unwrap_or_default(),
             })).collect(),
         },
         publisher: workflow.publisher.clone(),

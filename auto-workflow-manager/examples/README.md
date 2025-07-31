@@ -9,11 +9,17 @@ Example for contract initialization with allowed publishers and action executors
 
 ## Execute Messages
 
-### `execute-request-for-approval.json`
-Example for requesting workflow approval. Contains a complete workflow template with:
+### `execute-publish-workflow.json`
+Example for publishing a workflow. Contains a complete workflow template with:
 - Workflow ID and start action
 - Visibility setting (public/private)
 - Actions with parameters, next actions, and final state flags
+
+### `execute-publish-workflow-with-whitelist.json`
+Example for publishing a workflow with whitelisted contracts per action. Contains:
+- Workflow ID and start action
+- Visibility setting (public/private)
+- Actions with parameters, next actions, final state flags, templates, and whitelisted contracts per action
 
 ### `execute-instance.json`
 Example for executing a workflow instance. Contains:
@@ -37,6 +43,9 @@ Example for executing a specific action within a workflow instance. Contains:
 - Instance ID
 - Action ID to execute
 - Optional custom parameters
+
+### `execute-action-with-whitelist-validation.json`
+Example for executing an action with whitelist validation. The system will verify that the resolved contract address is in the workflow's whitelisted contracts list before execution.
 
 ## Query Messages
 
@@ -65,6 +74,11 @@ These JSON files can be used with:
   - `#ip.requester`: Instance parameter for requester address
   - `#ip.key`: Instance parameter lookup
   - `#cp.key`: Custom parameter from execute_action
+
+## Security Features
+
+### Whitelisted Contracts
+Actions can specify a list of whitelisted contract addresses. When executing actions, the system validates that the resolved contract address is in the action's whitelist before allowing execution. This provides an additional security layer to prevent unauthorized contract interactions at the action level.
 
 ## Action Types
 

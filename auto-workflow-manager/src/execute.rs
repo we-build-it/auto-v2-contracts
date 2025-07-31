@@ -5,7 +5,7 @@ use cosmwasm_std::{to_json_binary, Addr, DepsMut, Env, MessageInfo, Response, Su
 use crate::{
     msg::{NewInstanceMsg, ParamId, TemplateId},
     state::{
-        load_next_instance_id, load_workflow, load_workflow_action, load_workflow_action_params, load_workflow_action_template, load_workflow_instance, load_workflow_instance_params, remove_workflow_instance, save_workflow, save_workflow_action, save_workflow_action_params, save_workflow_action_templates, save_workflow_instance, save_workflow_instance_params, validate_sender_is_action_executor, validate_sender_is_publisher, Action, Workflow, WorkflowInstance
+        load_next_instance_id, load_workflow, load_workflow_action, load_workflow_action_params, load_workflow_action_template, load_workflow_instance, load_workflow_instance_params, remove_workflow_instance, save_workflow, save_workflow_action, save_workflow_action_params, save_workflow_action_templates, save_workflow_action_contracts, save_workflow_instance, save_workflow_instance_params, validate_sender_is_action_executor, validate_sender_is_publisher, validate_contract_is_whitelisted, Action, Workflow, WorkflowInstance
     },
 };
 use crate::{msg::{ActionParamValue, ExecutionType, NewWorkflowMsg, WorkflowInstanceState, WorkflowState, WorkflowVisibility}, ContractError};
@@ -41,6 +41,7 @@ pub fn publish_workflow(
         save_workflow_action(deps.storage, &input_workflow.id, &action_id, &new_action)?;
         save_workflow_action_params(deps.storage, &input_workflow.id, &action_id, &action.params)?;
         save_workflow_action_templates(deps.storage, &input_workflow.id, &action_id, &action.templates)?;
+        save_workflow_action_contracts(deps.storage, &input_workflow.id, &action_id, &action.whitelisted_contracts)?;
     }
 
     Ok(Response::new()
@@ -347,6 +348,9 @@ fn execute_dynamic_template(
     let resolved_contract = resolve_template_parameter(&template.contract, resolved_params, execute_action_params)?;
     let resolved_message = resolve_template_parameter(&template.message, resolved_params, execute_action_params)?;
     let resolved_funds = resolve_template_funds(&template.funds, resolved_params, execute_action_params)?;
+
+    // Validate that the resolved contract is whitelisted
+    validate_contract_is_whitelisted(storage, &workflow_id.to_string(), &action_id.to_string(), &resolved_contract)?;
 
     // Create the WasmMsg
     let wasm_msg = WasmMsg::Execute {

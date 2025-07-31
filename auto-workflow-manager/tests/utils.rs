@@ -32,6 +32,7 @@ pub fn create_test_workflow() -> NewWorkflowMsg {
         id: "test-workflow".to_string(),
         start_action: "stake_tokens".to_string(),
         visibility: WorkflowVisibility::Public,
+
         actions: HashMap::from([
             (
                 "stake_tokens".to_string(),
@@ -60,6 +61,9 @@ pub fn create_test_workflow() -> NewWorkflowMsg {
                             },
                         ),
                     ]),
+                    whitelisted_contracts: HashSet::from([
+                        "osmo1token123456789abcdefghijklmnopqrstuvwxyz".to_string(),
+                    ]),
                 },
             ),
             (
@@ -83,6 +87,9 @@ pub fn create_test_workflow() -> NewWorkflowMsg {
                             },
                         ),
                     ]),
+                    whitelisted_contracts: HashSet::from([
+                        "osmo1staking123456789abcdefghijklmnopqrstuvwxyz".to_string(),
+                    ]),
                 },
             ),
         ]),
@@ -95,6 +102,7 @@ pub fn create_simple_test_workflow() -> NewWorkflowMsg {
         id: "simple-test-workflow".to_string(),
         start_action: "stake_tokens".to_string(),
         visibility: WorkflowVisibility::Public,
+
         actions: HashMap::from([(
             "stake_tokens".to_string(),
             ActionMsg {
@@ -114,6 +122,9 @@ pub fn create_simple_test_workflow() -> NewWorkflowMsg {
                         },
                     ),
                 ]),
+                whitelisted_contracts: HashSet::from([
+                    "osmo1token123456789abcdefghijklmnopqrstuvwxyz".to_string(),
+                ]),
             },
         )]),
     }
@@ -125,6 +136,7 @@ pub fn create_template_test_workflow() -> NewWorkflowMsg {
         id: "template-test-workflow".to_string(),
         start_action: "claim_tokens".to_string(),
         visibility: WorkflowVisibility::Public,
+
         actions: HashMap::from([
             (
                 "claim_tokens".to_string(),
@@ -158,6 +170,9 @@ pub fn create_template_test_workflow() -> NewWorkflowMsg {
                                 funds: vec![],
                             },
                         ),
+                    ]),
+                    whitelisted_contracts: HashSet::from([
+                        "osmo1contract123456789abcdefghijklmnopqrstuvwxyz".to_string(),
                     ]),
                 },
             ),

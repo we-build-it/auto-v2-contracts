@@ -50,6 +50,7 @@ pub const WORKFLOWS: Map<WorkflowId, Workflow> = Map::new("w");
 pub const WORKFLOW_ACTIONS: Map<(WorkflowId, ActionId), Action> = Map::new("wa");
 pub const WORKFLOW_ACTION_PARAMS: Map<(WorkflowId, ActionId), HashMap<ParamId, ActionParamValue>> = Map::new("wap");
 pub const WORKFLOW_ACTION_TEMPLATES: Map<(WorkflowId, ActionId, TemplateId), Template> = Map::new("wat");
+pub const WORKFLOW_ACTION_CONTRACTS: Map<(WorkflowId, ActionId, String), ()> = Map::new("wac");
 
 pub fn save_workflow(storage: &mut dyn Storage, id: &WorkflowId, workflow: &Workflow) -> StdResult<()> {
     WORKFLOWS.save(storage, id.clone(), workflow)
@@ -91,6 +92,7 @@ pub fn remove_workflow_action(storage: &mut dyn Storage, workflow_id: &WorkflowI
     WORKFLOW_ACTIONS.remove(storage, (workflow_id.clone(), action_id.clone()));
     remove_workflow_action_params(storage, workflow_id, action_id)?;
     remove_workflow_action_templates(storage, workflow_id, action_id)?;
+    remove_workflow_action_contracts(storage, workflow_id, action_id)?;
     Ok(())
 }
 
@@ -132,6 +134,30 @@ pub fn remove_workflow_action_templates(storage: &mut dyn Storage, workflow_id: 
     let templates = WORKFLOW_ACTION_TEMPLATES.prefix((workflow_id.clone(), action_id.clone())).keys(storage, None, None, Order::Ascending).collect::<StdResult<Vec<_>>>()?;
     for template_id in templates {
         WORKFLOW_ACTION_TEMPLATES.remove(storage, (workflow_id.clone(), action_id.clone(), template_id.clone()));
+    }
+    Ok(())
+}
+
+pub fn save_workflow_action_contracts(storage: &mut dyn Storage, workflow_id: &WorkflowId, action_id: &ActionId, contracts: &HashSet<String>) -> StdResult<()> {
+    for contract in contracts {
+        WORKFLOW_ACTION_CONTRACTS.save(storage, (workflow_id.clone(), action_id.clone(), contract.clone()), &())?;
+    }
+    Ok(())
+}
+
+pub fn load_workflow_action_contract(storage: &dyn Storage, workflow_id: &WorkflowId, action_id: &ActionId, contract_addr: &str) -> StdResult<()> {
+    WORKFLOW_ACTION_CONTRACTS.load(storage, (workflow_id.clone(), action_id.clone(), contract_addr.to_string()))
+}
+
+pub fn load_workflow_action_contracts(storage: &dyn Storage, workflow_id: &WorkflowId, action_id: &ActionId) -> StdResult<HashSet<String>> {
+    let contracts = WORKFLOW_ACTION_CONTRACTS.prefix((workflow_id.clone(), action_id.clone())).keys(storage, None, None, Order::Ascending).collect::<StdResult<Vec<_>>>()?;
+    Ok(contracts.into_iter().collect())
+}
+
+pub fn remove_workflow_action_contracts(storage: &mut dyn Storage, workflow_id: &WorkflowId, action_id: &ActionId) -> StdResult<()> {
+    let contracts = WORKFLOW_ACTION_CONTRACTS.prefix((workflow_id.clone(), action_id.clone())).keys(storage, None, None, Order::Ascending).collect::<StdResult<Vec<_>>>()?;
+    for contract in contracts {
+        WORKFLOW_ACTION_CONTRACTS.remove(storage, (workflow_id.clone(), action_id.clone(), contract.clone()));
     }
     Ok(())
 }
@@ -244,4 +270,19 @@ pub fn validate_sender_is_admin(
     } else {
         Ok(())
     }
+}
+
+pub fn validate_contract_is_whitelisted(
+    storage: &dyn Storage,
+    workflow_id: &WorkflowId,
+    action_id: &ActionId,
+    contract_addr: &str,
+) -> Result<(), ContractError> {
+    let _ = load_workflow_action_contract(storage, workflow_id, action_id, contract_addr).map_err(|_| {
+        ContractError::ContractNotWhitelisted {
+            contract: contract_addr.to_string(),
+            workflow_id: workflow_id.to_string(),
+        }
+    })?;
+    Ok(())
 }
