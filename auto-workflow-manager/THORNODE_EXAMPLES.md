@@ -77,7 +77,6 @@ thornode tx wasm execute sthor1workflowmanagercontractaddress123456789 \
       "id": "staking_workflow",
       "start_action": "stake_tokens",
       "visibility": "public",
-      "fee_collector": "sthor1feecollector123456789",
       "actions": {
         "stake_tokens": {
           "action_type": "token_staker",
@@ -89,17 +88,7 @@ thornode tx wasm execute sthor1workflowmanagercontractaddress123456789 \
             "denom": "uosmo"
           },
           "next_actions": [],
-          "final_state": true,
-          "fees": [
-            {
-              "percentage": "0.05",
-              "target": "staked"
-            },
-            {
-              "percentage": "0.01",
-              "target": "extra"
-            }
-          ]
+          "final_state": true
         }
       }
     }
@@ -121,7 +110,6 @@ thornode tx wasm execute sthor1workflowmanagercontractaddress123456789 \
       "id": "private_claiming_workflow",
       "start_action": "claim_rewards",
       "visibility": "private",
-      "fee_collector": null,
       "actions": {
         "claim_rewards": {
           "action_type": "staked_token_claimer",
@@ -132,8 +120,7 @@ thornode tx wasm execute sthor1workflowmanagercontractaddress123456789 \
             "amount": "500000"
           },
           "next_actions": [],
-          "final_state": true,
-          "fees": null
+          "final_state": true
         }
       }
     }
@@ -155,7 +142,6 @@ thornode tx wasm execute sthor1workflowmanagercontractaddress123456789 \
       "id": "stake_and_claim_workflow",
       "start_action": "stake_tokens",
       "visibility": "public",
-      "fee_collector": "sthor1feecollector123456789",
       "actions": {
         "stake_tokens": {
           "action_type": "token_staker",
@@ -167,13 +153,7 @@ thornode tx wasm execute sthor1workflowmanagercontractaddress123456789 \
             "denom": "uosmo"
           },
           "next_actions": ["claim_rewards"],
-          "final_state": false,
-          "fees": [
-            {
-              "percentage": "0.03",
-              "target": "staked"
-            }
-          ]
+          "final_state": false
         },
         "claim_rewards": {
           "action_type": "staked_token_claimer",
@@ -184,13 +164,7 @@ thornode tx wasm execute sthor1workflowmanagercontractaddress123456789 \
             "amount": "500000"
           },
           "next_actions": [],
-          "final_state": true,
-          "fees": [
-            {
-              "percentage": "0.02",
-              "target": "claimed"
-            }
-          ]
+          "final_state": true
         }
       }
     }
@@ -497,131 +471,6 @@ thornode tx wasm execute sthor1workflowmanagercontractaddress123456789 \
 --gas auto --gas-adjustment 1.5
 ```
 
-## Fee Configuration Examples
-
-### 1. Workflow with Creator Fees Only
-
-```bash
-thornode tx wasm execute sthor1workflowmanagercontractaddress123456789 \
-'{
-  "publish_workflow": {
-    "workflow": {
-      "id": "creator_fee_workflow",
-      "start_action": "stake_tokens",
-      "visibility": "public",
-      "fee_collector": "sthor1creator123456789",
-      "actions": {
-        "stake_tokens": {
-          "action_type": "token_staker",
-          "params": {
-            "provider": "daodao",
-            "contractAddress": "osmo1stakingcontract123456789",
-            "userAddress": "#ip.requester",
-            "amount": "1000000",
-            "denom": "uosmo"
-          },
-          "next_actions": [],
-          "final_state": true,
-          "fees": [
-            {
-              "percentage": "0.10",
-              "target": "staked"
-            }
-          ]
-        }
-      }
-    }
-  }
-}' \
---from wbi-dev-1 \
---chain-id thorchain-stagenet-2 \
---node https://stagenet-rpc.ninerealms.com:443 \
---gas auto --gas-adjustment 1.5
-```
-
-### 2. Workflow with Multiple Fee Types
-
-```bash
-thornode tx wasm execute sthor1workflowmanagercontractaddress123456789 \
-'{
-  "publish_workflow": {
-    "workflow": {
-      "id": "multi_fee_workflow",
-      "start_action": "complex_action",
-      "visibility": "public",
-      "fee_collector": "sthor1feecollector123456789",
-      "actions": {
-        "complex_action": {
-          "action_type": "token_staker",
-          "params": {
-            "provider": "daodao",
-            "contractAddress": "osmo1stakingcontract123456789",
-            "userAddress": "#ip.requester",
-            "amount": "1000000",
-            "denom": "uosmo"
-          },
-          "next_actions": [],
-          "final_state": true,
-          "fees": [
-            {
-              "percentage": "0.05",
-              "target": "staked"
-            },
-            {
-              "percentage": "0.02",
-              "target": "extra"
-            },
-            {
-              "percentage": "0.01",
-              "target": "referral"
-            }
-          ]
-        }
-      }
-    }
-  }
-}' \
---from wbi-dev-1 \
---chain-id thorchain-stagenet-2 \
---node https://stagenet-rpc.ninerealms.com:443 \
---gas auto --gas-adjustment 1.5
-```
-
-### 3. Workflow without Fees
-
-```bash
-thornode tx wasm execute sthor1workflowmanagercontractaddress123456789 \
-'{
-  "publish_workflow": {
-    "workflow": {
-      "id": "free_workflow",
-      "start_action": "free_action",
-      "visibility": "public",
-      "fee_collector": null,
-      "actions": {
-        "free_action": {
-          "action_type": "token_staker",
-          "params": {
-            "provider": "daodao",
-            "contractAddress": "osmo1stakingcontract123456789",
-            "userAddress": "#ip.requester",
-            "amount": "1000000",
-            "denom": "uosmo"
-          },
-          "next_actions": [],
-          "final_state": true,
-          "fees": null
-        }
-      }
-    }
-  }
-}' \
---from wbi-dev-1 \
---chain-id thorchain-stagenet-2 \
---node https://stagenet-rpc.ninerealms.com:443 \
---gas auto --gas-adjustment 1.5
-```
-
 ## Important Notes
 
 1. **Gas Adjustment**: Use `--gas-adjustment 1.5` to avoid insufficient gas errors
@@ -633,21 +482,15 @@ thornode tx wasm execute sthor1workflowmanagercontractaddress123456789 \
    - `#cp.param_name` resolves to execution-time parameters
 5. **Workflow Visibility**: Private workflows can only be executed by the publisher
 6. **Instance Expiration**: Instances automatically expire based on the configured expiration time
-7. **Fee Collection**: 
-   - `fee_collector` specifies the address that will receive collected fees
-   - `fees` array defines percentage-based fees for each action
-   - Fee percentages are expressed as decimals (e.g., 0.05 for 5%)
-   - Fee targets refer to amounts to which apply the percentage, they depend on the action.
 
 ## Typical Usage Flow
 
 1. **Setup**: Deploy and instantiate the contract with authorized publishers and executors
-2. **Publish**: Publishers create and publish workflows with defined actions, parameters, and fee structures
+2. **Publish**: Publishers create and publish workflows with defined actions and parameters
 3. **Execute**: Users execute workflow instances with appropriate parameters
 4. **Manage**: Users can pause, resume, or cancel their workflow instances
 5. **Execute Actions**: Authorized executors execute individual actions within workflow instances
-6. **Fee Collection**: Automatic fee calculation and collection during action execution
-7. **Monitor**: Query workflows, instances, and execution status
+6. **Monitor**: Query workflows, instances, and execution status
 
 ## Error Handling
 
@@ -659,5 +502,4 @@ Common error scenarios and their solutions:
 - **Instance Not Found**: Verify the instance_id exists and belongs to the user
 - **Action Not Found**: Verify the action_id exists in the workflow
 - **Instance Expired**: Check the expiration_time and create a new instance if needed
-- **Invalid Action Sequence**: Ensure actions are executed in the correct order
-- **Invalid Fee Configuration**: Verify fee percentages are valid (0.0 to 1.0) and targets are properly specified 
+- **Invalid Action Sequence**: Ensure actions are executed in the correct order 
