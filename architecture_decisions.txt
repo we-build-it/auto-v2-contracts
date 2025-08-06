@@ -1,0 +1,3 @@
+Why do we use the workflow hash as the workflow id?
+
+Why the publisher needs to send the entire workflow definition as a json AND its hash to the Auto backend?
