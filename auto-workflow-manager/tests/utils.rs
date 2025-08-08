@@ -27,7 +27,9 @@ pub fn instantiate_contract(
 }
 
 #[allow(dead_code)]
-pub fn create_test_workflow() -> NewWorkflowMsg {
+pub fn create_test_workflow(api: MockApi) -> NewWorkflowMsg {
+    let token_address = api.addr_make("token_address");
+    let staking_address = api.addr_make("staking_address");
     NewWorkflowMsg {
         id: "test-workflow".to_string(),
         start_actions: HashSet::from([
@@ -50,7 +52,7 @@ pub fn create_test_workflow() -> NewWorkflowMsg {
                         (
                             "token_address".to_string(),
                             ActionParamValue::String(
-                                "osmo1token123456789abcdefghijklmnopqrstuvwxyz".to_string(),
+                                token_address.to_string(),
                             ),
                         ),
                     ]),
@@ -66,7 +68,7 @@ pub fn create_test_workflow() -> NewWorkflowMsg {
                         ),
                     ]),
                     whitelisted_contracts: HashSet::from([
-                        "osmo1token123456789abcdefghijklmnopqrstuvwxyz".to_string(),
+                        token_address.to_string(),
                     ]),
                 },
             ),
@@ -76,7 +78,7 @@ pub fn create_test_workflow() -> NewWorkflowMsg {
                     params: HashMap::from([(
                         "staking_contract".to_string(),
                         ActionParamValue::String(
-                            "osmo1staking123456789abcdefghijklmnopqrstuvwxyz".to_string(),
+                            staking_address.to_string(),
                         ),
                     )]),
                     next_actions: HashSet::new(),
@@ -91,7 +93,7 @@ pub fn create_test_workflow() -> NewWorkflowMsg {
                         ),
                     ]),
                     whitelisted_contracts: HashSet::from([
-                        "osmo1staking123456789abcdefghijklmnopqrstuvwxyz".to_string(),
+                        staking_address.to_string(),
                     ]),
                 },
             ),
@@ -100,7 +102,8 @@ pub fn create_test_workflow() -> NewWorkflowMsg {
 }
 
 #[allow(dead_code)]
-pub fn create_simple_test_workflow() -> NewWorkflowMsg {
+pub fn create_simple_test_workflow(api: MockApi) -> NewWorkflowMsg {
+    let contract_address =  api.addr_make("contract_to_call");
     NewWorkflowMsg {
         id: "simple-test-workflow".to_string(),
         start_actions: HashSet::from([
@@ -122,14 +125,14 @@ pub fn create_simple_test_workflow() -> NewWorkflowMsg {
                     (
                         "default".to_string(),
                         Template {
-                            contract: "osmo1token123456789abcdefghijklmnopqrstuvwxyz".to_string(),
+                            contract: contract_address.to_string(),
                             message: "{\"stake\":{ \"amount\": {{amount}} }}".to_string(),
                             funds: vec![],
                         },
                     ),
                 ]),
                 whitelisted_contracts: HashSet::from([
-                    "osmo1token123456789abcdefghijklmnopqrstuvwxyz".to_string(),
+                    contract_address.to_string(),
                 ]),
             },
         )]),

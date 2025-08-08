@@ -7,10 +7,10 @@ use crate::utils::create_test_environment;
 
 #[test]
 fn test_publish_workflow_ok() {
-    let (mut deps, env, _api, _admin_address, publisher_address, _executor_address) = create_test_environment();
+    let (mut deps, env, api, _admin_address, publisher_address, _executor_address) = create_test_environment();
 
     // Create and publish workflow using utils functions
-    let workflow_msg = create_test_workflow();
+    let workflow_msg = create_test_workflow(api);
     let response =
         publish_workflow(deps.as_mut(), env, publisher_address.clone(), workflow_msg).unwrap();
 
@@ -31,7 +31,7 @@ fn test_publish_workflow_invalid_publisher() {
     let unauthorized_publisher = api.addr_make("unauthorized_publisher");
     
     // Try to publish workflow with unauthorized publisher using utils functions
-    let workflow_msg = create_simple_test_workflow();
+    let workflow_msg = create_simple_test_workflow(api);
     let result = publish_workflow(
         deps.as_mut(),
         env,

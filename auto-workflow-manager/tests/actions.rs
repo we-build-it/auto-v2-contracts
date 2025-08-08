@@ -72,7 +72,7 @@ fn test_execute_action_ok() {
     env.block.time = Timestamp::from_seconds(1000000000);
 
     // Create a workflow with correct parameters for token_staker
-    let mut workflow_msg = create_simple_test_workflow();
+    let mut workflow_msg = create_simple_test_workflow(api);
     workflow_msg.actions.get_mut("stake_tokens").unwrap().params = HashMap::from([
         ("provider".to_string(), ActionParamValue::String("daodao".to_string())),
         ("contractAddress".to_string(), ActionParamValue::String("osmo1contract123456789".to_string())),
@@ -122,7 +122,7 @@ fn test_execute_action_unauthorized_executor() {
     env.block.time = Timestamp::from_seconds(1000000000);
 
     // Create a workflow with correct parameters for token_staker
-    let mut workflow_msg = create_simple_test_workflow();
+    let mut workflow_msg = create_simple_test_workflow(api);
     workflow_msg.actions.get_mut("stake_tokens").unwrap().params = HashMap::from([
         ("provider".to_string(), ActionParamValue::String("daodao".to_string())),
         ("contractAddress".to_string(), ActionParamValue::String("osmo1contract123456789".to_string())),
@@ -199,7 +199,7 @@ fn test_execute_action_instance_expired() {
     env.block.time = Timestamp::from_seconds(2000000000);
 
     // Publish a workflow first
-    let workflow_msg = create_simple_test_workflow();
+    let workflow_msg = create_simple_test_workflow(api);
     publish_workflow(deps.as_mut(), env.clone(), publisher_address.clone(), workflow_msg).unwrap();
 
     // Execute instance
@@ -238,7 +238,7 @@ fn test_execute_action_action_not_found() {
     env.block.time = Timestamp::from_seconds(1000000000);
 
     // Create a workflow with correct parameters for token_staker
-    let mut workflow_msg = create_simple_test_workflow();
+    let mut workflow_msg = create_simple_test_workflow(api);
     workflow_msg.actions.get_mut("stake_tokens").unwrap().params = HashMap::from([
         ("provider".to_string(), ActionParamValue::String("daodao".to_string())),
         ("contractAddress".to_string(), ActionParamValue::String("osmo1contract123456789".to_string())),
@@ -287,7 +287,7 @@ fn test_execute_action_invalid_action_sequence() {
     env.block.time = Timestamp::from_seconds(1000000000);
 
     // Create a workflow with multiple actions
-    let mut workflow_msg = create_simple_test_workflow();
+    let mut workflow_msg = create_simple_test_workflow(api);
     workflow_msg.actions.get_mut("stake_tokens").unwrap().params = HashMap::from([
         ("provider".to_string(), ActionParamValue::String("daodao".to_string())),
         ("contractAddress".to_string(), ActionParamValue::String("osmo1contract123456789".to_string())),
@@ -366,13 +366,9 @@ fn test_execute_action_with_params() {
     env.block.time = Timestamp::from_seconds(1000000000);
 
     // Create a workflow with correct parameters for token_staker
-    let mut workflow_msg = create_simple_test_workflow();
+    let mut workflow_msg = create_simple_test_workflow(api);
     workflow_msg.actions.get_mut("stake_tokens").unwrap().params = HashMap::from([
-        ("provider".to_string(), ActionParamValue::String("daodao".to_string())),
-        ("contractAddress".to_string(), ActionParamValue::String("osmo1contract123456789".to_string())),
-        ("userAddress".to_string(), ActionParamValue::String(user_address.to_string())),
         ("amount".to_string(), ActionParamValue::BigInt("1000000".to_string())),
-        ("denom".to_string(), ActionParamValue::String("uosmo".to_string())),
     ]);
 
     // Publish the workflow
@@ -418,13 +414,9 @@ fn test_execute_action_recurrent_workflow() {
     env.block.time = Timestamp::from_seconds(1000000000);
 
     // Create a workflow with correct parameters for token_staker
-    let mut workflow_msg = create_simple_test_workflow();
+    let mut workflow_msg = create_simple_test_workflow(api);
     workflow_msg.actions.get_mut("stake_tokens").unwrap().params = HashMap::from([
-        ("provider".to_string(), ActionParamValue::String("daodao".to_string())),
-        ("contractAddress".to_string(), ActionParamValue::String("osmo1contract123456789".to_string())),
-        ("userAddress".to_string(), ActionParamValue::String(user_address.to_string())),
         ("amount".to_string(), ActionParamValue::BigInt("1000000".to_string())),
-        ("denom".to_string(), ActionParamValue::String("uosmo".to_string())),
     ]);
 
     // Publish the workflow
@@ -467,6 +459,8 @@ fn test_execute_action_with_dynamic_template() {
     // Set a reasonable block time
     env.block.time = Timestamp::from_seconds(1000000000);
 
+    let contract_to_call = api.addr_make("contract_to_call");
+
     // Create a workflow with dynamic templates
     let workflow_msg = auto_workflow_manager::msg::NewWorkflowMsg {
         id: "template-test-workflow".to_string(),
@@ -484,7 +478,7 @@ fn test_execute_action_with_dynamic_template() {
                     params: HashMap::from([
                         (
                             "contractAddress".to_string(),
-                            ActionParamValue::String("osmo1contract123456789abcdefghijklmnopqrstuvwxyz".to_string()),
+                            ActionParamValue::String(contract_to_call.to_string()),
                         ),
                         (
                             "distributionId".to_string(),
@@ -511,7 +505,7 @@ fn test_execute_action_with_dynamic_template() {
                         ),
                     ]),
                     whitelisted_contracts: HashSet::from([
-                        "osmo1contract123456789abcdefghijklmnopqrstuvwxyz".to_string(),
+                        contract_to_call.to_string(),
                     ]),
                 },
             ),
@@ -560,6 +554,8 @@ fn test_execute_action_template_not_found() {
     // Set a reasonable block time
     env.block.time = Timestamp::from_seconds(1000000000);
 
+    let token_address =  api.addr_make("token_address");
+
     // Create a workflow with dynamic templates
     let workflow_msg = auto_workflow_manager::msg::NewWorkflowMsg {
         id: "template-test-workflow".to_string(),
@@ -577,7 +573,7 @@ fn test_execute_action_template_not_found() {
                     params: HashMap::from([
                         (
                             "contractAddress".to_string(),
-                            ActionParamValue::String("osmo1contract123456789abcdefghijklmnopqrstuvwxyz".to_string()),
+                            ActionParamValue::String(token_address.to_string()),
                         ),
                         (
                             "distributionId".to_string(),
@@ -596,7 +592,7 @@ fn test_execute_action_template_not_found() {
                         ),
                     ]),
                     whitelisted_contracts: HashSet::from([
-                        "osmo1contract123456789abcdefghijklmnopqrstuvwxyz".to_string(),
+                        token_address.to_string(),
                     ]),
                 },
             ),

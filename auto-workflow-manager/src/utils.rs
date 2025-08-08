@@ -37,6 +37,8 @@ use cosmwasm_std::Coin;
 use std::collections::HashMap;
 use std::str::FromStr;
 
+use crate::ContractError;
+
 /// Splits a concatenated string into `amount` and `denom` and creates a `Coin`.
 ///
 /// # Arguments
@@ -235,6 +237,77 @@ pub fn build_authz_msg(
     // Construct MsgExec using Anybuf
     let msg_exec_buf = Anybuf::new()
         .append_string(1, &env.contract.address.to_string()) // grantee (field 1)
+        .append_repeated_message(2, &[msg_anybuf]); // msgs (field 2)
+
+    // cosmwasm_2_0
+    // let cosmos_msg = CosmosMsg::Any(cosmwasm_std::AnyMsg { 
+    //     type_url: "/cosmos.authz.v1beta1.MsgExec".to_string(),
+    //     value: msg_exec_buf.as_bytes().into(),
+    // }); 
+
+    // cosmwasm_1_4
+    #[allow(deprecated)]
+    let cosmos_msg = CosmosMsg::Stargate {
+        type_url: "/cosmos.authz.v1beta1.MsgExec".to_string(),
+        value: msg_exec_buf.as_bytes().into(),
+    }; 
+
+    Ok(cosmos_msg)
+}
+
+/// Builds an Authz message to execute a contract on behalf of a user.
+///
+/// # Arguments
+///
+/// * `env` - The environment information.
+/// * `user` - The address of the user on whose behalf the action will be executed.
+/// * `contract_addr` - The address of the contract to execute.
+/// * `msg_str` - The message to execute.
+/// * `funds` - The funds to send.
+///
+/// # Returns
+///
+/// * `StdResult<CosmosMsg>` - The constructed Authz message wrapped in a CosmosMsg.
+pub fn build_authz_execute_contract_msg(
+    env: &Env,
+    user: &Addr,
+    contract_addr: &Addr,
+    msg_str: &String,
+    funds: &Vec<Coin>
+) -> Result<CosmosMsg, ContractError> {
+    // Construct the message to be wrapped in MsgExec
+    let msg_anybuf = {
+            // Construct MsgExecuteContract using Anybuf
+            let mut execute_contract_buf = Anybuf::new()
+                .append_string(1, &user.to_string()) // sender (field 1)
+                .append_string(2, &contract_addr.to_string()) // contract (field 2)
+                .append_string(3, &msg_str); // msg (field 3)
+
+            // Add funds to the message if provided
+            if !funds.is_empty() {
+                let funds_bufs: Vec<Anybuf> = funds
+                    .iter()
+                    .map(|fund| {
+                        Anybuf::new()
+                            .append_string(1, &fund.denom) // denom (field 1)
+                            .append_string(2, &fund.amount.to_string()) // amount (field 2)
+                    })
+                    .collect();
+
+                execute_contract_buf = execute_contract_buf.append_repeated_message(5, &funds_bufs);
+            }
+
+            let execute_contract_bytes = execute_contract_buf.as_bytes();
+
+            // Wrap MsgExecuteContract in an Any message
+            Anybuf::new()
+                .append_string(1, "/cosmwasm.wasm.v1.MsgExecuteContract") // type_url (field 1)
+                .append_bytes(2, &execute_contract_bytes) // value (field 2)
+    };
+
+    // Construct MsgExec using Anybuf
+    let msg_exec_buf = Anybuf::new()
+        .append_string(1, env.contract.address.to_string()) // grantee (field 1)
         .append_repeated_message(2, &[msg_anybuf]); // msgs (field 2)
 
     // cosmwasm_2_0

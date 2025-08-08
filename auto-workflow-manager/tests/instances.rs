@@ -68,7 +68,7 @@ fn test_execute_instance_ok() {
     let user_address = api.addr_make("user");
 
     // Publish a workflow first
-    let workflow_msg = create_simple_test_workflow();
+    let workflow_msg = create_simple_test_workflow(api);
     publish_workflow(deps.as_mut(), env.clone(), publisher_address.clone(), workflow_msg).unwrap();
 
     // Execute instance
@@ -113,7 +113,7 @@ fn test_execute_instance_private_workflow_denied() {
     let unauthorized_user = api.addr_make("unauthorized_user");
 
     // Create and publish a private workflow
-    let mut workflow_msg = create_simple_test_workflow();
+    let mut workflow_msg = create_simple_test_workflow(api);
     workflow_msg.visibility = auto_workflow_manager::msg::WorkflowVisibility::Private;
     publish_workflow(deps.as_mut(), env.clone(), publisher_address.clone(), workflow_msg).unwrap();
 
@@ -138,7 +138,7 @@ fn test_cancel_instance_ok() {
     let user_address = api.addr_make("user");
 
     // Publish a workflow first
-    let workflow_msg = create_simple_test_workflow();
+    let workflow_msg = create_simple_test_workflow(api);
     publish_workflow(deps.as_mut(), env.clone(), publisher_address.clone(), workflow_msg).unwrap();
 
     // Execute instance
@@ -183,7 +183,7 @@ fn test_pause_instance_ok() {
     let user_address = api.addr_make("user");
 
     // Publish a workflow first
-    let workflow_msg = create_simple_test_workflow();
+    let workflow_msg = create_simple_test_workflow(api);
     publish_workflow(deps.as_mut(), env.clone(), publisher_address.clone(), workflow_msg).unwrap();
 
     // Execute instance
@@ -228,7 +228,7 @@ fn test_pause_instance_already_paused() {
     let user_address = api.addr_make("user");
 
     // Publish a workflow first
-    let workflow_msg = create_simple_test_workflow();
+    let workflow_msg = create_simple_test_workflow(api);
     publish_workflow(deps.as_mut(), env.clone(), publisher_address.clone(), workflow_msg).unwrap();
 
     // Execute instance
@@ -258,7 +258,7 @@ fn test_resume_instance_ok() {
     let user_address = api.addr_make("user");
 
     // Publish a workflow first
-    let workflow_msg = create_simple_test_workflow();
+    let workflow_msg = create_simple_test_workflow(api);
     publish_workflow(deps.as_mut(), env.clone(), publisher_address.clone(), workflow_msg).unwrap();
 
     // Execute instance
@@ -306,7 +306,7 @@ fn test_resume_instance_not_paused() {
     let user_address = api.addr_make("user");
 
     // Publish a workflow first
-    let workflow_msg = create_simple_test_workflow();
+    let workflow_msg = create_simple_test_workflow(api);
     publish_workflow(deps.as_mut(), env.clone(), publisher_address.clone(), workflow_msg).unwrap();
 
     // Execute instance

@@ -8,12 +8,14 @@ use auto_workflow_manager::msg::{ActionMsg, ActionParamValue, NewWorkflowMsg, Wo
 
 #[test]
 fn test_publish_workflow_with_whitelist() {
-    let (mut deps, env, _api, _admin_address, publisher_address, _executor_address) = create_test_environment();
+    let (mut deps, env, api, _admin_address, publisher_address, _executor_address) = create_test_environment();
 
     // Create workflow with whitelisted contracts
     let mut whitelisted_contracts = HashSet::new();
-    whitelisted_contracts.insert("osmo1token123456789abcdefghijklmnopqrstuvwxyz".to_string());
-    whitelisted_contracts.insert("osmo1staking123456789abcdefghijklmnopqrstuvwxyz".to_string());
+    let token_address = api.addr_make("token_address");
+    let staking_address = api.addr_make("staking_address");
+    whitelisted_contracts.insert(token_address.to_string());
+    whitelisted_contracts.insert(staking_address.to_string());
 
     let mut actions = HashMap::new();
     
@@ -31,7 +33,7 @@ fn test_publish_workflow_with_whitelist() {
     let mut params = HashMap::new();
     params.insert(
         "token_address".to_string(),
-        ActionParamValue::String("osmo1token123456789abcdefghijklmnopqrstuvwxyz".to_string()),
+        ActionParamValue::String(token_address.to_string()),
     );
     params.insert(
         "amount".to_string(),
@@ -78,7 +80,8 @@ fn test_execute_action_with_whitelisted_contract() {
 
     // Create workflow with whitelisted contracts
     let mut whitelisted_contracts = HashSet::new();
-    whitelisted_contracts.insert("osmo1token123456789abcdefghijklmnopqrstuvwxyz".to_string());
+    let contract_to_call = api.addr_make("contract_to_call");
+    whitelisted_contracts.insert(contract_to_call.to_string());
 
     let mut actions = HashMap::new();
     
@@ -95,7 +98,7 @@ fn test_execute_action_with_whitelisted_contract() {
     let mut params = HashMap::new();
     params.insert(
         "token_address".to_string(),
-        ActionParamValue::String("osmo1token123456789abcdefghijklmnopqrstuvwxyz".to_string()),
+        ActionParamValue::String(contract_to_call.to_string()),
     );
     params.insert(
         "amount".to_string(),

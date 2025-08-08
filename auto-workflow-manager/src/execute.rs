@@ -1,12 +1,12 @@
 use std::{collections::HashMap, str::FromStr};
 
-use cosmwasm_std::{to_json_binary, Addr, DepsMut, Env, MessageInfo, Response, SubMsg, Uint128, WasmMsg};
+use cosmwasm_std::{to_json_binary, Addr, CosmosMsg, DepsMut, Env, MessageInfo, Response, Uint128, WasmMsg};
 
 use crate::{
     msg::{NewInstanceMsg, ParamId, TemplateId},
     state::{
-        load_next_instance_id, load_workflow, load_workflow_action, load_workflow_action_params, load_workflow_action_template, load_workflow_instance, load_workflow_instance_params, remove_workflow_instance, save_workflow, save_workflow_action, save_workflow_action_params, save_workflow_action_templates, save_workflow_action_contracts, save_workflow_instance, save_workflow_instance_params, validate_sender_is_action_executor, validate_sender_is_publisher, validate_contract_is_whitelisted, Action, Workflow, WorkflowInstance
-    },
+        load_next_instance_id, load_workflow, load_workflow_action, load_workflow_action_params, load_workflow_action_template, load_workflow_instance, load_workflow_instance_params, remove_workflow_instance, save_workflow, save_workflow_action, save_workflow_action_contracts, save_workflow_action_params, save_workflow_action_templates, save_workflow_instance, save_workflow_instance_params, validate_contract_is_whitelisted, validate_sender_is_action_executor, validate_sender_is_publisher, Action, Workflow, WorkflowInstance
+    }, utils::{build_authz_execute_contract_msg},
 };
 use crate::{msg::{ActionParamValue, ExecutionType, NewWorkflowMsg, WorkflowInstanceState, WorkflowState, WorkflowVisibility}, ContractError};
 
@@ -255,7 +255,7 @@ pub fn execute_action(
     }
 
     // Execute template-based action
-    let sub_msgs: Vec<SubMsg> = execute_dynamic_template(
+    let msgs: Vec<WasmMsg> = execute_dynamic_template(
         deps.storage,
         &user_instance.workflow_id,
         &action_id,
@@ -264,13 +264,30 @@ pub fn execute_action(
         &params,
     )?;
 
+    let authz_msgs: Vec<CosmosMsg> = msgs.iter().map(|msg| {
+        let cosmos_msg = match msg {
+            WasmMsg::Execute { contract_addr, msg, funds } => {
+                dbg!("AAA", contract_addr.to_string());
+                build_authz_execute_contract_msg(
+                    &env, 
+                    &user_addr, 
+                    &deps.api.addr_validate(contract_addr)?, 
+                    // &info.sender, 
+                    &msg.to_string(), 
+                    &funds)
+            }
+            _ => return Err(ContractError::GenericError("Unsupported message type".to_string()))
+        };
+        cosmos_msg
+    }).collect::<Result<Vec<CosmosMsg>, ContractError>>()?;
+
     // Update instance with last executed action
     let mut updated_instance = user_instance;
     updated_instance.last_executed_action = Some(action_id.clone());
     save_workflow_instance(deps.storage, &user_addr, &instance_id, &updated_instance)?;
 
     Ok(Response::new()
-        .add_submessages(sub_msgs)
+        .add_messages(authz_msgs)
         .add_attribute("method", "execute_action")
         .add_attribute("user_address", user_address)
         .add_attribute("instance_id", instance_id.to_string())
@@ -334,7 +351,7 @@ fn execute_dynamic_template(
     template_id: &TemplateId,
     resolved_params: &HashMap<String, ActionParamValue>,
     execute_action_params: &Option<HashMap<String, ActionParamValue>>,
-) -> Result<Vec<SubMsg>, ContractError> {
+) -> Result<Vec<WasmMsg>, ContractError> {
     // Load template for this action
     let template = load_workflow_action_template(storage, &workflow_id.to_string(), &action_id.to_string(), &template_id.to_string()).map_err(|_| {
         ContractError::TemplateNotFound {
@@ -359,9 +376,7 @@ fn execute_dynamic_template(
         funds: resolved_funds,
     };
 
-    Ok(vec![
-        SubMsg::reply_never(wasm_msg)
-    ])
+    Ok(vec![wasm_msg])
 }
 
 fn resolve_template_parameter(
