@@ -20,12 +20,12 @@ pub struct Config {
 #[cw_serde]
 pub struct Action {
     pub next_actions: HashSet<String>,
-    pub final_state: bool,
 }
 
 #[cw_serde]
 pub struct Workflow {
-    pub start_action: String,
+    pub start_actions: HashSet<String>,
+    pub end_actions: HashSet<String>,
     pub visibility: WorkflowVisibility,
     pub state: WorkflowState,
     pub publisher: Addr,

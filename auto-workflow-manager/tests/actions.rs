@@ -307,7 +307,6 @@ fn test_execute_action_invalid_action_sequence() {
                 ("denom".to_string(), ActionParamValue::String("uosmo".to_string())),
             ]),
             next_actions: std::collections::HashSet::new(),
-            final_state: true,
             templates: HashMap::from([
                 (
                     "default".to_string(),
@@ -326,7 +325,6 @@ fn test_execute_action_invalid_action_sequence() {
     // Update the first action to have next_actions
     if let Some(first_action) = workflow_msg.actions.get_mut("stake_tokens") {
         first_action.next_actions.insert("second_action".to_string());
-        first_action.final_state = false;
     }
 
     // Publish the workflow
@@ -472,7 +470,12 @@ fn test_execute_action_with_dynamic_template() {
     // Create a workflow with dynamic templates
     let workflow_msg = auto_workflow_manager::msg::NewWorkflowMsg {
         id: "template-test-workflow".to_string(),
-        start_action: "claim_tokens".to_string(),
+        start_actions: HashSet::from([
+            "claim_tokens".to_string(),
+        ]),
+        end_actions: HashSet::from([
+            "claim_tokens".to_string(),
+        ]),
         visibility: auto_workflow_manager::msg::WorkflowVisibility::Public,
         actions: HashMap::from([
             (
@@ -489,7 +492,6 @@ fn test_execute_action_with_dynamic_template() {
                         ),
                     ]),
                     next_actions: HashSet::new(),
-                    final_state: true,
                     templates: HashMap::from([
                         (
                             "daodao".to_string(),
@@ -561,7 +563,12 @@ fn test_execute_action_template_not_found() {
     // Create a workflow with dynamic templates
     let workflow_msg = auto_workflow_manager::msg::NewWorkflowMsg {
         id: "template-test-workflow".to_string(),
-        start_action: "claim_tokens".to_string(),
+        start_actions: HashSet::from([
+            "claim_tokens".to_string(),
+        ]),
+        end_actions: HashSet::from([
+            "claim_tokens".to_string(),
+        ]),
         visibility: auto_workflow_manager::msg::WorkflowVisibility::Public,
         actions: HashMap::from([
             (
@@ -578,7 +585,6 @@ fn test_execute_action_template_not_found() {
                         ),
                     ]),
                     next_actions: HashSet::new(),
-                    final_state: true,
                     templates: HashMap::from([
                         (
                             "daodao".to_string(),

@@ -11,15 +11,15 @@ Example for contract initialization with allowed publishers and action executors
 
 ### `execute-publish-workflow.json`
 Example for publishing a workflow. Contains a complete workflow template with:
-- Workflow ID and start action
+- Workflow ID and start/end actions
 - Visibility setting (public/private)
-- Actions with parameters, next actions, and final state flags
+- Actions with parameters, next actions
 
 ### `execute-publish-workflow-with-whitelist.json`
 Example for publishing a workflow with whitelisted contracts per action. Contains:
-- Workflow ID and start action
+- Workflow ID and start/end actions
 - Visibility setting (public/private)
-- Actions with parameters, next actions, final state flags, templates, and whitelisted contracts per action
+- Actions with parameters, next actions, templates, and whitelisted contracts per action
 
 ### `execute-instance.json`
 Example for executing a workflow instance. Contains:

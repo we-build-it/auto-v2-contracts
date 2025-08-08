@@ -2,7 +2,8 @@
   "publish_workflow": {
     "workflow": {
       "id": "staked-token-claimer-workflow",
-      "start_action": "stake_tokens",
+      "start_actions": ["stake_tokens"],
+      "end_actions": ["claim_rewards"],
       "visibility": "public",
       "actions": {
         "stake_tokens": {
@@ -18,8 +19,7 @@
               "string": "#ip.requester"
             }
           },
-          "next_actions": ["claim_rewards"],
-          "final_state": false
+          "next_actions": ["claim_rewards"]
         },
         "claim_rewards": {
           "action_type": "StakedTokenClaimer",
@@ -31,8 +31,7 @@
               "string": "osmo1staking123456789abcdefghijklmnopqrstuvwxyz"
             }
           },
-          "next_actions": [],
-          "final_state": true
+          "next_actions": []
         }
       }
     }

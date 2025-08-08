@@ -43,7 +43,6 @@ fn test_publish_workflow_with_whitelist() {
         ActionMsg {
             params,
             next_actions: HashSet::new(),
-            final_state: true,
             templates,
             whitelisted_contracts,
         },
@@ -51,7 +50,12 @@ fn test_publish_workflow_with_whitelist() {
 
     let workflow_msg = NewWorkflowMsg {
         id: "test-whitelist-workflow".to_string(),
-        start_action: "stake_tokens".to_string(),
+        start_actions: HashSet::from([
+            "stake_tokens".to_string(),
+        ]),
+        end_actions: HashSet::from([
+            "stake_tokens".to_string(),
+        ]),
         visibility: WorkflowVisibility::Public,
         actions,
     };
@@ -103,7 +107,6 @@ fn test_execute_action_with_whitelisted_contract() {
         ActionMsg {
             params,
             next_actions: HashSet::new(),
-            final_state: true,
             templates,
             whitelisted_contracts,
         },
@@ -111,7 +114,12 @@ fn test_execute_action_with_whitelisted_contract() {
 
     let workflow_msg = NewWorkflowMsg {
         id: "test-whitelist-workflow".to_string(),
-        start_action: "stake_tokens".to_string(),
+        start_actions: HashSet::from([
+            "stake_tokens".to_string(),
+        ]),
+        end_actions: HashSet::from([
+            "stake_tokens".to_string(),
+        ]),
         visibility: WorkflowVisibility::Public,
         actions,
     };
@@ -200,7 +208,6 @@ fn test_execute_action_with_non_whitelisted_contract() {
         ActionMsg {
             params,
             next_actions: HashSet::new(),
-            final_state: true,
             templates,
             whitelisted_contracts,
         },
@@ -208,7 +215,12 @@ fn test_execute_action_with_non_whitelisted_contract() {
 
     let workflow_msg = NewWorkflowMsg {
         id: "test-whitelist-workflow".to_string(),
-        start_action: "stake_tokens".to_string(),
+        start_actions: HashSet::from([
+            "stake_tokens".to_string(),
+        ]),
+        end_actions: HashSet::from([
+            "stake_tokens".to_string(),
+        ]),
         visibility: WorkflowVisibility::Public,
         actions,
     };

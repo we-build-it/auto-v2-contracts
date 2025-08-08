@@ -75,7 +75,8 @@ thornode tx wasm execute sthor1workflowmanagercontractaddress123456789 \
   "publish_workflow": {
     "workflow": {
       "id": "staking_workflow",
-      "start_action": "stake_tokens",
+      "start_actions": ["stake_tokens"],
+      "end_actions": ["stake_tokens"],
       "visibility": "public",
       "actions": {
         "stake_tokens": {
@@ -87,8 +88,7 @@ thornode tx wasm execute sthor1workflowmanagercontractaddress123456789 \
             "amount": "1000000",
             "denom": "uosmo"
           },
-          "next_actions": [],
-          "final_state": true
+          "next_actions": []
         }
       }
     }
@@ -108,7 +108,8 @@ thornode tx wasm execute sthor1workflowmanagercontractaddress123456789 \
   "publish_workflow": {
     "workflow": {
       "id": "private_claiming_workflow",
-      "start_action": "claim_rewards",
+      "start_actions": "claim_rewards",
+      "end_actions": "claim_rewards",
       "visibility": "private",
       "actions": {
         "claim_rewards": {
@@ -119,8 +120,7 @@ thornode tx wasm execute sthor1workflowmanagercontractaddress123456789 \
             "userAddress": "#ip.requester",
             "amount": "500000"
           },
-          "next_actions": [],
-          "final_state": true
+          "next_actions": []
         }
       }
     }
@@ -140,7 +140,8 @@ thornode tx wasm execute sthor1workflowmanagercontractaddress123456789 \
   "publish_workflow": {
     "workflow": {
       "id": "stake_and_claim_workflow",
-      "start_action": "stake_tokens",
+      "start_actions": ["stake_tokens"],
+      "end_actions": ["claim_rewards"],
       "visibility": "public",
       "actions": {
         "stake_tokens": {
@@ -152,8 +153,7 @@ thornode tx wasm execute sthor1workflowmanagercontractaddress123456789 \
             "amount": "1000000",
             "denom": "uosmo"
           },
-          "next_actions": ["claim_rewards"],
-          "final_state": false
+          "next_actions": ["claim_rewards"]
         },
         "claim_rewards": {
           "action_type": "staked_token_claimer",
@@ -163,8 +163,7 @@ thornode tx wasm execute sthor1workflowmanagercontractaddress123456789 \
             "userAddress": "#ip.requester",
             "amount": "500000"
           },
-          "next_actions": [],
-          "final_state": true
+          "next_actions": []
         }
       }
     }
@@ -404,7 +403,8 @@ thornode tx wasm execute sthor1workflowmanagercontractaddress123456789 \
   "publish_workflow": {
     "workflow": {
       "id": "parameterized_workflow",
-      "start_action": "custom_action",
+      "start_actions": ["custom_action"],
+      "end_actions": ["custom_action"],
       "visibility": "public",
       "actions": {
         "custom_action": {
@@ -416,8 +416,7 @@ thornode tx wasm execute sthor1workflowmanagercontractaddress123456789 \
             "amount": "#ip.stake_amount",
             "denom": "uosmo"
           },
-          "next_actions": [],
-          "final_state": true
+          "next_actions": []
         }
       }
     }

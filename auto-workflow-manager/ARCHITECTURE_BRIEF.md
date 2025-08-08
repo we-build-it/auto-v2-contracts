@@ -34,7 +34,8 @@ Creators use this structure to define new workflows in the system.
 ```rust
 pub struct NewWorkflowMsg {
     pub id: WorkflowId,                        // Hash of the entire workflow definition
-    pub start_action: ActionId,                // Action where the workflow starts
+    pub start_actions: HashSet<ActionId>,      // Actions where the workflow starts
+    pub end_actions: HashSet<ActionId>,        // Action where the workflow ends
     pub visibility: WorkflowVisibility,        // Public or Private
     pub actions: HashMap<ActionId, ActionMsg>, // All the workflow's actions
 }
@@ -45,7 +46,6 @@ pub struct NewWorkflowMsg {
 pub struct ActionMsg {
     pub params: HashMap<ParamId, ActionParamValue>, // Action parameters
     pub next_actions: HashSet<ActionId>,            // Allowed actions after this one
-    pub final_state: bool,                          // True if the workflow can be restarted after this action
     pub templates: HashMap<TemplateId, Template>,   // Allowed templates for this action. The TemplateId is a hash over the template's fields.
     pub whitelisted_contracts: HashSet<String>,     // Allowed contracts to be called by this action
 }
@@ -97,7 +97,8 @@ ExecuteAction {
 #### Workflows, Actions and Templates Definitions
 ```rust
 pub struct Workflow {
-    pub start_action: String,           // Entry point action
+    pub start_actions: HashSet<String>, // Entry point actions
+    pub end_actions: HashSet<String>,   // Finish actions
     pub visibility: WorkflowVisibility, // Public/Private access control
     pub state: WorkflowState,           // Approval status
     pub publisher: Addr,                // Workflow owner
@@ -106,7 +107,7 @@ pub struct Workflow {
 ```rust
 pub struct Action {
     pub next_actions: HashSet<String>, // Next allowed actions
-    pub final_state: bool,             // True if the instance can be restarted after this action
+
 }
 ```
 ```rust

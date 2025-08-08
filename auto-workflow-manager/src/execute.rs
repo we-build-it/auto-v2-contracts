@@ -26,7 +26,8 @@ pub fn publish_workflow(
     }
 
     let new_workflow = Workflow {
-        start_action: input_workflow.start_action,
+        start_actions: input_workflow.start_actions,
+        end_actions: input_workflow.end_actions,
         visibility: input_workflow.visibility,
         publisher: info.sender.clone(),
         state: WorkflowState::Approved,
@@ -35,8 +36,7 @@ pub fn publish_workflow(
     save_workflow(deps.storage, &input_workflow.id, &new_workflow)?;
     for (action_id, action) in input_workflow.actions {
         let new_action = Action {
-            next_actions: action.next_actions,
-            final_state: action.final_state,
+            next_actions: action.next_actions
         };
         save_workflow_action(deps.storage, &input_workflow.id, &action_id, &new_action)?;
         save_workflow_action_params(deps.storage, &input_workflow.id, &action_id, &action.params)?;
@@ -222,7 +222,7 @@ pub fn execute_action(
         })?;
 
     let can_execute = match &user_instance.last_executed_action {
-        None => action_id == workflow.start_action,
+        None => workflow.start_actions.contains(&action_id),
         Some(last_executed_action_id) => {
             let last_executed_action = load_workflow_action(deps.storage, &user_instance.workflow_id, &last_executed_action_id)
                 .map_err(|_| ContractError::ActionNotFound {
@@ -230,7 +230,7 @@ pub fn execute_action(
                 action_id: last_executed_action_id.clone(),
             })?;
             last_executed_action.next_actions.contains(&action_id) 
-            || (user_instance.execution_type == ExecutionType::Recurrent && last_executed_action.final_state && action_id == workflow.start_action)
+            || (user_instance.execution_type == ExecutionType::Recurrent && workflow.end_actions.contains(last_executed_action_id) && workflow.start_actions.contains(&action_id))
         }
     };
 

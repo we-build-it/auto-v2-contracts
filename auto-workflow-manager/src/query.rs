@@ -9,12 +9,12 @@ pub fn query_workflow_by_id(deps: Deps, workflow_id: String) -> StdResult<GetWor
     Ok(GetWorkflowResponse { workflow: WorkflowResponse {
         base: NewWorkflowMsg {
             id: workflow_id.clone(),
-            start_action: workflow.start_action,
+            start_actions: workflow.start_actions,
+            end_actions: workflow.end_actions,
             visibility: workflow.visibility,
             actions: load_workflow_actions(deps.storage, &workflow_id)?.iter().map(|(action_id, action)| (action_id.clone(), ActionMsg {
                 params: load_workflow_action_params(deps.storage, &workflow_id, &action_id).unwrap_or_default(),
                 next_actions: action.next_actions.clone(),
-                final_state: action.final_state,
                 templates: load_workflow_action_templates(deps.storage, &workflow_id, &action_id).unwrap_or_default(),
                 whitelisted_contracts: load_workflow_action_contracts(deps.storage, &workflow_id, &action_id).unwrap_or_default(),
             })).collect(),

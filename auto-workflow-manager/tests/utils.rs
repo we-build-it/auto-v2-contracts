@@ -30,7 +30,12 @@ pub fn instantiate_contract(
 pub fn create_test_workflow() -> NewWorkflowMsg {
     NewWorkflowMsg {
         id: "test-workflow".to_string(),
-        start_action: "stake_tokens".to_string(),
+        start_actions: HashSet::from([
+            "stake_tokens".to_string(),
+        ]),
+        end_actions: HashSet::from([
+            "claim_rewards".to_string(),
+        ]),
         visibility: WorkflowVisibility::Public,
 
         actions: HashMap::from([
@@ -50,7 +55,6 @@ pub fn create_test_workflow() -> NewWorkflowMsg {
                         ),
                     ]),
                     next_actions: HashSet::from(["claim_rewards".to_string()]),
-                    final_state: false,
                     templates: HashMap::from([
                         (
                             "default".to_string(),
@@ -76,7 +80,6 @@ pub fn create_test_workflow() -> NewWorkflowMsg {
                         ),
                     )]),
                     next_actions: HashSet::new(),
-                    final_state: true,
                     templates: HashMap::from([
                         (
                             "default".to_string(),
@@ -100,9 +103,13 @@ pub fn create_test_workflow() -> NewWorkflowMsg {
 pub fn create_simple_test_workflow() -> NewWorkflowMsg {
     NewWorkflowMsg {
         id: "simple-test-workflow".to_string(),
-        start_action: "stake_tokens".to_string(),
+        start_actions: HashSet::from([
+            "stake_tokens".to_string(),
+        ]),
+        end_actions: HashSet::from([
+            "stake_tokens".to_string(),
+        ]),
         visibility: WorkflowVisibility::Public,
-
         actions: HashMap::from([(
             "stake_tokens".to_string(),
             ActionMsg {
@@ -111,7 +118,6 @@ pub fn create_simple_test_workflow() -> NewWorkflowMsg {
                     ActionParamValue::String("1000000".to_string()),
                 )]),
                 next_actions: HashSet::new(),
-                final_state: true,
                 templates: HashMap::from([
                     (
                         "default".to_string(),
@@ -134,9 +140,13 @@ pub fn create_simple_test_workflow() -> NewWorkflowMsg {
 pub fn create_template_test_workflow() -> NewWorkflowMsg {
     NewWorkflowMsg {
         id: "template-test-workflow".to_string(),
-        start_action: "claim_tokens".to_string(),
+        start_actions: HashSet::from([
+            "claim_tokens".to_string(),
+        ]),
+        end_actions: HashSet::from([
+            "claim_tokens".to_string(),
+        ]),
         visibility: WorkflowVisibility::Public,
-
         actions: HashMap::from([
             (
                 "claim_tokens".to_string(),
@@ -152,7 +162,6 @@ pub fn create_template_test_workflow() -> NewWorkflowMsg {
                         ),
                     ]),
                     next_actions: HashSet::new(),
-                    final_state: true,
                     templates: HashMap::from([
                         (
                             "daodao".to_string(),

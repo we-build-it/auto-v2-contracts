@@ -106,7 +106,8 @@ pub enum SudoMsg {
 ```rust
 pub struct NewWorkflowMsg {
     pub id: WorkflowId,
-    pub start_action: ActionId,
+    pub start_actions: HashSet<ActionId>,
+    pub end_actions: HashSet<ActionId>,
     pub visibility: WorkflowVisibility,
     pub actions: HashMap<ActionId, ActionMsg>,
 }
@@ -115,7 +116,6 @@ pub struct ActionMsg {
     pub action_type: ActionType,
     pub params: HashMap<ParamId, ActionParamValue>,
     pub next_actions: HashSet<ActionId>,
-    pub final_state: bool,
 }
 
 pub struct NewInstanceMsg {
@@ -174,7 +174,12 @@ pub enum ActionType {
 ```rust
 let workflow = NewWorkflowMsg {
     id: "staking_workflow".to_string(),
-    start_action: "stake_tokens".to_string(),
+    start_actions: HashSet::from([
+        "stake_tokens".to_string(),
+    ]),
+    end_actions: HashSet::from([
+        "stake_tokens".to_string(),
+    ]),
     visibility: WorkflowVisibility::Public,
     actions: HashMap::from([
         (
@@ -188,8 +193,7 @@ let workflow = NewWorkflowMsg {
                     ("amount".to_string(), ActionParamValue::BigInt("1000000".to_string())),
                     ("denom".to_string(), ActionParamValue::String("uosmo".to_string())),
                 ]),
-                next_actions: HashSet::new(),
-                final_state: true,
+                next_actions: HashSet::new()
             },
         ),
     ]),

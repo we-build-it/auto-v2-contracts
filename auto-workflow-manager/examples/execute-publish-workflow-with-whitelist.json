@@ -2,7 +2,8 @@
   "publish_workflow": {
     "workflow": {
       "id": "staked-token-claimer-workflow",
-      "start_action": "stake_tokens",
+      "start_actions": ["stake_tokens"],
+      "end_actions": ["claim_rewards"],
       "visibility": "public",
       "actions": {
         "stake_tokens": {
@@ -18,7 +19,6 @@
             }
           },
           "next_actions": ["claim_rewards"],
-          "final_state": false,
           "templates": {
             "stake_template": {
               "contract": "{{token_address}}",
@@ -40,7 +40,6 @@
             }
           },
           "next_actions": [],
-          "final_state": true,
           "templates": {
             "claim_template": {
               "contract": "{{staking_contract}}",

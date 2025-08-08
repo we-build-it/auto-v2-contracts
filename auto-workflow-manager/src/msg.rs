@@ -57,14 +57,14 @@ pub struct Template {
 pub struct ActionMsg {
     pub params: HashMap<ParamId, ActionParamValue>,
     pub next_actions: HashSet<ActionId>,
-    pub final_state: bool,
     pub templates: HashMap<TemplateId, Template>, // Now required, not optional
     pub whitelisted_contracts: HashSet<String>, // Lista de contratos whitelisted por acción
 }
 #[cw_serde]
 pub struct NewWorkflowMsg {
     pub id: WorkflowId,
-    pub start_action: ActionId,
+    pub start_actions: HashSet<ActionId>,
+    pub end_actions: HashSet<ActionId>,
     pub visibility: WorkflowVisibility,
     // action_name -> action
     pub actions: HashMap<ActionId, ActionMsg>,
