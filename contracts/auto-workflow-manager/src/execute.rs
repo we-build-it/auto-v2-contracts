@@ -267,7 +267,6 @@ pub fn execute_action(
     let authz_msgs: Vec<CosmosMsg> = msgs.iter().map(|msg| {
         let cosmos_msg = match msg {
             WasmMsg::Execute { contract_addr, msg, funds } => {
-                dbg!("AAA", contract_addr.to_string());
                 build_authz_execute_contract_msg(
                     &env, 
                     &user_addr, 

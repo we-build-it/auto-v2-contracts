@@ -106,13 +106,13 @@ pub fn sudo(deps: DepsMut, _env: Env, msg: SudoMsg) -> Result<Response, Contract
 }
 
 
-// #[cfg_attr(not(feature = "library"), entry_point)]
-// pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
-//     // Update version if changed
-//     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-//     // Migrate HERE other parts of state when needed
-//     Ok(Response::default())
-// }
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(deps: DepsMut, _env: Env, _msg: ()) -> StdResult<Response> {
+    // Update version if changed
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    // Migrate HERE other parts of state when needed
+    Ok(Response::default())
+}
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {

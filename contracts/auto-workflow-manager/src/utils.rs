@@ -275,13 +275,22 @@ pub fn build_authz_execute_contract_msg(
     msg_str: &String,
     funds: &Vec<Coin>
 ) -> Result<CosmosMsg, ContractError> {
+    // Debug logging to inspect parameters
+    println!("=== build_authz_execute_contract_msg parameters ===");
+    println!("env.contract.address: {}", env.contract.address);
+    println!("user: {}", user);
+    println!("contract_addr: {}", contract_addr);
+    println!("msg_str: {}", msg_str);
+    println!("funds: {:?}", funds);
+    println!("================================================");
+    
     // Construct the message to be wrapped in MsgExec
     let msg_anybuf = {
             // Construct MsgExecuteContract using Anybuf
             let mut execute_contract_buf = Anybuf::new()
                 .append_string(1, &user.to_string()) // sender (field 1)
                 .append_string(2, &contract_addr.to_string()) // contract (field 2)
-                .append_string(3, &msg_str); // msg (field 3)
+                .append_bytes(3, &msg_str.as_bytes()); // msg (field 3)
 
             // Add funds to the message if provided
             if !funds.is_empty() {
@@ -311,17 +320,17 @@ pub fn build_authz_execute_contract_msg(
         .append_repeated_message(2, &[msg_anybuf]); // msgs (field 2)
 
     // cosmwasm_2_0
-    // let cosmos_msg = CosmosMsg::Any(cosmwasm_std::AnyMsg { 
-    //     type_url: "/cosmos.authz.v1beta1.MsgExec".to_string(),
-    //     value: msg_exec_buf.as_bytes().into(),
-    // }); 
-
-    // cosmwasm_1_4
-    #[allow(deprecated)]
-    let cosmos_msg = CosmosMsg::Stargate {
+    let cosmos_msg = CosmosMsg::Any(cosmwasm_std::AnyMsg { 
         type_url: "/cosmos.authz.v1beta1.MsgExec".to_string(),
         value: msg_exec_buf.as_bytes().into(),
-    }; 
+    }); 
+
+    // cosmwasm_1_4
+    // #[allow(deprecated)]
+    // let cosmos_msg = CosmosMsg::Stargate {
+    //     type_url: "/cosmos.authz.v1beta1.MsgExec".to_string(),
+    //     value: msg_exec_buf.as_bytes().into(),
+    // }; 
 
     Ok(cosmos_msg)
 }
