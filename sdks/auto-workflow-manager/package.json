@@ -1,0 +1,41 @@
+{
+  "name": "auto-workflow-manager-sdk",
+  "version": "1.0.0",
+  "description": "TypeScript SDK for Auto Workflow Manager Contract",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "nodemon --exec ts-node src/index.ts",
+    "start": "node dist/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build"
+  },
+  "keywords": [
+    "cosmos",
+    "cosmwasm",
+    "workflow",
+    "automation",
+    "sdk",
+    "typescript"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "nodemon": "^3.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@cosmjs/cosmwasm-stargate": "^0.32.0",
+    "@cosmjs/proto-signing": "^0.32.0",
+    "@cosmjs/stargate": "^0.32.0",
+    "@cosmjs/tendermint-rpc": "^0.32.0"
+  },
+  "files": [
+    "dist/**/*",
+    "README.md"
+  ]
+}
