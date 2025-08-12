@@ -2,3 +2,4 @@
 /contracts/artifacts
 /sdks/*/node_modules
 /sdks/*/dist
+/target
