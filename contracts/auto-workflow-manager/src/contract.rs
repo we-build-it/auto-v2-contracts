@@ -11,7 +11,7 @@ use crate::{
     },
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg, SudoMsg},
     query::{query_instances_by_requester, query_workflow_by_id, query_workflow_instance},
-    state::{load_config, save_config, Config},
+    state::{load_config, save_config, Config}, utils::build_authz_execute_contract_msg,
 };
 
 // version info for migration info
@@ -81,6 +81,18 @@ pub fn execute(
             template_id,
             params,
         ),
+        // TODO: temporal AuthZ test, remove this
+        ExecuteMsg::TestAuthz { } => {
+            let daodao_msg = "{ \"claim\": { \"id\": 1}}";
+            let authz_msg = build_authz_execute_contract_msg(
+                &env, 
+                &info.sender, 
+                &deps.api.addr_validate("sthor1du9dd7w44dqnadt76dr6pks6m3lma40fttfqxfyz4nm5l7npfg6qx9mqfz").unwrap(), 
+                &daodao_msg.to_string(), 
+                &vec![])
+                .unwrap();
+            Ok(Response::new().add_message(authz_msg))
+        },
     }
 }
 
@@ -106,13 +118,13 @@ pub fn sudo(deps: DepsMut, _env: Env, msg: SudoMsg) -> Result<Response, Contract
 }
 
 
-// #[cfg_attr(not(feature = "library"), entry_point)]
-// pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
-//     // Update version if changed
-//     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-//     // Migrate HERE other parts of state when needed
-//     Ok(Response::default())
-// }
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(deps: DepsMut, _env: Env, _msg: ()) -> StdResult<Response> {
+    // Update version if changed
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    // Migrate HERE other parts of state when needed
+    Ok(Response::default())
+}
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {

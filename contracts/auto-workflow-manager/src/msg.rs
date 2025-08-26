@@ -102,6 +102,8 @@ pub enum ExecuteMsg {
         template_id: TemplateId, // Now required, not optional
         params: Option<HashMap<ParamId, ActionParamValue>>
     },
+    // TODO: temporal AuthZ test, remove this
+    TestAuthz { },
 }
 
 #[cw_serde]
