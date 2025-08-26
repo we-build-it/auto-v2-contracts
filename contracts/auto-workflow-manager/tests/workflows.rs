@@ -15,13 +15,15 @@ fn test_publish_workflow_ok() {
         publish_workflow(deps.as_mut(), env, publisher_address.clone(), workflow_msg).unwrap();
 
     // Verify response attributes
-    assert_eq!(response.attributes.len(), 3);
+    assert_eq!(response.attributes.len(), 4);
     assert_eq!(response.attributes[0].key, "method");
     assert_eq!(response.attributes[0].value, "publish_workflow");
     assert_eq!(response.attributes[1].key, "workflow_id");
     assert_eq!(response.attributes[1].value, "test-workflow");
     assert_eq!(response.attributes[2].key, "publisher");
     assert_eq!(response.attributes[2].value, publisher_address.to_string());
+    assert_eq!(response.attributes[3].key, "state");
+    assert_eq!(response.attributes[3].value, "approved");
 }
 
 #[test]

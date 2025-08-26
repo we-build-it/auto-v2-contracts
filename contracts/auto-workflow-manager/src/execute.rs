@@ -1,14 +1,29 @@
 use std::{collections::HashMap, str::FromStr};
 
-use cosmwasm_std::{to_json_binary, Addr, CosmosMsg, DepsMut, Env, MessageInfo, Response, Uint128, WasmMsg};
+use cosmwasm_std::{
+    to_json_binary, Addr, CosmosMsg, DepsMut, Env, MessageInfo, Response, Uint128, WasmMsg,
+};
 
+use crate::{
+    msg::{
+        ActionParamValue, ExecutionType, NewWorkflowMsg, WorkflowInstanceState, WorkflowState,
+        WorkflowVisibility,
+    },
+    ContractError,
+};
 use crate::{
     msg::{NewInstanceMsg, ParamId, TemplateId},
     state::{
-        load_next_instance_id, load_workflow, load_workflow_action, load_workflow_action_params, load_workflow_action_template, load_workflow_instance, load_workflow_instance_params, remove_workflow_instance, save_workflow, save_workflow_action, save_workflow_action_contracts, save_workflow_action_params, save_workflow_action_templates, save_workflow_instance, save_workflow_instance_params, validate_contract_is_whitelisted, validate_sender_is_action_executor, validate_sender_is_publisher, Action, Workflow, WorkflowInstance
-    }, utils::{build_authz_execute_contract_msg},
+        load_next_instance_id, load_workflow, load_workflow_action, load_workflow_action_params,
+        load_workflow_action_template, load_workflow_instance, load_workflow_instance_params,
+        remove_workflow_instance, save_workflow, save_workflow_action,
+        save_workflow_action_contracts, save_workflow_action_params,
+        save_workflow_action_templates, save_workflow_instance, save_workflow_instance_params,
+        validate_contract_is_whitelisted, validate_sender_is_action_executor,
+        validate_sender_is_publisher, Action, Workflow, WorkflowInstance,
+    },
+    utils::build_authz_execute_contract_msg,
 };
-use crate::{msg::{ActionParamValue, ExecutionType, NewWorkflowMsg, WorkflowInstanceState, WorkflowState, WorkflowVisibility}, ContractError};
 
 pub fn publish_workflow(
     deps: DepsMut,
@@ -36,18 +51,29 @@ pub fn publish_workflow(
     save_workflow(deps.storage, &input_workflow.id, &new_workflow)?;
     for (action_id, action) in input_workflow.actions {
         let new_action = Action {
-            next_actions: action.next_actions
+            next_actions: action.next_actions,
         };
         save_workflow_action(deps.storage, &input_workflow.id, &action_id, &new_action)?;
         save_workflow_action_params(deps.storage, &input_workflow.id, &action_id, &action.params)?;
-        save_workflow_action_templates(deps.storage, &input_workflow.id, &action_id, &action.templates)?;
-        save_workflow_action_contracts(deps.storage, &input_workflow.id, &action_id, &action.whitelisted_contracts)?;
+        save_workflow_action_templates(
+            deps.storage,
+            &input_workflow.id,
+            &action_id,
+            &action.templates,
+        )?;
+        save_workflow_action_contracts(
+            deps.storage,
+            &input_workflow.id,
+            &action_id,
+            &action.whitelisted_contracts,
+        )?;
     }
 
     Ok(Response::new()
         .add_attribute("method", "publish_workflow")
         .add_attribute("workflow_id", input_workflow.id)
-        .add_attribute("publisher", info.sender.to_string()))
+        .add_attribute("publisher", info.sender.to_string())
+        .add_attribute("state", new_workflow.state.to_string()))
 }
 
 pub fn execute_instance(
@@ -93,7 +119,12 @@ pub fn execute_instance(
 
     // Save the instance
     save_workflow_instance(deps.storage, &info.sender, &instance_id, &new_instance)?;
-    save_workflow_instance_params(deps.storage, &info.sender, &instance_id, &instance.onchain_parameters)?;
+    save_workflow_instance_params(
+        deps.storage,
+        &info.sender,
+        &instance_id,
+        &instance.onchain_parameters,
+    )?;
 
     Ok(Response::new()
         .add_attribute("method", "execute_instance")
@@ -102,40 +133,83 @@ pub fn execute_instance(
         .add_attribute("requester", info.sender.to_string()))
 }
 
-pub fn cancel_instance(
+pub fn cancel_run(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     instance_id: u64,
+    run_id: String,
 ) -> Result<Response, ContractError> {
     // Load the instance
-    let _instance =
+    let instance =
         load_workflow_instance(deps.storage, &info.sender, &instance_id).map_err(|_| {
             ContractError::InstanceNotFound {
                 instance_id: instance_id.to_string(),
             }
         })?;
 
-    // Remove the instance
-    remove_workflow_instance(deps.storage, &info.sender, &instance_id)?;
+    // Only remove the instance if it's OneShot
+    if matches!(instance.execution_type, ExecutionType::OneShot) {
+        remove_workflow_instance(deps.storage, &info.sender, &instance_id)?;
+    }
 
     Ok(Response::new()
-        .add_attribute("method", "cancel_instance")
+        .add_attribute("method", "cancel_run")
         .add_attribute("instance_id", instance_id.to_string())
+        .add_attribute("run_id", run_id)
         .add_attribute("canceller", info.sender.to_string()))
 }
 
-pub fn pause_instance(
+pub fn cancel_schedule(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     instance_id: u64,
 ) -> Result<Response, ContractError> {
     // Load the instance
-    let mut instance = load_workflow_instance(deps.storage, &info.sender, &instance_id)
-        .map_err(|_| ContractError::InstanceNotFound {
-            instance_id: instance_id.to_string(),
+    let instance =
+        load_workflow_instance(deps.storage, &info.sender, &instance_id).map_err(|_| {
+            ContractError::InstanceNotFound {
+                instance_id: instance_id.to_string(),
+            }
         })?;
+
+    // Check if instance is NOT Recurrent (only Recurrent instances can have their schedule changed)
+    if !matches!(instance.execution_type, ExecutionType::Recurrent) {
+        return Err(ContractError::GenericError(
+            "Can't change schedule for non-recurrent instances".to_string(),
+        ));
+    }
+
+    // Remove the instance
+    remove_workflow_instance(deps.storage, &info.sender, &instance_id)?;
+
+    Ok(Response::new()
+        .add_attribute("method", "cancel_schedule")
+        .add_attribute("instance_id", instance_id.to_string())
+        .add_attribute("canceller", info.sender.to_string()))
+}
+
+pub fn pause_schedule(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    instance_id: u64,
+) -> Result<Response, ContractError> {
+    // Load the instance
+    let mut instance =
+        load_workflow_instance(deps.storage, &info.sender, &instance_id).map_err(|_| {
+            ContractError::InstanceNotFound {
+                instance_id: instance_id.to_string(),
+            }
+        })?;
+
+    // Check if instance is NOT Recurrent (only Recurrent instances can have their schedule changed)
+    if !matches!(instance.execution_type, ExecutionType::Recurrent) {
+        return Err(ContractError::GenericError(
+            "Can't change schedule for non-recurrent instances".to_string(),
+        ));
+    }
 
     // Check if instance is running
     if !matches!(instance.state, WorkflowInstanceState::Running) {
@@ -151,22 +225,31 @@ pub fn pause_instance(
     save_workflow_instance(deps.storage, &info.sender, &instance_id, &instance)?;
 
     Ok(Response::new()
-        .add_attribute("method", "pause_instance")
+        .add_attribute("method", "pause_schedule")
         .add_attribute("instance_id", instance_id.to_string())
         .add_attribute("pauser", info.sender.to_string()))
 }
 
-pub fn resume_instance(
+pub fn resume_schedule(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     instance_id: u64,
 ) -> Result<Response, ContractError> {
     // Load the instance
-    let mut instance = load_workflow_instance(deps.storage, &info.sender, &instance_id)
-        .map_err(|_| ContractError::InstanceNotFound {
-            instance_id: instance_id.to_string(),
+    let mut instance =
+        load_workflow_instance(deps.storage, &info.sender, &instance_id).map_err(|_| {
+            ContractError::InstanceNotFound {
+                instance_id: instance_id.to_string(),
+            }
         })?;
+
+    // Check if instance is NOT Recurrent (only Recurrent instances can have their schedule changed)
+    if !matches!(instance.execution_type, ExecutionType::Recurrent) {
+        return Err(ContractError::GenericError(
+            "Can't change schedule for non-recurrent instances".to_string(),
+        ));
+    }
 
     // Check if instance is paused
     if !matches!(instance.state, WorkflowInstanceState::Paused) {
@@ -182,7 +265,7 @@ pub fn resume_instance(
     save_workflow_instance(deps.storage, &info.sender, &instance_id, &instance)?;
 
     Ok(Response::new()
-        .add_attribute("method", "resume_instance")
+        .add_attribute("method", "resume_schedule")
         .add_attribute("instance_id", instance_id.to_string())
         .add_attribute("resumer", info.sender.to_string()))
 }
@@ -202,7 +285,8 @@ pub fn execute_action(
 
     // Load user instance
     let user_addr = deps.api.addr_validate(&user_address)?;
-    let user_instance: WorkflowInstance = load_workflow_instance(deps.storage, &user_addr, &instance_id)?;
+    let user_instance: WorkflowInstance =
+        load_workflow_instance(deps.storage, &user_addr, &instance_id)?;
 
     // Validate instance expiration time
     if env.block.time >= user_instance.expiration_time {
@@ -215,22 +299,30 @@ pub fn execute_action(
     let workflow = load_workflow(deps.storage, &user_instance.workflow_id)?;
 
     // Ensure the action exists
-    let _action_to_execute = load_workflow_action(deps.storage, &user_instance.workflow_id, &action_id)
-        .map_err(|_| ContractError::ActionNotFound {
-            workflow_id: user_instance.workflow_id.clone(),
-            action_id: action_id.clone(),
-        })?;
+    let _action_to_execute =
+        load_workflow_action(deps.storage, &user_instance.workflow_id, &action_id).map_err(
+            |_| ContractError::ActionNotFound {
+                workflow_id: user_instance.workflow_id.clone(),
+                action_id: action_id.clone(),
+            },
+        )?;
 
     let can_execute = match &user_instance.last_executed_action {
         None => workflow.start_actions.contains(&action_id),
         Some(last_executed_action_id) => {
-            let last_executed_action = load_workflow_action(deps.storage, &user_instance.workflow_id, &last_executed_action_id)
-                .map_err(|_| ContractError::ActionNotFound {
+            let last_executed_action = load_workflow_action(
+                deps.storage,
+                &user_instance.workflow_id,
+                &last_executed_action_id,
+            )
+            .map_err(|_| ContractError::ActionNotFound {
                 workflow_id: user_instance.workflow_id.clone(),
                 action_id: last_executed_action_id.clone(),
             })?;
-            last_executed_action.next_actions.contains(&action_id) 
-            || (user_instance.execution_type == ExecutionType::Recurrent && workflow.end_actions.contains(last_executed_action_id) && workflow.start_actions.contains(&action_id))
+            last_executed_action.next_actions.contains(&action_id)
+                || (user_instance.execution_type == ExecutionType::Recurrent
+                    && workflow.end_actions.contains(last_executed_action_id)
+                    && workflow.start_actions.contains(&action_id))
         }
     };
 
@@ -241,7 +333,8 @@ pub fn execute_action(
     }
 
     // Get action parameters and create new HashMap
-    let action_params = load_workflow_action_params(deps.storage, &user_instance.workflow_id, &action_id)?;
+    let action_params =
+        load_workflow_action_params(deps.storage, &user_instance.workflow_id, &action_id)?;
     let instance_params = load_workflow_instance_params(deps.storage, &user_addr, &instance_id)?;
     let mut resolved_params = HashMap::<String, ActionParamValue>::new();
 
@@ -250,7 +343,7 @@ pub fn execute_action(
         // si param.value comienza con #ip, busco en user_instance.params
         // si param.value comienza con #cp, busco en execute_action_params
         // else es un valor fijo
-        let resolved_value = resolve_param_value(&value, &user_addr,&instance_params, &params)?;
+        let resolved_value = resolve_param_value(&value, &user_addr, &instance_params, &params)?;
         resolved_params.insert(key.clone(), resolved_value);
     }
 
@@ -264,21 +357,33 @@ pub fn execute_action(
         &params,
     )?;
 
-    let authz_msgs: Vec<CosmosMsg> = msgs.iter().map(|msg| {
-        let cosmos_msg = match msg {
-            WasmMsg::Execute { contract_addr, msg, funds } => {
-                build_authz_execute_contract_msg(
-                    &env, 
-                    &user_addr, 
-                    &deps.api.addr_validate(contract_addr)?, 
-                    // &info.sender, 
-                    &msg.to_string(), 
-                    &funds)
-            }
-            _ => return Err(ContractError::GenericError("Unsupported message type".to_string()))
-        };
-        cosmos_msg
-    }).collect::<Result<Vec<CosmosMsg>, ContractError>>()?;
+    let authz_msgs: Vec<CosmosMsg> = msgs
+        .iter()
+        .map(|msg| {
+            let cosmos_msg = match msg {
+                WasmMsg::Execute {
+                    contract_addr,
+                    msg,
+                    funds,
+                } => {
+                    build_authz_execute_contract_msg(
+                        &env,
+                        &user_addr,
+                        &deps.api.addr_validate(contract_addr)?,
+                        // &info.sender,
+                        &msg.to_string(),
+                        &funds,
+                    )
+                }
+                _ => {
+                    return Err(ContractError::GenericError(
+                        "Unsupported message type".to_string(),
+                    ))
+                }
+            };
+            cosmos_msg
+        })
+        .collect::<Result<Vec<CosmosMsg>, ContractError>>()?;
 
     // Update instance with last executed action
     let mut updated_instance = user_instance;
@@ -305,9 +410,7 @@ fn resolve_param_value(
     };
 
     if value_str == "#ip.requester" {
-        Ok(ActionParamValue::String(
-            user_addr.to_string(),
-        ))
+        Ok(ActionParamValue::String(user_addr.to_string()))
     } else if value_str.starts_with("#ip.") {
         // Extract the key after #ip.
         let key = &value_str[4..];
@@ -341,7 +444,6 @@ fn resolve_param_value(
     }
 }
 
-
 //=========== DYNAMIC TEMPLATE ACTION ============
 fn execute_dynamic_template(
     storage: &dyn cosmwasm_std::Storage,
@@ -352,21 +454,33 @@ fn execute_dynamic_template(
     execute_action_params: &Option<HashMap<String, ActionParamValue>>,
 ) -> Result<Vec<WasmMsg>, ContractError> {
     // Load template for this action
-    let template = load_workflow_action_template(storage, &workflow_id.to_string(), &action_id.to_string(), &template_id.to_string()).map_err(|_| {
-        ContractError::TemplateNotFound {
-            workflow_id: workflow_id.to_string(),
-            action_id: action_id.to_string(),
-            template_id: template_id.to_string(),
-        }
+    let template = load_workflow_action_template(
+        storage,
+        &workflow_id.to_string(),
+        &action_id.to_string(),
+        &template_id.to_string(),
+    )
+    .map_err(|_| ContractError::TemplateNotFound {
+        workflow_id: workflow_id.to_string(),
+        action_id: action_id.to_string(),
+        template_id: template_id.to_string(),
     })?;
 
     // Resolve template parameters
-    let resolved_contract = resolve_template_parameter(&template.contract, resolved_params, execute_action_params)?;
-    let resolved_message = resolve_template_parameter(&template.message, resolved_params, execute_action_params)?;
-    let resolved_funds = resolve_template_funds(&template.funds, resolved_params, execute_action_params)?;
+    let resolved_contract =
+        resolve_template_parameter(&template.contract, resolved_params, execute_action_params)?;
+    let resolved_message =
+        resolve_template_parameter(&template.message, resolved_params, execute_action_params)?;
+    let resolved_funds =
+        resolve_template_funds(&template.funds, resolved_params, execute_action_params)?;
 
     // Validate that the resolved contract is whitelisted
-    validate_contract_is_whitelisted(storage, &workflow_id.to_string(), &action_id.to_string(), &resolved_contract)?;
+    validate_contract_is_whitelisted(
+        storage,
+        &workflow_id.to_string(),
+        &action_id.to_string(),
+        &resolved_contract,
+    )?;
 
     // Create the WasmMsg
     let wasm_msg = WasmMsg::Execute {
@@ -384,7 +498,7 @@ fn resolve_template_parameter(
     execute_action_params: &Option<HashMap<String, ActionParamValue>>,
 ) -> Result<String, ContractError> {
     let mut result = template_param.to_string();
-    
+
     // Replace {{param}} placeholders with resolved values
     for (key, value) in resolved_params {
         let placeholder = format!("{{{{{}}}}}", key);
@@ -416,20 +530,21 @@ fn resolve_template_funds(
     execute_action_params: &Option<HashMap<String, ActionParamValue>>,
 ) -> Result<Vec<cosmwasm_std::Coin>, ContractError> {
     let mut resolved_funds = Vec::new();
-    
+
     for (amount_template, denom_template) in template_funds {
-        let resolved_amount = resolve_template_parameter(amount_template, resolved_params, execute_action_params)?;
-        let resolved_denom = resolve_template_parameter(denom_template, resolved_params, execute_action_params)?;
-        
+        let resolved_amount =
+            resolve_template_parameter(amount_template, resolved_params, execute_action_params)?;
+        let resolved_denom =
+            resolve_template_parameter(denom_template, resolved_params, execute_action_params)?;
+
         let amount = Uint128::from_str(&resolved_amount)?;
         resolved_funds.push(cosmwasm_std::Coin {
             amount,
             denom: resolved_denom,
         });
     }
-    
+
     Ok(resolved_funds)
 }
-
 
 //=========== DYNAMIC TEMPLATE ACTION (END) ============

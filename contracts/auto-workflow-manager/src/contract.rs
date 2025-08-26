@@ -7,7 +7,7 @@ use cw2::set_contract_version;
 use crate::{
     error::ContractError,
     execute::{
-        cancel_instance, execute_action, execute_instance, pause_instance, publish_workflow, resume_instance
+        cancel_run, cancel_schedule, execute_action, execute_instance, pause_schedule, publish_workflow, resume_schedule
     },
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg, SudoMsg},
     query::{query_instances_by_requester, query_workflow_by_id, query_workflow_instance},
@@ -62,9 +62,10 @@ pub fn execute(
     match msg {
         ExecuteMsg::PublishWorkflow { workflow } => publish_workflow(deps, env, info, workflow),
         ExecuteMsg::ExecuteInstance { instance } => execute_instance(deps, env, info, instance),
-        ExecuteMsg::CancelInstance { instance_id } => cancel_instance(deps, env, info, instance_id),
-        ExecuteMsg::PauseInstance { instance_id } => pause_instance(deps, env, info, instance_id),
-        ExecuteMsg::ResumeInstance { instance_id } => resume_instance(deps, env, info, instance_id),
+        ExecuteMsg::CancelRun { instance_id , run_id} => cancel_run(deps, env, info, instance_id, run_id),
+        ExecuteMsg::CancelSchedule { instance_id } => cancel_schedule(deps, env, info, instance_id),
+        ExecuteMsg::PauseSchedule { instance_id } => pause_schedule(deps, env, info, instance_id),
+        ExecuteMsg::ResumeSchedule { instance_id } => resume_schedule(deps, env, info, instance_id),
         ExecuteMsg::ExecuteAction {
             user_address,
             instance_id,

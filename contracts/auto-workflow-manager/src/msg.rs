@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::fmt;
 
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Timestamp};
@@ -25,6 +26,15 @@ pub enum ExecutionType {
 pub enum WorkflowState {
     Approved,
     Pending,
+}
+
+impl fmt::Display for WorkflowState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            WorkflowState::Approved => write!(f, "approved"),
+            WorkflowState::Pending => write!(f, "pending"),
+        }
+    }
 }
 
 #[cw_serde]
@@ -86,13 +96,17 @@ pub enum ExecuteMsg {
     ExecuteInstance {
         instance: NewInstanceMsg,
     },
-    CancelInstance {
+    CancelRun {
+        instance_id: InstanceId,
+        run_id: String,
+    },
+    CancelSchedule {
         instance_id: InstanceId,
     },
-    PauseInstance {
+    PauseSchedule {
         instance_id: InstanceId,
     },
-    ResumeInstance {
+    ResumeSchedule {
         instance_id: InstanceId,
     },
     ExecuteAction {
