@@ -22,6 +22,15 @@ fn create_test_instance(workflow_id: String) -> NewInstanceMsg {
     }
 }
 
+fn create_test_instance_with_params(workflow_id: String, params: HashMap<String, ActionParamValue>) -> NewInstanceMsg {
+    NewInstanceMsg {
+        workflow_id,
+        onchain_parameters: params,
+        execution_type: ExecutionType::OneShot,
+        expiration_time: Timestamp::from_seconds(10000000000), // Far future
+    }
+}
+
 fn create_test_instance_with_expiration(workflow_id: String, expiration_time: Timestamp) -> NewInstanceMsg {
     NewInstanceMsg {
         workflow_id,
@@ -630,3 +639,142 @@ fn test_execute_action_template_not_found() {
         _ => panic!("Expected TemplateNotFound error, got different error: {:?}", result),
     }
 } 
+
+#[test]
+fn test_execute_action_with_dynamic_template_echo() {
+    let (mut deps, mut env, api, _admin_address, publisher_address, executor_address) = create_test_environment();
+    let user_address = api.addr_make("tthor1zf3gsk7edzwl9syyefvfhle37cjtql35h6k85m");
+
+    // Set a reasonable block time
+    env.block.time = Timestamp::from_seconds(1000000000);
+
+    let contract_to_call = api.addr_make("tthor14hj2tavq8fpesdwxxcu44rty3hh90vhujrvcmstl4zr3txmfvw9sw58u9f").to_string();
+
+    let aux = "{ \"echo\": { \"message\": \"Q2xhaW0gT3BlcmF0aW9u\", \"attributes\": [[\"priority\", \"high\"],[\"timestamp\", \"1640995200\"]] } }".to_string();
+    dbg!(&aux);
+
+    
+    // Create a workflow with dynamic templates
+    let workflow_msg = auto_workflow_manager::msg::NewWorkflowMsg {
+        id: "eeda92878b06e1b442d9ce37fd564768c1f4e4f3db350031c14ae2319e8ebb1c".to_string(),
+        start_actions: HashSet::from(["claim".to_string()]),
+        end_actions: HashSet::from(["stake".to_string()]),
+        visibility: auto_workflow_manager::msg::WorkflowVisibility::Public,
+        actions: HashMap::from([
+            (
+                "claim".to_string(),
+                auto_workflow_manager::msg::ActionMsg {
+                    params: HashMap::from([
+                        (
+                            "templateId".to_string(),
+                            ActionParamValue::String("#ip.claimTemplateId".to_string()),
+                        ),
+                        (
+                            "contractAddress".to_string(),
+                            ActionParamValue::String("#ip.claimContractAddress".to_string()),
+                        ),
+                        (
+                            "userAddress".to_string(),
+                            ActionParamValue::String("#ip.requester".to_string()),
+                        ),
+                        (
+                            "distributionId".to_string(),
+                            ActionParamValue::String("#ip.distributionId".to_string()),
+                        ),
+                    ]),
+                    next_actions: HashSet::from(["stake".to_string()]),
+                    templates: HashMap::from([
+                        (
+                            "daodao".to_string(),
+                            auto_workflow_manager::msg::Template {
+                                contract: "{{contractAddress}}".to_string(),
+                                message: "{ \"echo\": { \"message\": \"Q2xhaW0gT3BlcmF0aW9u\", \"attributes\": [[\"priority\", \"high\"],[\"timestamp\", \"1640995200\"]] } }".to_string(),
+                                funds: vec![],
+                            },
+                        ),
+                    ]),
+                    whitelisted_contracts: HashSet::from([
+                        contract_to_call.to_string(),
+                    ]),
+                },
+            ),
+            (
+                "stake".to_string(),
+                auto_workflow_manager::msg::ActionMsg {
+                    params: HashMap::from([
+                        (
+                            "templateId".to_string(),
+                            ActionParamValue::String("#ip.stakeTemplateId".to_string()),
+                        ),
+                        (
+                            "contractAddress".to_string(),
+                            ActionParamValue::String("#ip.stakeContractAddress".to_string()),
+                        ),
+                        (
+                            "userAddress".to_string(),
+                            ActionParamValue::String("#ip.requester".to_string()),
+                        ),
+                    ]),
+                    next_actions: HashSet::new(),
+                    templates: HashMap::from([
+                        (
+                            "daodao".to_string(),
+                            auto_workflow_manager::msg::Template {
+                                contract: "{{contractAddress}}".to_string(),
+                                message: "{ \"echo\": { \"message\": \"T3BlcmFjaW9uIGRlIFN0YWtl\", \"attributes\": [[\"priority\", \"high\"],[\"timestamp\", \"1640995200\"]] } }".to_string(),
+                                funds: vec![
+                                    ("{{amount}}".to_string(), "{{denom}}".to_string()),
+                                ],
+                            },
+                        ),
+                    ]),
+                    whitelisted_contracts: HashSet::from([
+                        contract_to_call.to_string(),
+                    ]),
+                },
+            ),
+        ]),
+    };
+
+    // Publish the workflow
+    publish_workflow(deps.as_mut(), env.clone(), publisher_address.clone(), workflow_msg).unwrap();
+
+    // Execute instance with future expiration
+    let instance = create_test_instance_with_params(
+        "eeda92878b06e1b442d9ce37fd564768c1f4e4f3db350031c14ae2319e8ebb1c".to_string(), 
+        HashMap::from([
+            ("claimTemplateId".to_string(), ActionParamValue::String("daodao".to_string())),
+            ("claimContractAddress".to_string(), ActionParamValue::String(contract_to_call.to_string())),
+            ("stakeTemplateId".to_string(), ActionParamValue::String("daodao".to_string())),
+            ("stakeContractAddress".to_string(), ActionParamValue::String(contract_to_call.to_string())),
+            ("distributionId".to_string(), ActionParamValue::String("1".to_string())),
+        ]));
+    execute_instance(&mut deps, env.clone(), user_address.clone(), instance).unwrap();
+
+    // Execute action with daodao template
+    let response = execute_action(
+        &mut deps,
+        env.clone(),
+        executor_address.clone(),
+        user_address.to_string(),
+        1,
+        "claim".to_string(),
+        "daodao".to_string(),
+        None,
+    ).unwrap();
+
+    // Verify response attributes
+    assert_eq!(response.attributes.len(), 4);
+    assert_eq!(response.attributes[0].key, "method");
+    assert_eq!(response.attributes[0].value, "execute_action");
+    assert_eq!(response.attributes[1].key, "user_address");
+    assert_eq!(response.attributes[1].value, user_address.to_string());
+    assert_eq!(response.attributes[2].key, "instance_id");
+    assert_eq!(response.attributes[2].value, "1");
+    assert_eq!(response.attributes[3].key, "action_id");
+    assert_eq!(response.attributes[3].value, "claim");
+
+    // Verify that sub-messages were created
+    assert_eq!(response.messages.len(), 1);
+    dbg!(&response.messages[0]);
+}
