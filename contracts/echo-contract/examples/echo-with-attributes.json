@@ -1,5 +1,5 @@
 {
-  "echo_with_attributes": {
+  "echo": {
     "message": "eyJ0ZXN0IjogIm1lc3NhZ2UiLCAiZGF0YSI6ICJzb21lIHZhbHVlIn0=",
     "attributes": [
       ["message_type", "json_data"],
@@ -9,3 +9,4 @@
     ]
   }
 }
+
