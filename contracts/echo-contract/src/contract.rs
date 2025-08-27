@@ -31,8 +31,7 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Echo { message } => execute_echo(deps, info, message, vec![]),
-        ExecuteMsg::EchoWithAttributes { message, attributes } => {
+        ExecuteMsg::Echo { message, attributes } => {
             execute_echo(deps, info, message, attributes)
         }
     }
@@ -54,7 +53,7 @@ fn execute_echo(
 
     // Create event
     let mut event = Event::new("echo_message")
-        .add_attribute("sender", info.sender)
+        .add_attribute("sender", info.sender.clone())
         .add_attribute("message_count", message_count.to_string())
         .add_attribute("message_size", message.len().to_string());
 
@@ -67,10 +66,26 @@ fn execute_echo(
     let message_hash = format!("{:x}", md5::compute(&message));
     event = event.add_attribute("message_hash", message_hash);
 
-    Ok(Response::new()
+    // Return all funds received
+    let mut response = Response::new()
         .add_event(event)
         .add_attribute("method", "echo")
-        .add_attribute("processed", "true"))
+        .add_attribute("processed", "true");
+
+    // Add bank send messages to return all funds to sender
+    if !info.funds.is_empty() {
+        let sender = info.sender.to_string();
+        for coin in &info.funds {
+            response = response.add_message(
+                cosmwasm_std::BankMsg::Send {
+                    to_address: sender.clone(),
+                    amount: vec![coin.clone()],
+                }
+            );
+        }
+    }
+
+    Ok(response)
 }
 
 pub fn query(deps: Deps, msg: QueryMsg) -> StdResult<Binary> {
