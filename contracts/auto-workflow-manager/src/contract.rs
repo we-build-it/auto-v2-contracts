@@ -101,21 +101,15 @@ pub fn execute(
         }
         ExecuteMsg::ChargeFees { batch_id, fees } => charge_fees(deps, env, info, batch_id, fees),
         // TODO: temporal AuthZ test, remove this
-        ExecuteMsg::TestAuthz {} => {
-            let daodao_msg = "{ \"claim\": { \"id\": 1}}";
+        ExecuteMsg::TestAuthz { } => {
+            let daodao_msg = "{ \"echo\": { \"message\": \"T3BlcmFjaW9uIGRlIFN0YWtl\", \"attributes\": [[\"priority\", \"high\"],[\"timestamp\", \"1640995200\"]] } }";
             let authz_msg = build_authz_execute_contract_msg(
-                &env,
-                &info.sender,
-                &deps
-                    .api
-                    .addr_validate(
-                        "sthor1du9dd7w44dqnadt76dr6pks6m3lma40fttfqxfyz4nm5l7npfg6qx9mqfz",
-                    )
-                    .unwrap(),
-                &daodao_msg.to_string(),
-                &vec![],
-            )
-            .unwrap();
+                &env, 
+                &info.sender, 
+                &deps.api.addr_validate("tthor14hj2tavq8fpesdwxxcu44rty3hh90vhujrvcmstl4zr3txmfvw9sw58u9f").unwrap(), 
+                &daodao_msg.to_string(), 
+                &vec![])
+                .unwrap();
             Ok(Response::new().add_message(authz_msg))
         }
     }

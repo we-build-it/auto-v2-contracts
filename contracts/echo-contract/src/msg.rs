@@ -8,12 +8,8 @@ pub struct InstantiateMsg {
 
 #[cw_serde]
 pub enum ExecuteMsg {
-    // Echo any message and emit an event
-    Echo {
-        message: Binary,
-    },
     // Echo with custom event attributes
-    EchoWithAttributes {
+    Echo {
         message: Binary,
         attributes: Vec<(String, String)>,
     },

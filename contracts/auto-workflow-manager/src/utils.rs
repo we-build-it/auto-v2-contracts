@@ -162,7 +162,7 @@ pub enum AuthzMessageType {
 /// * `env` - The environment information.
 /// * `user` - The address of the user on whose behalf the action will be executed.
 /// * `contract_addr` - The address of the contract to execute.
-/// * `msg_str` - The message to execute.
+/// * `msg_str` - The message to execute. This must be a plain string containing the JSON message.
 /// * `funds` - The funds to send.
 ///
 /// # Returns

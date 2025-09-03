@@ -1,7 +1,7 @@
 use std::{collections::HashMap, str::FromStr};
 
 use cosmwasm_std::{
-    to_json_binary, Addr, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response, Uint128, WasmMsg,
+    to_json_binary, Addr, Binary, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response, Uint128, WasmMsg
 };
 
 use crate::{
@@ -373,8 +373,7 @@ pub fn execute_action(
                         &env,
                         &user_addr,
                         &deps.api.addr_validate(contract_addr)?,
-                        // &info.sender,
-                        &msg.to_string(),
+                        &String::from_utf8(msg.to_vec()).unwrap(),
                         &funds,
                     )
                 }
@@ -488,7 +487,7 @@ fn execute_dynamic_template(
     // Create the WasmMsg
     let wasm_msg = WasmMsg::Execute {
         contract_addr: resolved_contract,
-        msg: to_json_binary(&resolved_message)?,
+        msg: Binary::from(resolved_message.as_bytes()),
         funds: resolved_funds,
     };
 
