@@ -163,9 +163,6 @@ fn test_charge_fees_from_user_balance_invalid_denom() {
         user: user_address,
         fees: vec![
             auto_fee_manager::msg::Fee {
-                workflow_instance_id: "test-instance-1".to_string(),
-                action_id: "test-action-1".to_string(),
-                description: "Test execution fee".to_string(),
                 timestamp: 1234567890,
                 amount: Uint128::from(1000u128),
                 denom: "uatom".to_string(), // Invalid denom
@@ -240,9 +237,6 @@ fn test_charge_fees_from_user_balance_below_threshold_event() {
         user: user_address.clone(),
         fees: vec![
             auto_fee_manager::msg::Fee {
-                workflow_instance_id: "test-instance-1".to_string(),
-                action_id: "test-action-1".to_string(),
-                description: "Test execution fee".to_string(),
                 timestamp: 1234567890,
                 amount: Uint128::from(100u128), // This will bring balance to 50, below threshold
                 denom: "uusdc".to_string(),
@@ -325,9 +319,6 @@ fn test_charge_fees_from_user_balance_storage_tracking() {
         user: user_address.clone(),
         fees: vec![
             auto_fee_manager::msg::Fee {
-                workflow_instance_id: "test-instance-1".to_string(),
-                action_id: "test-action-1".to_string(),
-                description: "Test execution fee".to_string(),
                 timestamp: 1234567890,
                 amount: Uint128::from(100u128),
                 denom: "uusdc".to_string(),
@@ -335,9 +326,6 @@ fn test_charge_fees_from_user_balance_storage_tracking() {
                 creator_address: None,
             },
             auto_fee_manager::msg::Fee {
-                workflow_instance_id: "test-instance-2".to_string(),
-                action_id: "test-action-2".to_string(),
-                description: "Test creator fee".to_string(),
                 timestamp: 1234567891,
                 amount: Uint128::from(200u128),
                 denom: "uusdc".to_string(),
@@ -424,9 +412,6 @@ fn test_charge_fees_from_user_balance_creator_fallback() {
         user: user_address.clone(),
         fees: vec![
             auto_fee_manager::msg::Fee {
-                workflow_instance_id: "test-instance-1".to_string(),
-                action_id: "test-action-1".to_string(),
-                description: "Test creator fee with fallback".to_string(),
                 timestamp: 1234567890,
                 amount: Uint128::from(300u128),
                 denom: "uusdc".to_string(),
@@ -501,9 +486,6 @@ fn test_charge_fees_from_user_balance_partial_execution_fee() {
         user: user_address.clone(),
         fees: vec![
             auto_fee_manager::msg::Fee {
-                workflow_instance_id: "test-instance-1".to_string(),
-                action_id: "test-action-1".to_string(),
-                description: "Test partial execution fee".to_string(),
                 timestamp: 1234567890,
                 amount: Uint128::from(15u128),
                 denom: "uusdc".to_string(),

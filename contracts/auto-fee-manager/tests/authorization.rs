@@ -155,9 +155,6 @@ fn test_workflow_manager_functions_require_authorization() {
     let creator_address = api.addr_make("creator");
     let test_fees = vec![
         auto_fee_manager::msg::Fee {
-            workflow_instance_id: "test-instance-1".to_string(),
-            action_id: "test-action-1".to_string(),
-            description: "Test creator fee".to_string(),
             timestamp: 1234567890,
             amount: Uint128::from(1000u128),
             denom: "uusdc".to_string(),
@@ -313,9 +310,6 @@ fn test_sudo_set_workflow_manager_address() {
     let creator_address = api.addr_make("creator");
     let test_fees = vec![
         auto_fee_manager::msg::Fee {
-            workflow_instance_id: "test-instance-1".to_string(),
-            action_id: "test-action-1".to_string(),
-            description: "Test creator fee".to_string(),
             timestamp: 1234567890,
             amount: Uint128::from(1000u128),
             denom: "uusdc".to_string(),

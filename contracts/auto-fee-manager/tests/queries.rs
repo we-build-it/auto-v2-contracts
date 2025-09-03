@@ -340,9 +340,6 @@ fn test_get_non_creator_fees() {
         user: user_address.clone(),
         fees: vec![
             Fee {
-                workflow_instance_id: "test-instance-1".to_string(),
-                action_id: "test-action-1".to_string(),
-                description: "Test execution fee".to_string(),
                 timestamp: 1234567890,
                 amount: Uint128::from(100u128),
                 denom: "tcy".to_string(),

@@ -1,0 +1,532 @@
+use auto_workflow_manager::{msg::NewInstanceMsg, ContractError};
+use cosmwasm_std::{Addr, Uint128};
+
+mod utils;
+use utils::{create_simple_test_workflow, create_test_environment, publish_workflow};
+
+use auto_workflow_manager::{
+    contract::{execute, query},
+    msg::{ExecuteMsg, FeeTotal, FeeType, QueryMsg, UserFee},
+    state::{PaymentConfig, PaymentSource},
+};
+
+use crate::utils::{create_oneshot_test_instance, execute_instance};
+
+fn set_user_payment_config(
+    deps: &mut cosmwasm_std::OwnedDeps<
+        cosmwasm_std::testing::MockStorage,
+        cosmwasm_std::testing::MockApi,
+        cosmwasm_std::testing::MockQuerier,
+        cosmwasm_std::Empty,
+    >,
+    env: cosmwasm_std::Env,
+    admin: Addr,
+    user_address: String,
+    payment_config: PaymentConfig,
+) -> Result<cosmwasm_std::Response, auto_workflow_manager::error::ContractError> {
+    let execute_msg = ExecuteMsg::SetUserPaymentConfig {
+        user_address,
+        payment_config,
+    };
+    let execute_info = cosmwasm_std::testing::message_info(&admin, &[]);
+    execute(deps.as_mut(), env, execute_info, execute_msg)
+}
+
+fn remove_user_payment_config(
+    deps: &mut cosmwasm_std::OwnedDeps<
+        cosmwasm_std::testing::MockStorage,
+        cosmwasm_std::testing::MockApi,
+        cosmwasm_std::testing::MockQuerier,
+        cosmwasm_std::Empty,
+    >,
+    env: cosmwasm_std::Env,
+    admin: Addr,
+    user_address: String,
+) -> Result<cosmwasm_std::Response, auto_workflow_manager::error::ContractError> {
+    let execute_msg = ExecuteMsg::RemoveUserPaymentConfig { user_address };
+    let execute_info = cosmwasm_std::testing::message_info(&admin, &[]);
+    execute(deps.as_mut(), env, execute_info, execute_msg)
+}
+
+fn query_user_payment_config(
+    deps: &cosmwasm_std::OwnedDeps<
+        cosmwasm_std::testing::MockStorage,
+        cosmwasm_std::testing::MockApi,
+        cosmwasm_std::testing::MockQuerier,
+        cosmwasm_std::Empty,
+    >,
+    user_address: String,
+) -> Result<
+    auto_workflow_manager::msg::GetUserPaymentConfigResponse,
+    auto_workflow_manager::error::ContractError,
+> {
+    let query_msg = QueryMsg::GetUserPaymentConfig { user_address };
+    let response = query(deps.as_ref(), cosmwasm_std::testing::mock_env(), query_msg)?;
+    let result: auto_workflow_manager::msg::GetUserPaymentConfigResponse =
+        cosmwasm_std::from_json(response)?;
+    Ok(result)
+}
+
+fn create_test_payment_config() -> PaymentConfig {
+    PaymentConfig {
+        allowance_usd: Uint128::new(1000),
+        source: PaymentSource::Wallet,
+    }
+}
+
+fn create_test_payment_config_prepaid() -> PaymentConfig {
+    PaymentConfig {
+        allowance_usd: Uint128::new(500),
+        source: PaymentSource::Prepaid,
+    }
+}
+
+#[test]
+fn test_set_user_payment_config_ok() {
+    let (mut deps, env, api, admin_address, _publisher_address, _executor_address) =
+        create_test_environment();
+    let user_address = api.addr_make("user");
+
+    // Set payment config
+    let payment_config = create_test_payment_config();
+    let response = set_user_payment_config(
+        &mut deps,
+        env,
+        admin_address.clone(),
+        user_address.to_string(),
+        payment_config.clone(),
+    )
+    .unwrap();
+
+    // Verify response attributes
+    assert_eq!(response.attributes.len(), 4);
+    assert_eq!(response.attributes[0].key, "method");
+    assert_eq!(response.attributes[0].value, "set_user_payment_config");
+    assert_eq!(response.attributes[1].key, "user_address");
+    assert_eq!(response.attributes[1].value, user_address.to_string());
+    assert_eq!(response.attributes[2].key, "allowance_usd");
+    assert_eq!(response.attributes[2].value, "1000");
+    assert_eq!(response.attributes[3].key, "source");
+    assert_eq!(response.attributes[3].value, "Wallet");
+
+    // Verify that the payment config was actually saved in the state
+    let saved_config = query_user_payment_config(&deps, user_address.to_string()).unwrap();
+    assert!(saved_config.payment_config.is_some());
+    let config = saved_config.payment_config.unwrap();
+    assert_eq!(config.allowance_usd, Uint128::new(1000));
+    assert!(matches!(config.source, PaymentSource::Wallet));
+}
+
+#[test]
+fn test_set_user_payment_config_unauthorized() {
+    let (mut deps, env, api, _admin_address, publisher_address, _executor_address) =
+        create_test_environment();
+    let user_address = api.addr_make("user");
+
+    // Try to set payment config with non-admin user
+    let payment_config = create_test_payment_config();
+    let result = set_user_payment_config(
+        &mut deps,
+        env,
+        publisher_address, // Using publisher instead of admin
+        user_address.to_string(),
+        payment_config,
+    );
+
+    // Verify that the operation fails
+    assert!(result.is_err());
+
+    match result {
+        Err(ContractError::Unauthorized {}) => {
+            // Expected error
+        }
+        _ => panic!("Expected Unauthorized error, got different error"),
+    }
+}
+
+#[test]
+fn test_set_user_payment_config_invalid_address() {
+    let (mut deps, env, _api, admin_address, _publisher_address, _executor_address) =
+        create_test_environment();
+
+    // Try to set payment config with invalid address
+    let payment_config = create_test_payment_config();
+    let result = set_user_payment_config(
+        &mut deps,
+        env,
+        admin_address,
+        "invalid-address".to_string(),
+        payment_config,
+    );
+
+    // Verify that the operation fails
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_query_user_payment_config_ok() {
+    let (mut deps, env, api, admin_address, _publisher_address, _executor_address) =
+        create_test_environment();
+    let user_address = api.addr_make("user");
+
+    // Set payment config first
+    let payment_config = create_test_payment_config();
+    set_user_payment_config(
+        &mut deps,
+        env,
+        admin_address,
+        user_address.to_string(),
+        payment_config.clone(),
+    )
+    .unwrap();
+
+    // Query the payment config
+    let result = query_user_payment_config(&deps, user_address.to_string()).unwrap();
+
+    // Verify the result
+    assert!(result.payment_config.is_some());
+    let config = result.payment_config.unwrap();
+    assert_eq!(config.allowance_usd, Uint128::new(1000));
+    assert!(matches!(config.source, PaymentSource::Wallet));
+}
+
+#[test]
+fn test_query_user_payment_config_not_found() {
+    let (deps, _env, api, _admin_address, _publisher_address, _executor_address) =
+        create_test_environment();
+    let user_address = api.addr_make("user");
+
+    // Try to query non-existent payment config
+    let result = query_user_payment_config(&deps, user_address.to_string()).unwrap();
+
+    // Verify that the operation returns None
+    assert!(result.payment_config.is_none());
+}
+
+#[test]
+fn test_remove_user_payment_config_ok() {
+    let (mut deps, env, api, admin_address, _publisher_address, _executor_address) =
+        create_test_environment();
+    let user_address = api.addr_make("user");
+
+    // Set payment config first
+    let payment_config = create_test_payment_config();
+    set_user_payment_config(
+        &mut deps,
+        env.clone(),
+        admin_address.clone(),
+        user_address.to_string(),
+        payment_config,
+    )
+    .unwrap();
+
+    // Verify it exists
+    let query_result = query_user_payment_config(&deps, user_address.to_string());
+    assert!(query_result.is_ok());
+
+    // Remove the payment config
+    let response =
+        remove_user_payment_config(&mut deps, env, admin_address, user_address.to_string())
+            .unwrap();
+
+    // Verify response attributes
+    assert_eq!(response.attributes.len(), 2);
+    assert_eq!(response.attributes[0].key, "method");
+    assert_eq!(response.attributes[0].value, "remove_user_payment_config");
+    assert_eq!(response.attributes[1].key, "user_address");
+    assert_eq!(response.attributes[1].value, user_address.to_string());
+
+    // Verify it no longer exists
+    let query_result = query_user_payment_config(&deps, user_address.to_string()).unwrap();
+    assert!(query_result.payment_config.is_none());
+}
+
+#[test]
+fn test_remove_user_payment_config_unauthorized() {
+    let (mut deps, env, api, _admin_address, publisher_address, _executor_address) =
+        create_test_environment();
+    let user_address = api.addr_make("user");
+
+    // Try to remove payment config with non-admin user
+    let result = remove_user_payment_config(
+        &mut deps,
+        env,
+        publisher_address, // Using publisher instead of admin
+        user_address.to_string(),
+    );
+
+    // Verify that the operation fails
+    assert!(result.is_err());
+
+    match result {
+        Err(ContractError::Unauthorized {}) => {
+            // Expected error
+        }
+        _ => panic!("Expected Unauthorized error, got different error"),
+    }
+}
+
+#[test]
+fn test_payment_config_prepaid_source() {
+    let (mut deps, env, api, admin_address, _publisher_address, _executor_address) =
+        create_test_environment();
+    let user_address = api.addr_make("user");
+
+    // Set payment config with Prepaid source
+    let payment_config = create_test_payment_config_prepaid();
+    let response = set_user_payment_config(
+        &mut deps,
+        env.clone(),
+        admin_address.clone(),
+        user_address.to_string(),
+        payment_config.clone(),
+    )
+    .unwrap();
+
+    // Verify response attributes
+    assert_eq!(response.attributes[3].key, "source");
+    assert_eq!(response.attributes[3].value, "Prepaid");
+
+    // Query and verify the config
+    let result = query_user_payment_config(&deps, user_address.to_string()).unwrap();
+    assert!(result.payment_config.is_some());
+    let config = result.payment_config.unwrap();
+    assert_eq!(config.allowance_usd, Uint128::new(500));
+    assert!(matches!(config.source, PaymentSource::Prepaid));
+
+    // Verify that the payment config was actually saved in the state
+    let saved_config = query_user_payment_config(&deps, user_address.to_string()).unwrap();
+    assert!(saved_config.payment_config.is_some());
+    let saved_config_unwrapped = saved_config.payment_config.unwrap();
+    assert_eq!(saved_config_unwrapped.allowance_usd, Uint128::new(500));
+    assert!(matches!(
+        saved_config_unwrapped.source,
+        PaymentSource::Prepaid
+    ));
+}
+
+#[test]
+fn test_update_user_payment_config() {
+    let (mut deps, env, api, admin_address, _publisher_address, _executor_address) =
+        create_test_environment();
+    let user_address = api.addr_make("user");
+
+    // Set initial payment config
+    let initial_config = create_test_payment_config();
+    set_user_payment_config(
+        &mut deps,
+        env.clone(),
+        admin_address.clone(),
+        user_address.to_string(),
+        initial_config,
+    )
+    .unwrap();
+
+    // Update with new config
+    let updated_config = PaymentConfig {
+        allowance_usd: Uint128::new(2000),
+        source: PaymentSource::Prepaid,
+    };
+    set_user_payment_config(
+        &mut deps,
+        env,
+        admin_address,
+        user_address.to_string(),
+        updated_config.clone(),
+    )
+    .unwrap();
+
+    // Query and verify the updated config
+    let result = query_user_payment_config(&deps, user_address.to_string()).unwrap();
+    assert!(result.payment_config.is_some());
+    let config = result.payment_config.unwrap();
+    assert_eq!(config.allowance_usd, Uint128::new(2000));
+    assert!(matches!(config.source, PaymentSource::Prepaid));
+
+    // Verify that the payment config was actually updated in the state
+    let saved_config = query_user_payment_config(&deps, user_address.to_string()).unwrap();
+    assert!(saved_config.payment_config.is_some());
+    let saved_config_unwrapped = saved_config.payment_config.unwrap();
+    assert_eq!(saved_config_unwrapped.allowance_usd, Uint128::new(2000));
+    assert!(matches!(
+        saved_config_unwrapped.source,
+        PaymentSource::Prepaid
+    ));
+}
+
+#[test]
+fn test_charge_fees_events() {
+    let (mut deps, env, api, admin_address, publisher_address, _executor_address) =
+        create_test_environment();
+
+    // Publish a workflow first
+    let workflow_msg = create_simple_test_workflow(api);
+    publish_workflow(
+        deps.as_mut(),
+        env.clone(),
+        publisher_address.clone(),
+        workflow_msg,
+    )
+    .unwrap();
+
+    // Create users
+    let user1: Addr = api.addr_make("user1");
+    let user2: Addr = api.addr_make("user2");
+
+    // Set payment config
+    let payment_config = create_test_payment_config_prepaid();
+    set_user_payment_config(
+        &mut deps,
+        env.clone(),
+        admin_address.clone(),
+        user1.to_string(),
+        payment_config.clone(),
+    )
+    .unwrap();
+    set_user_payment_config(
+        &mut deps,
+        env.clone(),
+        admin_address.clone(),
+        user2.to_string(),
+        payment_config.clone(),
+    )
+    .unwrap();
+
+    // Execute instance
+    let instance1: NewInstanceMsg =
+        create_oneshot_test_instance("simple-test-workflow".to_string());
+    execute_instance(&mut deps, env.clone(), user1.clone(), instance1).unwrap();
+    let instance2: NewInstanceMsg =
+        create_oneshot_test_instance("simple-test-workflow".to_string());
+    execute_instance(&mut deps, env.clone(), user2.clone(), instance2).unwrap();
+
+    // Create test fees
+    let fees = vec![
+        UserFee {
+            address: user1.to_string(),
+            totals: vec![
+                FeeTotal {
+                    denom: "RUNE".to_string(),
+                    amount: Uint128::new(100000000),
+                    fee_type: FeeType::Execution,
+                    instance_id: 1,
+                    denom_decimals: 8,
+                },
+                FeeTotal {
+                    denom: "AUTO".to_string(),
+                    amount: Uint128::new(10000000000),
+                    fee_type: FeeType::Creator,
+                    instance_id: 1,
+                    denom_decimals: 10,
+                },
+            ],
+        },
+        UserFee {
+            address: user2.to_string(),
+            totals: vec![FeeTotal {
+                denom: "TCY".to_string(),
+                amount: Uint128::new(1000000000000),
+                fee_type: FeeType::Execution,
+                instance_id: 2,
+                denom_decimals: 12,
+            }],
+        },
+    ];
+
+    let batch_id = "test-batch-123".to_string();
+
+    // Execute charge_fees
+    let response = charge_fees(&mut deps, env, admin_address, batch_id.clone(), fees).unwrap();
+
+    // Verify main response attributes
+    assert_eq!(response.attributes.len(), 3);
+    assert_eq!(response.attributes[0].key, "method");
+    assert_eq!(response.attributes[0].value, "charge_fees");
+    assert_eq!(response.attributes[1].key, "batch_id");
+    assert_eq!(response.attributes[1].value, batch_id);
+    assert_eq!(response.attributes[2].key, "users_count");
+    assert_eq!(response.attributes[2].value, "2");
+
+    // Verify events
+    assert_eq!(response.events.len(), 6); // 3 rate events + 3 fee events
+
+    // Check rate events
+    let rate_events: Vec<_> = response
+        .events
+        .iter()
+        .filter(|event| event.ty == "fee-rate")
+        .collect();
+    assert_eq!(rate_events.len(), 3); // RUNE, AUTO, and TCY
+
+    // Check fee events
+    let fee_events: Vec<_> = response
+        .events
+        .iter()
+        .filter(|event| event.ty == "fee-charged")
+        .collect();
+    assert_eq!(fee_events.len(), 3);
+
+    // Verify fee events for user1
+    let user1_fee_events: Vec<_> = fee_events
+        .iter()
+        .filter(|event| {
+            event
+                .attributes
+                .iter()
+                .any(|attr| attr.key == "user_address" && attr.value == user1.to_string())
+        })
+        .collect();
+    assert_eq!(user1_fee_events.len(), 2);
+
+    // Check RUNE fee for user1
+    let rune_event = user1_fee_events
+        .iter()
+        .find(|event| {
+            event
+                .attributes
+                .iter()
+                .any(|attr| attr.key == "denom" && attr.value == "RUNE")
+        })
+        .unwrap();
+
+    assert!(rune_event
+        .attributes
+        .iter()
+        .any(|attr| attr.key == "amount_charged" && attr.value == "1000"));
+
+    // Verify event has all necessary attributes
+    assert_eq!(rune_event.attributes.len(), 5); // user_address, denom, amount_charged, fee_type, instance_id
+
+    // Verify rate events exist
+    let rune_rate_event = rate_events
+        .iter()
+        .find(|event| {
+            event
+                .attributes
+                .iter()
+                .any(|attr| attr.key == "denom" && attr.value == "RUNE")
+        })
+        .unwrap();
+
+    assert!(rune_rate_event
+        .attributes
+        .iter()
+        .any(|attr| attr.key == "usd_rate" && attr.value == "0.5"));
+}
+
+fn charge_fees(
+    deps: &mut cosmwasm_std::OwnedDeps<
+        cosmwasm_std::testing::MockStorage,
+        cosmwasm_std::testing::MockApi,
+        cosmwasm_std::testing::MockQuerier,
+        cosmwasm_std::Empty,
+    >,
+    env: cosmwasm_std::Env,
+    admin: Addr,
+    batch_id: String,
+    fees: Vec<UserFee>,
+) -> Result<cosmwasm_std::Response, auto_workflow_manager::error::ContractError> {
+    let execute_msg = ExecuteMsg::ChargeFees { batch_id, fees };
+    let execute_info = cosmwasm_std::testing::message_info(&admin, &[]);
+    execute(deps.as_mut(), env, execute_info, execute_msg)
+}

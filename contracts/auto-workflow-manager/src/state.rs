@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use cosmwasm_std::{Addr, Order, StdResult, Storage, Timestamp};
+use cosmwasm_std::{Addr, Order, StdResult, Storage, Timestamp, Uint128};
 use cw_storage_plus::{Item, Map};
 
 use cosmwasm_schema::cw_serde;
@@ -15,6 +15,7 @@ pub struct Config {
     pub allowed_publishers: HashSet<Addr>,
     pub allowed_action_executors: HashSet<Addr>,
     pub referral_memo: String,
+    pub fee_manager_address: Addr,
 }
 
 #[cw_serde]
@@ -31,7 +32,6 @@ pub struct Workflow {
     pub publisher: Addr,
 }
 
-
 #[cw_serde]
 pub struct WorkflowInstance {
     pub workflow_id: WorkflowId,
@@ -39,8 +39,39 @@ pub struct WorkflowInstance {
     pub last_executed_action: Option<String>,
     pub execution_type: ExecutionType,
     pub expiration_time: Timestamp,
+    // pub requester: Addr,
 }
 
+#[cw_serde]
+pub struct PaymentConfig {
+    pub allowance_usd: Uint128,
+    pub source: PaymentSource,
+}
+
+#[cw_serde]
+pub enum PaymentSource {
+    Wallet,
+    Prepaid,
+}
+
+// ==================================== 
+// ========== PAYMENT CONFIG ==========
+// ==================================== 
+
+pub const USER_PAYMENT_CONFIG: Map<Addr, PaymentConfig> = Map::new("upc");
+
+pub fn save_user_payment_config(storage: &mut dyn Storage, user: &Addr, config: &PaymentConfig) -> StdResult<()> {
+    USER_PAYMENT_CONFIG.save(storage, user.clone(), config)
+}
+
+pub fn load_user_payment_config(storage: &dyn Storage, user: &Addr) -> StdResult<PaymentConfig> {
+    USER_PAYMENT_CONFIG.load(storage, user.clone())
+}
+
+pub fn remove_user_payment_config(storage: &mut dyn Storage, user: &Addr) -> StdResult<()> {
+    USER_PAYMENT_CONFIG.remove(storage, user.clone());
+    Ok(())
+}
 
 // =============================== 
 // ========== WORKFLOWS ==========

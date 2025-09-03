@@ -1,14 +1,15 @@
 use std::{collections::HashMap, str::FromStr};
 
 use cosmwasm_std::{
-    to_json_binary, Addr, CosmosMsg, DepsMut, Env, MessageInfo, Response, Uint128, WasmMsg,
+    to_json_binary, Addr, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response, Uint128, WasmMsg,
 };
 
 use crate::{
     msg::{
-        ActionParamValue, ExecutionType, NewWorkflowMsg, WorkflowInstanceState, WorkflowState,
-        WorkflowVisibility,
+        ActionParamValue, ExecutionType, FeeType, NewWorkflowMsg, UserFee, WorkflowInstanceState,
+        WorkflowState, WorkflowVisibility,
     },
+    state::{load_user_payment_config, load_config, PaymentSource},
     ContractError,
 };
 use crate::{
@@ -16,11 +17,12 @@ use crate::{
     state::{
         load_next_instance_id, load_workflow, load_workflow_action, load_workflow_action_params,
         load_workflow_action_template, load_workflow_instance, load_workflow_instance_params,
-        remove_workflow_instance, save_workflow, save_workflow_action,
-        save_workflow_action_contracts, save_workflow_action_params,
-        save_workflow_action_templates, save_workflow_instance, save_workflow_instance_params,
-        validate_contract_is_whitelisted, validate_sender_is_action_executor,
-        validate_sender_is_publisher, Action, Workflow, WorkflowInstance,
+        remove_user_payment_config, remove_workflow_instance, save_user_payment_config,
+        save_workflow, save_workflow_action, save_workflow_action_contracts,
+        save_workflow_action_params, save_workflow_action_templates, save_workflow_instance,
+        save_workflow_instance_params, validate_contract_is_whitelisted,
+        validate_sender_is_action_executor, validate_sender_is_admin, validate_sender_is_publisher,
+        Action, PaymentConfig, Workflow, WorkflowInstance,
     },
     utils::build_authz_execute_contract_msg,
 };
@@ -115,6 +117,7 @@ pub fn execute_instance(
         last_executed_action: None,
         execution_type: instance.execution_type,
         expiration_time: instance.expiration_time,
+        // requester: info.sender.clone(),
     };
 
     // Save the instance
@@ -548,3 +551,257 @@ fn resolve_template_funds(
 }
 
 //=========== DYNAMIC TEMPLATE ACTION (END) ============
+
+pub fn set_user_payment_config(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    user_address: String,
+    payment_config: PaymentConfig,
+) -> Result<Response, ContractError> {
+    // Validate sender is admin
+    validate_sender_is_admin(deps.storage, &info)?;
+
+    // Validate user address
+    let user_addr = deps.api.addr_validate(&user_address)?;
+
+    // Save the payment config
+    save_user_payment_config(deps.storage, &user_addr, &payment_config)?;
+
+    Ok(Response::new()
+        .add_attribute("method", "set_user_payment_config")
+        .add_attribute("user_address", user_address)
+        .add_attribute("allowance_usd", payment_config.allowance_usd.to_string())
+        .add_attribute("source", format!("{:?}", payment_config.source)))
+}
+
+pub fn remove_user_payment_config_execute(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    user_address: String,
+) -> Result<Response, ContractError> {
+    // Validate sender is admin
+    validate_sender_is_admin(deps.storage, &info)?;
+
+    // Validate user address
+    let user_addr = deps.api.addr_validate(&user_address)?;
+
+    // Remove the payment config
+    remove_user_payment_config(deps.storage, &user_addr)?;
+
+    Ok(Response::new()
+        .add_attribute("method", "remove_user_payment_config")
+        .add_attribute("user_address", user_address))
+}
+
+pub fn charge_fees(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    batch_id: String,
+    fees: Vec<UserFee>,
+) -> Result<Response, ContractError> {
+    // Validate sender is admin
+    validate_sender_is_admin(deps.storage, &info)?;
+
+    let mut response = Response::new()
+        .add_attribute("method", "charge_fees")
+        .add_attribute("batch_id", batch_id.clone())
+        .add_attribute("users_count", fees.len().to_string());
+
+    // TODO: Implement fee charging logic
+    // This will involve:
+    // 1. Validating user payment configs
+    // 2. Checking allowances
+    // 3. Processing payments through external service
+    // 4. Updating user payment states
+
+    // Collect unique denominations to emit rate events
+    let mut unique_denoms = std::collections::HashSet::new();
+    for user_fee in &fees {
+        for fee_total in &user_fee.totals {
+            unique_denoms.insert(fee_total.denom.clone());
+        }
+    }
+
+    // Get quotes for all unique denominations
+    let quotes = get_quotes(&unique_denoms);
+
+    // Emit rate events for each unique denomination
+    for denom in &unique_denoms {
+        let quote = quotes.get(denom).unwrap();
+        let usd_rate = convert_quote_to_usd_decimal(*quote);
+
+        response = response.add_event(
+            cosmwasm_std::Event::new("fee-rate")
+                .add_attribute("denom", denom.clone())
+                .add_attribute("usd_rate", usd_rate.to_string()),
+        );
+    }
+
+    // Emit events for each fee (without rate info)
+    for user_fee in fees {
+        // Get the payment config for this user
+        let requester = deps.api.addr_validate(&user_fee.address)?;
+        let payment_config = load_user_payment_config(deps.storage, &requester)?;
+
+        for fee_total in &user_fee.totals {
+            // Get the quote for this denomination
+            let quote = quotes.get(&fee_total.denom).unwrap();
+
+            // TODO: quote not found
+            
+            // Simplified calculation to avoid Decimal precision issues
+            let fee_total_amount_usd = (fee_total.amount * quote) / Uint128::new(10_u128.pow(fee_total.denom_decimals as u32));
+
+            // Get the workflow instance to extract the executor
+            let workflow_instance =
+                load_workflow_instance(deps.storage, &requester, &fee_total.instance_id)?;
+            let workflow = load_workflow(deps.storage, &workflow_instance.workflow_id)?;
+
+            let creator = workflow.publisher.clone();
+
+            // Get user's allowance in USD (already in utoken with 8 decimals)
+            let user_allowance_usd = payment_config.allowance_usd;
+
+            let (amount_charged, amount_charged_usd) = 
+            // Case 1: allowance >= fee_total.amount_usd
+            if user_allowance_usd >= fee_total_amount_usd
+            {
+                (fee_total.amount, fee_total_amount_usd)
+            }
+            // Case 2: 0 < allowance < fee_total.amount_usd => charge what allowance represents
+            else if user_allowance_usd > Uint128::zero() {
+                // Simplified calculation: convert allowance USD to denom amount
+                let amount_to_charge = (user_allowance_usd * Uint128::new(10_u128.pow(fee_total.denom_decimals as u32))) / quote;
+
+                (amount_to_charge, user_allowance_usd)
+            }
+            // Case 3: allowance = 0 => charge nothing
+            else {
+                (Uint128::zero(), Uint128::zero())
+            };
+
+            // Update user's allowance
+            let new_allowance = user_allowance_usd - amount_charged_usd;
+            save_user_payment_config(
+                deps.storage,
+                &requester,
+                &PaymentConfig {
+                    allowance_usd: new_allowance,
+                    source: payment_config.source.clone(),
+                },
+            )?;
+
+            // Load config to get fee manager address
+            let config = load_config(deps.storage)?;
+            
+            // Helper function to create fee message
+            let create_fee_message = |fee_type: &str, creator_address: Option<&Addr>| -> serde_json::Value {
+                let fee_data = {
+                    let mut fee = serde_json::json!({
+                        "timestamp": _env.block.time.seconds(),
+                        "amount": amount_charged.to_string(),
+                        "denom": fee_total.denom,
+                        "fee_type": fee_type
+                    });
+                    
+                    if let Some(creator) = creator_address {
+                        fee["creator_address"] = serde_json::Value::String(creator.to_string());
+                    } else {
+                        fee["creator_address"] = serde_json::Value::Null;
+                    }
+                    
+                    fee
+                };
+                
+                match payment_config.source {
+                    PaymentSource::Wallet => {
+                        serde_json::json!({
+                            "charge_fees_from_message_coins": {
+                                "fees": [fee_data]
+                            }
+                        })
+                    },
+                    PaymentSource::Prepaid => {
+                        serde_json::json!({
+                            "charge_fees_from_user_balance": {
+                                "batch": [{
+                                    "user": requester.to_string(),
+                                    "fees": [fee_data]
+                                }]
+                            }
+                        })
+                    }
+                }
+            };
+            
+            // Create fee message based on fee type
+            let fee_msg = match fee_total.fee_type {
+                FeeType::Execution => create_fee_message("execution", None),
+                FeeType::Creator => create_fee_message("creator", Some(&creator)),
+            };
+            
+            // Send message to fee manager
+            match payment_config.source {
+                PaymentSource::Wallet => {
+                    // Build AUTHZ message in name of requester
+                    let authz_msg = build_authz_execute_contract_msg(
+                        &_env,
+                        &requester,
+                        &config.fee_manager_address,
+                        &fee_msg.to_string(),
+                        &vec![],
+                    )?;
+                    
+                    response = response.add_message(authz_msg);
+                },
+                PaymentSource::Prepaid => {
+                    // Direct call to fee manager
+                    let wasm_msg = WasmMsg::Execute {
+                        contract_addr: config.fee_manager_address.to_string(),
+                        msg: to_json_binary(&fee_msg)?,
+                        funds: vec![],
+                    };
+                    
+                    response = response.add_message(wasm_msg);
+                },
+            }
+
+            response = response.add_event(
+                cosmwasm_std::Event::new("fee-charged")
+                    .add_attribute("user_address", user_fee.address.clone())
+                    .add_attribute("denom", fee_total.denom.clone())
+                    .add_attribute("amount_charged", amount_charged.to_string())
+                    .add_attribute("fee_type", fee_total.fee_type.to_string())
+                    .add_attribute("instance_id", fee_total.instance_id.to_string()),
+            );
+        }
+    }
+
+    Ok(response)
+}
+
+/// Mock function to get USD quotes for different denominations
+/// TODO: Replace with actual oracle integration
+fn get_quotes(denoms: &std::collections::HashSet<String>) -> HashMap<String, Uint128> {
+    let mut quotes = HashMap::new();
+
+    for denom in denoms {
+        // Mock: all tokens quote at 0.5 USD
+        // In real implementation, this would fetch from oracle
+        // Oracle returns 8 decimal precision, so 0.5 USD = 50000000
+        quotes.insert(denom.clone(), Uint128::new(50000000));
+    }
+
+    quotes
+}
+
+/// Convert oracle quote to USD decimal value
+/// Oracle returns 8 decimal precision, so we need to convert to Decimal
+fn convert_quote_to_usd_decimal(quote: Uint128) -> Decimal {
+    // Oracle returns 8 decimal precision (e.g., 50000000 for 0.5 USD)
+    // Convert to Decimal with 8 decimal places
+    Decimal::from_ratio(quote, Uint128::new(100000000))
+}

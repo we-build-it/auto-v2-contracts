@@ -47,9 +47,6 @@ pub fn create_test_user_fees(user: Addr) -> UserFees {
         user,
         fees: vec![
             Fee {
-                workflow_instance_id: "test-instance-1".to_string(),
-                action_id: "test-action-1".to_string(),
-                description: "Test execution fee".to_string(),
                 timestamp: 1234567890,
                 amount: Uint128::from(1000u128),
                 denom: "uusdc".to_string(),
@@ -57,9 +54,6 @@ pub fn create_test_user_fees(user: Addr) -> UserFees {
                 creator_address: None,
             },
             Fee {
-                workflow_instance_id: "test-instance-2".to_string(),
-                action_id: "test-action-2".to_string(),
-                description: "Test creator fee".to_string(),
                 timestamp: 1234567891,
                 amount: Uint128::from(2000u128),
                 denom: "uusdc".to_string(),
@@ -82,9 +76,6 @@ pub fn create_test_user_fees_with_creator(
         user,
         fees: vec![
             Fee {
-                workflow_instance_id: "test-instance-1".to_string(),
-                action_id: "test-action-1".to_string(),
-                description: "Test creator fee".to_string(),
                 timestamp: 1234567890,
                 amount,
                 denom,

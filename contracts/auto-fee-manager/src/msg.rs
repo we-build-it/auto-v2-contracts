@@ -79,17 +79,16 @@ pub struct UserBalance {
     pub balance: i128,
 }
 
+// ChargeFeesFromUserBalance has a vector of UserFees
 #[cw_serde]
 pub struct UserFees {
     pub user: Addr,
     pub fees: Vec<Fee>,
 }
 
+// ChargeFeesFromMessageCoins has a vector of Fee
 #[cw_serde]
 pub struct Fee {
-    pub workflow_instance_id: String,
-    pub action_id: String,
-    pub description: String,
     pub timestamp: u64,
     pub amount: Uint128,
     pub denom: String,
