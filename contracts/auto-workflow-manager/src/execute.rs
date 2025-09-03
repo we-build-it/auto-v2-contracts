@@ -1,7 +1,8 @@
 use std::{collections::HashMap, str::FromStr};
 
 use cosmwasm_std::{
-    to_json_binary, Addr, Binary, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response, Uint128, WasmMsg
+    to_json_binary, Addr, Binary, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response, Uint128, WasmMsg,
+    Reply, SubMsg
 };
 
 use crate::{
@@ -12,6 +13,22 @@ use crate::{
     state::{load_user_payment_config, load_config, PaymentSource},
     ContractError,
 };
+use cw_storage_plus::Map;
+
+// Data structure to pass from execute to reply
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct FeeEventData {
+    pub user_address: String,
+    pub denom: String,
+    pub amount_charged: Uint128,
+    pub fee_type: FeeType,
+    pub instance_id: u64,
+}
+
+// Temporary storage for fee event data
+pub const FEE_EVENT_DATA: Map<u64, FeeEventData> = Map::new("fed");
+
+
 use crate::{
     msg::{NewInstanceMsg, ParamId, TemplateId},
     state::{
@@ -606,15 +623,7 @@ pub fn charge_fees(
 
     let mut response = Response::new()
         .add_attribute("method", "charge_fees")
-        .add_attribute("batch_id", batch_id.clone())
-        .add_attribute("users_count", fees.len().to_string());
-
-    // TODO: Implement fee charging logic
-    // This will involve:
-    // 1. Validating user payment configs
-    // 2. Checking allowances
-    // 3. Processing payments through external service
-    // 4. Updating user payment states
+        .add_attribute("batch_id", batch_id.clone());
 
     // Collect unique denominations to emit rate events
     let mut unique_denoms = std::collections::HashSet::new();
@@ -639,6 +648,12 @@ pub fn charge_fees(
         );
     }
 
+    // Load config to get fee manager address
+    let config = load_config(deps.storage)?;
+
+    // Initialize reply ID counter starting from 100
+    let mut reply_id = 1000u64;
+    
     // Emit events for each fee (without rate info)
     for user_fee in fees {
         // Get the payment config for this user
@@ -649,7 +664,7 @@ pub fn charge_fees(
             // Get the quote for this denomination
             let quote = quotes.get(&fee_total.denom).unwrap();
 
-            // TODO: quote not found
+            // TODO: skip fee if quote not found
             
             // Simplified calculation to avoid Decimal precision issues
             let fee_total_amount_usd = (fee_total.amount * quote) / Uint128::new(10_u128.pow(fee_total.denom_decimals as u32));
@@ -682,100 +697,121 @@ pub fn charge_fees(
                 (Uint128::zero(), Uint128::zero())
             };
 
-            // Update user's allowance
-            let new_allowance = user_allowance_usd - amount_charged_usd;
-            save_user_payment_config(
-                deps.storage,
-                &requester,
-                &PaymentConfig {
-                    allowance_usd: new_allowance,
-                    source: payment_config.source.clone(),
-                },
-            )?;
-
-            // Load config to get fee manager address
-            let config = load_config(deps.storage)?;
             
-            // Helper function to create fee message
-            let create_fee_message = |fee_type: &str, creator_address: Option<&Addr>| -> serde_json::Value {
-                let fee_data = {
-                    let mut fee = serde_json::json!({
-                        "timestamp": _env.block.time.seconds(),
-                        "amount": amount_charged.to_string(),
-                        "denom": fee_total.denom,
-                        "fee_type": fee_type
-                    });
-                    
-                    if let Some(creator) = creator_address {
-                        fee["creator_address"] = serde_json::Value::String(creator.to_string());
-                    } else {
-                        fee["creator_address"] = serde_json::Value::Null;
-                    }
-                    
-                    fee
-                };
+            // Only process if there's something to charge
+            if amount_charged > Uint128::zero() {
                 
-                match payment_config.source {
-                    PaymentSource::Wallet => {
-                        serde_json::json!({
-                            "charge_fees_from_message_coins": {
-                                "fees": [fee_data]
-                            }
-                        })
+                // Update user's allowance
+                let new_allowance = user_allowance_usd - amount_charged_usd;
+                save_user_payment_config(
+                    deps.storage,
+                    &requester,
+                    &PaymentConfig {
+                        allowance_usd: new_allowance,
+                        source: payment_config.source.clone(),
                     },
-                    PaymentSource::Prepaid => {
-                        serde_json::json!({
-                            "charge_fees_from_user_balance": {
-                                "batch": [{
-                                    "user": requester.to_string(),
-                                    "fees": [fee_data]
-                                }]
-                            }
-                        })
-                    }
-                }
-            };
-            
-            // Create fee message based on fee type
-            let fee_msg = match fee_total.fee_type {
-                FeeType::Execution => create_fee_message("execution", None),
-                FeeType::Creator => create_fee_message("creator", Some(&creator)),
-            };
-            
-            // Send message to fee manager
-            match payment_config.source {
-                PaymentSource::Wallet => {
-                    // Build AUTHZ message in name of requester
-                    let authz_msg = build_authz_execute_contract_msg(
-                        &_env,
-                        &requester,
-                        &config.fee_manager_address,
-                        &fee_msg.to_string(),
-                        &vec![],
-                    )?;
-                    
-                    response = response.add_message(authz_msg);
-                },
-                PaymentSource::Prepaid => {
-                    // Direct call to fee manager
-                    let wasm_msg = WasmMsg::Execute {
-                        contract_addr: config.fee_manager_address.to_string(),
-                        msg: to_json_binary(&fee_msg)?,
-                        funds: vec![],
+                )?;
+    
+                // Helper function to create fee message
+                let create_fee_message = |fee_type: &str, creator_address: Option<&Addr>| -> serde_json::Value {
+                    let fee_data = {
+                        let mut fee = serde_json::json!({
+                            "timestamp": _env.block.time.seconds(),
+                            "amount": amount_charged.to_string(),
+                            "denom": fee_total.denom,
+                            "fee_type": fee_type
+                        });
+                        
+                        if let Some(creator) = creator_address {
+                            fee["creator_address"] = serde_json::Value::String(creator.to_string());
+                        } else {
+                            fee["creator_address"] = serde_json::Value::Null;
+                        }
+                        
+                        fee
                     };
                     
-                    response = response.add_message(wasm_msg);
-                },
+                    match payment_config.source {
+                        PaymentSource::Wallet => {
+                            serde_json::json!({
+                                "charge_fees_from_message_coins": {
+                                    "fees": [fee_data]
+                                }
+                            })
+                        },
+                        PaymentSource::Prepaid => {
+                            serde_json::json!({
+                                "charge_fees_from_user_balance": {
+                                    "batch": [{
+                                        "user": requester.to_string(),
+                                        "fees": [fee_data]
+                                    }]
+                                }
+                            })
+                        }
+                    }
+                };
+                
+                // Create fee message based on fee type
+                let fee_msg = match fee_total.fee_type {
+                    FeeType::Execution => create_fee_message("execution", None),
+                    FeeType::Creator => create_fee_message("creator", Some(&creator)),
+                };
+                
+                // Create and store fee event data for reply
+                let fee_event_data = FeeEventData {
+                    user_address: user_fee.address.clone(),
+                    denom: fee_total.denom.clone(),
+                    amount_charged,
+                    fee_type: fee_total.fee_type.clone(),
+                    instance_id: fee_total.instance_id,
+                };
+                FEE_EVENT_DATA.save(deps.storage, reply_id, &fee_event_data)?;
+                
+                // Send message to fee manager with reply
+                match payment_config.source {
+                    PaymentSource::Wallet => {
+                        // Create funds with amount_charged and denom for AUTHZ
+                        let funds = vec![cosmwasm_std::Coin {
+                            denom: fee_total.denom.clone(),
+                            amount: amount_charged,
+                        }];
+                        
+                        // Build AUTHZ message in name of requester
+                        let authz_msg = build_authz_execute_contract_msg(
+                            &_env,
+                            &requester,
+                            &config.fee_manager_address,
+                            &fee_msg.to_string(),
+                            &funds,
+                        )?;
+                        
+                        // Create submessage with reply
+                        let sub_msg = SubMsg::reply_on_success(authz_msg, reply_id);
+                        response = response.add_submessage(sub_msg);
+                        
+                        // Increment reply_id for next iteration
+                        reply_id += 1;
+                    },
+                    PaymentSource::Prepaid => {
+                        // Direct call to fee manager
+                        let wasm_msg = WasmMsg::Execute {
+                            contract_addr: config.fee_manager_address.to_string(),
+                            msg: to_json_binary(&fee_msg)?,
+                            funds: vec![],
+                        };
+                        
+                        // Create submessage with reply
+                        let sub_msg = SubMsg::reply_on_success(wasm_msg, reply_id);
+                        response = response.add_submessage(sub_msg);
+                        
+                        // Increment reply_id for next iteration
+                        reply_id += 1;
+                    },
+                }
             }
 
-            response = response.add_event(
-                cosmwasm_std::Event::new("fee-charged")
-                    .add_attribute("user_address", user_fee.address.clone())
-                    .add_attribute("denom", fee_total.denom.clone())
-                    .add_attribute("amount_charged", amount_charged.to_string())
-                    .add_attribute("fee_type", fee_total.fee_type.to_string())
-                    .add_attribute("instance_id", fee_total.instance_id.to_string()),
-            );
+
         }
     }
 
@@ -803,4 +839,57 @@ fn convert_quote_to_usd_decimal(quote: Uint128) -> Decimal {
     // Oracle returns 8 decimal precision (e.g., 50000000 for 0.5 USD)
     // Convert to Decimal with 8 decimal places
     Decimal::from_ratio(quote, Uint128::new(100000000))
+}
+
+/// Handle reply from fee manager contract
+pub fn handle_fee_manager_reply(
+    deps: DepsMut,
+    _env: Env,
+    reply: Reply,
+) -> Result<Response, ContractError> {
+    // Check if there was an error
+    if let cosmwasm_std::SubMsgResult::Err(error_msg) = reply.result {
+        // Load fee event data from storage for error event
+        let fee_event_data = FEE_EVENT_DATA.load(deps.storage, reply.id)?;
+        
+        let response = Response::new()
+            .add_event(
+                cosmwasm_std::Event::new("fee-error")
+                    .add_attribute("user_address", fee_event_data.user_address)
+                    .add_attribute("denom", fee_event_data.denom)
+                    .add_attribute("fee_type", fee_event_data.fee_type.to_string())
+                    .add_attribute("instance_id", fee_event_data.instance_id.to_string())
+                    .add_attribute("error", "true")
+                    .add_attribute("details", error_msg)
+            );
+        
+        // Clean up the temporary data
+        FEE_EVENT_DATA.remove(deps.storage, reply.id);
+        
+        return Ok(response);
+    }
+    
+    // Success case - extract the reply data
+    let _reply_data = reply.result.into_result().map_err(|_| {
+        ContractError::GenericError("Fee manager contract execution failed".to_string())
+    })?;
+    
+    // Load fee event data from storage
+    let fee_event_data = FEE_EVENT_DATA.load(deps.storage, reply.id)?;
+    
+    // Emit the exact same event that was emitted before
+    let response = Response::new()
+        .add_event(
+            cosmwasm_std::Event::new("fee-charged")
+                .add_attribute("user_address", fee_event_data.user_address)
+                .add_attribute("denom", fee_event_data.denom)
+                .add_attribute("amount_charged", fee_event_data.amount_charged.to_string())
+                .add_attribute("fee_type", fee_event_data.fee_type.to_string())
+                .add_attribute("instance_id", fee_event_data.instance_id.to_string())
+        );
+    
+    // Clean up the temporary data
+    FEE_EVENT_DATA.remove(deps.storage, reply.id);
+    
+    Ok(response)
 }

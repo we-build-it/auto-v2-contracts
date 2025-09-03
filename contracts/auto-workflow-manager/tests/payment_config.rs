@@ -439,16 +439,14 @@ fn test_charge_fees_events() {
     let response = charge_fees(&mut deps, env, admin_address, batch_id.clone(), fees).unwrap();
 
     // Verify main response attributes
-    assert_eq!(response.attributes.len(), 3);
+    assert_eq!(response.attributes.len(), 2);
     assert_eq!(response.attributes[0].key, "method");
     assert_eq!(response.attributes[0].value, "charge_fees");
     assert_eq!(response.attributes[1].key, "batch_id");
     assert_eq!(response.attributes[1].value, batch_id);
-    assert_eq!(response.attributes[2].key, "users_count");
-    assert_eq!(response.attributes[2].value, "2");
 
-    // Verify events
-    assert_eq!(response.events.len(), 6); // 3 rate events + 3 fee events
+    // Verify events from execute
+    assert_eq!(response.events.len(), 3); // Only rate events are emitted in execute
 
     // Check rate events
     let rate_events: Vec<_> = response
@@ -457,45 +455,6 @@ fn test_charge_fees_events() {
         .filter(|event| event.ty == "fee-rate")
         .collect();
     assert_eq!(rate_events.len(), 3); // RUNE, AUTO, and TCY
-
-    // Check fee events
-    let fee_events: Vec<_> = response
-        .events
-        .iter()
-        .filter(|event| event.ty == "fee-charged")
-        .collect();
-    assert_eq!(fee_events.len(), 3);
-
-    // Verify fee events for user1
-    let user1_fee_events: Vec<_> = fee_events
-        .iter()
-        .filter(|event| {
-            event
-                .attributes
-                .iter()
-                .any(|attr| attr.key == "user_address" && attr.value == user1.to_string())
-        })
-        .collect();
-    assert_eq!(user1_fee_events.len(), 2);
-
-    // Check RUNE fee for user1
-    let rune_event = user1_fee_events
-        .iter()
-        .find(|event| {
-            event
-                .attributes
-                .iter()
-                .any(|attr| attr.key == "denom" && attr.value == "RUNE")
-        })
-        .unwrap();
-
-    assert!(rune_event
-        .attributes
-        .iter()
-        .any(|attr| attr.key == "amount_charged" && attr.value == "1000"));
-
-    // Verify event has all necessary attributes
-    assert_eq!(rune_event.attributes.len(), 5); // user_address, denom, amount_charged, fee_type, instance_id
 
     // Verify rate events exist
     let rune_rate_event = rate_events
@@ -512,6 +471,77 @@ fn test_charge_fees_events() {
         .attributes
         .iter()
         .any(|attr| attr.key == "usd_rate" && attr.value == "0.5"));
+
+    // Verify that submessages were created correctly
+    assert_eq!(response.messages.len(), 3); // 3 submessages for 3 fees
+    
+    // Note: In a real blockchain environment, these submessages would trigger replies
+    // and the reply function would emit fee-charged events. In tests, we can't easily
+    // simulate this, but we can verify that the data was stored correctly and that
+    // the reply function exists and works.
+    
+    // For now, we'll test the reply function separately in a dedicated test
+}
+
+#[test]
+fn test_handle_fee_manager_reply() {
+    let (mut deps, env, _api, _admin_address, _publisher_address, _executor_address) =
+        create_test_environment();
+    
+    // Create test fee event data
+    let fee_event_data = auto_workflow_manager::execute::FeeEventData {
+        user_address: "thor1test".to_string(),
+        denom: "RUNE".to_string(),
+        amount_charged: Uint128::new(1000),
+        fee_type: FeeType::Execution,
+        instance_id: 1,
+    };
+    
+    // Store the data in the temporary storage
+    use auto_workflow_manager::execute::FEE_EVENT_DATA;
+    FEE_EVENT_DATA.save(deps.as_mut().storage, 1, &fee_event_data).unwrap();
+    
+    // Create a mock reply
+    #[allow(deprecated)]
+    let reply = cosmwasm_std::Reply {
+        id: 1,
+        result: cosmwasm_std::SubMsgResult::Ok(cosmwasm_std::SubMsgResponse {
+            events: vec![],
+            msg_responses: vec![],
+            data: None,
+            // msg_responses: vec![],
+        }),
+        gas_used: 0,
+        payload: cosmwasm_std::Binary::default(),
+    };
+    
+    // Call the reply function directly
+    let response = auto_workflow_manager::execute::handle_fee_manager_reply(
+        deps.as_mut(),
+        env,
+        reply,
+    ).unwrap();
+    
+    // Verify the response (no attributes, only events)
+    assert_eq!(response.attributes.len(), 0);
+    
+    // Verify the fee-charged event
+    assert_eq!(response.events.len(), 1);
+    let fee_event = &response.events[0];
+    assert_eq!(fee_event.ty, "fee-charged");
+    assert_eq!(fee_event.attributes.len(), 5);
+    
+    // Check specific attributes
+    assert!(fee_event.attributes.iter().any(|attr| 
+        attr.key == "user_address" && attr.value == "thor1test"));
+    assert!(fee_event.attributes.iter().any(|attr| 
+        attr.key == "denom" && attr.value == "RUNE"));
+    assert!(fee_event.attributes.iter().any(|attr| 
+        attr.key == "amount_charged" && attr.value == "1000"));
+    assert!(fee_event.attributes.iter().any(|attr| 
+        attr.key == "fee_type" && attr.value == "execution"));
+    assert!(fee_event.attributes.iter().any(|attr| 
+        attr.key == "instance_id" && attr.value == "1"));
 }
 
 fn charge_fees(

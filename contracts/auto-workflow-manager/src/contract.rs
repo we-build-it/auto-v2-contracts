@@ -1,6 +1,7 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::{
     entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
+    Reply,
 };
 use cw2::set_contract_version;
 
@@ -112,6 +113,19 @@ pub fn execute(
                 .unwrap();
             Ok(Response::new().add_message(authz_msg))
         }
+    }
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn reply(deps: DepsMut, env: Env, reply: Reply) -> Result<Response, ContractError> {
+    // Handle replies from submessages
+    match reply.id {
+        // Handle fee manager replies (instance_id is used as reply_id)
+        id if id > 0 => {
+            // This is a fee manager reply
+            crate::execute::handle_fee_manager_reply(deps, env, reply)
+        }
+        _ => Err(ContractError::GenericError("Unknown reply ID".to_string())),
     }
 }
 
