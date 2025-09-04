@@ -53,6 +53,7 @@ fn to_workflow_instance_response(deps: Deps, requester: &Addr, instance_id: &Ins
             execution_type: instance.execution_type.clone(),
             expiration_time: instance.expiration_time,
             onchain_parameters: load_workflow_instance_params(deps.storage, &requester, &instance_id).unwrap_or_default(),
+            offchain_parameters: std::collections::HashMap::new(),
         },
         id: instance_id.clone(),
         state: instance.state.clone(),

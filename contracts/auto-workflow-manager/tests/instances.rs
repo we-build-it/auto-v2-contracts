@@ -14,6 +14,7 @@ fn create_oneshot_test_instance(workflow_id: String) -> NewInstanceMsg {
     NewInstanceMsg {
         workflow_id,
         onchain_parameters: std::collections::HashMap::new(),
+        offchain_parameters: std::collections::HashMap::new(),
         execution_type: ExecutionType::OneShot,
         expiration_time: Timestamp::from_seconds(1000000000), // Far future
     }
@@ -23,6 +24,7 @@ fn create_recurrent_test_instance(workflow_id: String) -> NewInstanceMsg {
     NewInstanceMsg {
         workflow_id,
         onchain_parameters: std::collections::HashMap::new(),
+        offchain_parameters: std::collections::HashMap::new(),
         execution_type: ExecutionType::Recurrent,
         expiration_time: Timestamp::from_seconds(1000000000), // Far future
     }

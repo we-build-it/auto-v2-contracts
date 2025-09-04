@@ -87,6 +87,7 @@ pub struct NewWorkflowMsg {
 pub struct NewInstanceMsg {
     pub workflow_id: WorkflowId,
     pub onchain_parameters: HashMap<ParamId, ActionParamValue>,
+    pub offchain_parameters: HashMap<ParamId, ActionParamValue>,
     pub execution_type: ExecutionType,
     pub expiration_time: Timestamp,
 }

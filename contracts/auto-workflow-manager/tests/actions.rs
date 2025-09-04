@@ -17,6 +17,7 @@ fn create_test_instance(workflow_id: String) -> NewInstanceMsg {
     NewInstanceMsg {
         workflow_id,
         onchain_parameters: HashMap::new(),
+        offchain_parameters: HashMap::new(),
         execution_type: ExecutionType::OneShot,
         expiration_time: Timestamp::from_seconds(1000000000), // Far future
     }
@@ -26,6 +27,7 @@ fn create_test_instance_with_params(workflow_id: String, params: HashMap<String,
     NewInstanceMsg {
         workflow_id,
         onchain_parameters: params,
+        offchain_parameters: HashMap::new(),
         execution_type: ExecutionType::OneShot,
         expiration_time: Timestamp::from_seconds(10000000000), // Far future
     }
@@ -35,6 +37,7 @@ fn create_test_instance_with_expiration(workflow_id: String, expiration_time: Ti
     NewInstanceMsg {
         workflow_id,
         onchain_parameters: HashMap::new(),
+        offchain_parameters: HashMap::new(),
         execution_type: ExecutionType::OneShot,
         expiration_time,
     }

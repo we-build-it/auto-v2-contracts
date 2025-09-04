@@ -644,7 +644,7 @@ pub fn charge_fees(
         response = response.add_event(
             cosmwasm_std::Event::new("fee-rate")
                 .add_attribute("denom", denom.clone())
-                .add_attribute("usd_rate", usd_rate.to_string()),
+                .add_attribute("oracle_usd_rate", usd_rate.to_string()),
         );
     }
 

@@ -137,6 +137,7 @@ fn test_execute_action_with_whitelisted_contract() {
     let instance_msg = auto_workflow_manager::msg::NewInstanceMsg {
         workflow_id: "test-whitelist-workflow".to_string(),
         onchain_parameters: HashMap::new(),
+        offchain_parameters: HashMap::new(),
         execution_type: auto_workflow_manager::msg::ExecutionType::OneShot,
         expiration_time: Timestamp::from_seconds(env.block.time.seconds() + 3600),
     };
@@ -238,6 +239,7 @@ fn test_execute_action_with_non_whitelisted_contract() {
     let instance_msg = auto_workflow_manager::msg::NewInstanceMsg {
         workflow_id: "test-whitelist-workflow".to_string(),
         onchain_parameters: HashMap::new(),
+        offchain_parameters: HashMap::new(),
         execution_type: auto_workflow_manager::msg::ExecutionType::OneShot,
         expiration_time: Timestamp::from_seconds(env.block.time.seconds() + 3600),
     };
