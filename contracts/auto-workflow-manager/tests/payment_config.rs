@@ -470,10 +470,10 @@ fn test_charge_fees_events() {
     assert!(rune_rate_event
         .attributes
         .iter()
-        .any(|attr| attr.key == "usd_rate" && attr.value == "0.5"));
+        .any(|attr| attr.key == "oracle_usd_rate" && attr.value == "0.5"));
 
     // Verify that submessages were created correctly
-    assert_eq!(response.messages.len(), 3); // 3 submessages for 3 fees
+    assert_eq!(response.messages.len(), 2); // 2 submessages for 2 users (one per user)
     
     // Note: In a real blockchain environment, these submessages would trigger replies
     // and the reply function would emit fee-charged events. In tests, we can't easily
@@ -499,7 +499,7 @@ fn test_handle_fee_manager_reply() {
     
     // Store the data in the temporary storage
     use auto_workflow_manager::execute::FEE_EVENT_DATA;
-    FEE_EVENT_DATA.save(deps.as_mut().storage, 1, &fee_event_data).unwrap();
+    FEE_EVENT_DATA.save(deps.as_mut().storage, 1, &vec![fee_event_data]).unwrap();
     
     // Create a mock reply
     #[allow(deprecated)]
