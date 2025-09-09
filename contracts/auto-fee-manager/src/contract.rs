@@ -1,6 +1,6 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128};
+use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 use cw2::set_contract_version;
 
 use crate::error::ContractError;
@@ -17,20 +17,6 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, crate::CONTRACT_NAME, crate::CONTRACT_VERSION)?;
-
-    // Validate max_debt is not negative (can be zero)
-    if msg.max_debt.amount < Uint128::zero() {
-        return Err(ContractError::InvalidMaxDebt {
-            reason: "max_debt cannot be negative".to_string(),
-        });
-    }
-
-    // Validate min_balance_threshold is not negative (can be zero)
-    if msg.min_balance_threshold.amount < Uint128::zero() {
-        return Err(ContractError::InvalidMaxDebt {
-            reason: "min_balance_threshold cannot be negative".to_string(),
-        });
-    }
 
     // Validate execution_fees_destination_address is not empty and is a valid address
     validate_address(&deps, &msg.execution_fees_destination_address.as_str(), "execution_fees_destination_address")?;
@@ -53,8 +39,6 @@ pub fn instantiate(
     ACCEPTED_DENOMS.save(deps.storage, &msg.accepted_denoms)?;
 
     let config = Config {
-        max_debt: msg.max_debt,
-        min_balance_threshold: msg.min_balance_threshold,
         execution_fees_destination_address: msg.execution_fees_destination_address,
         distribution_fees_destination_address: msg.distribution_fees_destination_address,
         crank_authorized_address: msg.crank_authorized_address,

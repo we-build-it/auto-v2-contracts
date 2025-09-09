@@ -46,6 +46,7 @@ pub fn instantiate(
         allowed_action_executors: msg.allowed_action_executors,
         referral_memo: msg.referral_memo,
         fee_manager_address: msg.fee_manager_address,
+        allowance_denom: msg.allowance_denom,
     };
 
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
