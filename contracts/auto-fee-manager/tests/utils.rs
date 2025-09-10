@@ -28,7 +28,7 @@ pub fn instantiate_contract(
         execution_fees_destination_address,
         distribution_fees_destination_address,
         crank_authorized_address,
-        workflow_manager_address,
+        workflow_manager_address: Some(workflow_manager_address),
         creator_distribution_fee,
     };
     let instantiate_info = message_info(&admin, &[]);

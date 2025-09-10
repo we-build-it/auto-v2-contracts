@@ -795,7 +795,8 @@ pub fn charge_fees(
                     };
                     
                     // Create submessage with reply
-                    let sub_msg = SubMsg::reply_always(wasm_msg, reply_id);
+                    // TODO: review if we should replay_always instead of reply_on_success
+                    let sub_msg = SubMsg::reply_on_success(wasm_msg, reply_id);
                     response = response.add_submessage(sub_msg);
                 },
             }

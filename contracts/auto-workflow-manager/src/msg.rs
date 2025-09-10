@@ -229,6 +229,8 @@ pub enum QueryMsg {
     GetWorkflowInstance { user_address: String, instance_id: u64 },
     #[returns(GetUserPaymentConfigResponse)]
     GetUserPaymentConfig { user_address: String },
+    #[returns(InstantiateMsg)]
+    GetConfig {},
 }
 
 #[cw_serde]

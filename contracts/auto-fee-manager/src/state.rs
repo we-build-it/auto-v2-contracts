@@ -9,7 +9,7 @@ pub struct Config {
     pub execution_fees_destination_address: Addr,
     pub distribution_fees_destination_address: Addr,
     pub crank_authorized_address: Addr,
-    pub workflow_manager_address: Addr,
+    pub workflow_manager_address: Option<Addr>,
     pub creator_distribution_fee: Uint128,
 }
 

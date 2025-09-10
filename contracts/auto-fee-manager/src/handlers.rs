@@ -136,7 +136,7 @@ pub fn handle_charge_fees_from_user_balance(
     info: MessageInfo,
     batch: Vec<UserFees>,
 ) -> Result<Response, ContractError> {
-    verify_authorization(deps.as_ref(), &info)?;
+    verify_workflow_manager(deps.as_ref(), &info)?;
     let accepted_denoms = ACCEPTED_DENOMS.load(deps.storage)?;
 
     let mut users_below_threshold = Vec::new();

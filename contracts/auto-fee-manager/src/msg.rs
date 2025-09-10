@@ -13,7 +13,7 @@ pub struct InstantiateMsg {
     // Address that is authorized to charge fees from the crank contract
     pub crank_authorized_address: Addr,
     // Address of the workflow manager contract
-    pub workflow_manager_address: Addr,
+    pub workflow_manager_address: Option<Addr>,
     // Creator distribution fee (e.g., 0.05 for 5%)
     pub creator_distribution_fee: Uint128,
 }
@@ -72,6 +72,8 @@ pub enum QueryMsg {
     IsCreatorSubscribed { creator: Addr },
     #[returns(SubscribedCreatorsResponse)]
     GetSubscribedCreators {},
+    #[returns(InstantiateMsg)]
+    GetConfig {},
 }
 
 #[cw_serde]
