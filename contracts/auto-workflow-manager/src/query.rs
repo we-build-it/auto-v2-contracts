@@ -54,6 +54,8 @@ fn to_workflow_instance_response(deps: Deps, requester: &Addr, instance_id: &Ins
             expiration_time: instance.expiration_time,
             onchain_parameters: load_workflow_instance_params(deps.storage, &requester, &instance_id).unwrap_or_default(),
             offchain_parameters: std::collections::HashMap::new(),
+            // TODO: this field is not in state, we need a new Msg to avoid return None
+            cron_expression: None,
         },
         id: instance_id.clone(),
         state: instance.state.clone(),

@@ -92,6 +92,7 @@ pub struct NewInstanceMsg {
     pub onchain_parameters: HashMap<ParamId, ActionParamValue>,
     pub offchain_parameters: HashMap<ParamId, ActionParamValue>,
     pub execution_type: ExecutionType,
+    pub cron_expression: Option<String>,
     pub expiration_time: Timestamp,
 }
 
