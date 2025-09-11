@@ -140,6 +140,7 @@ fn test_execute_action_with_whitelisted_contract() {
         offchain_parameters: HashMap::new(),
         execution_type: auto_workflow_manager::msg::ExecutionType::OneShot,
         expiration_time: Timestamp::from_seconds(env.block.time.seconds() + 3600),
+        cron_expression: None,
     };
 
     let response = auto_workflow_manager::execute::execute_instance(
@@ -242,6 +243,7 @@ fn test_execute_action_with_non_whitelisted_contract() {
         offchain_parameters: HashMap::new(),
         execution_type: auto_workflow_manager::msg::ExecutionType::OneShot,
         expiration_time: Timestamp::from_seconds(env.block.time.seconds() + 3600),
+        cron_expression: None,
     };
 
     let response = auto_workflow_manager::execute::execute_instance(
