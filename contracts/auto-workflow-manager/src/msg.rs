@@ -53,6 +53,7 @@ pub struct InstantiateMsg {
     pub allowed_action_executors: HashSet<Addr>,
     pub referral_memo: String,
     pub fee_manager_address: Addr,
+    pub allowance_denom: String,
 }
 
 pub type WorkflowId = String;
@@ -191,14 +192,14 @@ pub struct GetUserPaymentConfigResponse {
 #[cw_serde]
 pub enum FeeType {
     Execution,
-    Creator,
+    Creator { instance_id: InstanceId },
 }
 
 impl fmt::Display for FeeType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             FeeType::Execution => write!(f, "execution"),
-            FeeType::Creator => write!(f, "creator"),
+            FeeType::Creator { instance_id } => write!(f, "creator_{}", instance_id),
         }
     }
 }
@@ -210,7 +211,6 @@ pub struct FeeTotal {
     pub denom_decimals: u8,
     pub amount: Uint128,
     pub fee_type: FeeType,
-    pub instance_id: InstanceId,
 }
 
 #[cw_serde]
@@ -236,6 +236,8 @@ pub enum QueryMsg {
     GetWorkflowInstance { user_address: String, instance_id: u64 },
     #[returns(GetUserPaymentConfigResponse)]
     GetUserPaymentConfig { user_address: String },
+    #[returns(InstantiateMsg)]
+    GetConfig {},
 }
 
 #[cw_serde]

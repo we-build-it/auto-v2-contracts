@@ -27,7 +27,7 @@ pub fn handle_deposit(deps: DepsMut, info: MessageInfo) -> Result<Response, Cont
     // Process each coin sent
     for coin in &info.funds {
         // Validate that the denom is accepted
-        if !accepted_denoms.contains(&coin.denom) {
+        if !accepted_denoms.iter().any(|d| d.denom == coin.denom) {
             return Err(ContractError::DenomNotAccepted {
                 denom: coin.denom.clone(),
             });
@@ -83,7 +83,7 @@ pub fn handle_withdraw(
     let accepted_denoms = ACCEPTED_DENOMS.load(deps.storage)?;
 
     // Validate that the denom is accepted
-    if !accepted_denoms.contains(&denom) {
+    if !accepted_denoms.iter().any(|d| d.denom == denom) {
         return Err(ContractError::DenomNotAccepted {
             denom: denom.clone(),
         });
@@ -136,8 +136,7 @@ pub fn handle_charge_fees_from_user_balance(
     info: MessageInfo,
     batch: Vec<UserFees>,
 ) -> Result<Response, ContractError> {
-    verify_authorization(deps.as_ref(), &info)?;
-    let config = CONFIG.load(deps.storage)?;
+    verify_workflow_manager(deps.as_ref(), &info)?;
     let accepted_denoms = ACCEPTED_DENOMS.load(deps.storage)?;
 
     let mut users_below_threshold = Vec::new();
@@ -154,29 +153,24 @@ pub fn handle_charge_fees_from_user_balance(
     for user_fees in &batch {
         for fee in &user_fees.fees {
             // Validate denom
-            if !accepted_denoms.contains(&fee.denom) {
+            if !accepted_denoms.iter().any(|d| d.denom == fee.denom) {
                 return Err(ContractError::DenomNotAccepted {
                     denom: fee.denom.clone(),
                 });
             }
             
-            match fee.fee_type {
+            match &fee.fee_type {
                 FeeType::Execution => {
                     *user_execution_totals
                         .entry((user_fees.user.clone(), fee.denom.clone()))
                         .or_insert(Uint128::zero()) += fee.amount;
                 }
-                FeeType::Creator => {
-                    let creator_addr = fee.creator_address.as_ref().ok_or_else(|| {
-                        ContractError::InvalidCreatorAddress {
-                            reason: "creator_address is required for Creator fees".to_string(),
-                        }
-                    })?;
+                FeeType::Creator { creator_address } => {
                     *user_creator_totals
                         .entry((user_fees.user.clone(), fee.denom.clone()))
                         .or_insert(Uint128::zero()) += fee.amount;
                     *creator_fees_totals
-                        .entry((creator_addr.clone(), fee.denom.clone()))
+                        .entry((creator_address.clone(), fee.denom.clone()))
                         .or_insert(Uint128::zero()) += fee.amount;
                 }
             }
@@ -222,7 +216,7 @@ pub fn handle_charge_fees_from_user_balance(
         USER_BALANCES.save(deps.storage, (user.clone(), denom.as_str()), &new_balance)?;
         
         // Check if balance is below threshold
-        if new_balance <= config.min_balance_threshold.amount.u128() as i128 {
+        if new_balance <= accepted_denoms.iter().find(|d| d.denom == denom).unwrap().min_balance_threshold.u128() as i128 {
             users_below_threshold.push((user.clone(), denom.clone()));
         }
         
@@ -238,24 +232,31 @@ pub fn handle_charge_fees_from_user_balance(
         // Update creator_fees only with what could actually be charged
         if creator_chargeable > 0 {
             // Find the creator address for this user/denom combination
-            let mut creator_address = None;
+            let mut found_creator_address = None;
             for user_fees in &batch {
                 if user_fees.user == user {
                     for fee in &user_fees.fees {
-                        if fee.denom == denom && matches!(fee.fee_type, FeeType::Creator) {
-                            creator_address = fee.creator_address.as_ref();
-                            break;
+                        if fee.denom == denom {
+                            match &fee.fee_type {
+                                FeeType::Creator { creator_address } => {
+                                    found_creator_address = Some(creator_address.clone());
+                                    break;
+                                }
+                                _ => {
+                                    continue;
+                                }
+                            }
                         }
                     }
                 }
             }
-            let creator_address = creator_address.unwrap();
+            let creator_address = found_creator_address.unwrap();
             
             let current_creator_fees = CREATOR_FEES
-                .may_load(deps.storage, (creator_address, denom.as_str()))?
+                .may_load(deps.storage, (&creator_address, &denom.as_str()))?
                 .unwrap_or(Uint128::zero());
             let new_creator_fees = current_creator_fees + Uint128::from(creator_chargeable);
-            CREATOR_FEES.save(deps.storage, (creator_address, denom.as_str()), &new_creator_fees)?;
+            CREATOR_FEES.save(deps.storage, (&creator_address, &denom.as_str()), &new_creator_fees)?;
         }
     }
 
@@ -281,27 +282,23 @@ pub fn handle_charge_fees_from_message_coins(
     let mut creator_fees_accum: HashMap<(Addr, String), Uint128> = HashMap::new();
     
     for fee in &fees {
-        // Validate that all fees are Creator type
-        if matches!(fee.fee_type, FeeType::Execution) {
-            return Err(ContractError::InvalidFeeType {
-                reason: "Only Creator fees are allowed in ChargeFeesFromMessageCoins".to_string(),
-            });
-        }
-        
-        // Accumulate expected funds
-        *expected_funds
-            .entry(fee.denom.clone())
-            .or_insert(Uint128::zero()) += fee.amount;
-        
-        // Accumulate creator fees
-        let creator_addr = fee.creator_address.as_ref().ok_or_else(|| {
-            ContractError::InvalidCreatorAddress {
-                reason: "creator_address is required for Creator fees".to_string(),
+        match &fee.fee_type {
+            FeeType::Creator { creator_address } => {
+                // Accumulate expected funds
+                *expected_funds
+                    .entry(fee.denom.clone())
+                    .or_insert(Uint128::zero()) += fee.amount;
+                // Accumulate creator fees
+                *creator_fees_accum
+                    .entry((creator_address.clone(), fee.denom.clone()))
+                    .or_insert(Uint128::zero()) += fee.amount;
             }
-        })?;
-        *creator_fees_accum
-            .entry((creator_addr.clone(), fee.denom.clone()))
-            .or_insert(Uint128::zero()) += fee.amount;
+            FeeType::Execution => {
+                return Err(ContractError::InvalidFeeType {
+                    reason: "Only Creator fees are allowed in ChargeFeesFromMessageCoins".to_string(),
+                });
+            }
+        }
     }
 
     // Validate sent funds match expected funds in single pass
@@ -613,27 +610,23 @@ pub fn handle_distribute_creator_fees(
 }
 
 pub fn has_exceeded_debt_limit(deps: Deps, user: Addr) -> StdResult<bool> {
-    // Get the config to access max_debt
-    let config = CONFIG.load(deps.storage)?;
-    
-    // Get the user's balance for the max_debt denom
-    let user_balance = USER_BALANCES
-        .may_load(deps.storage, (user, config.max_debt.denom.as_str()))?
-        .unwrap_or(0);
-    
-    // If the balance is positive or zero, the user hasn't exceeded the debt limit
-    if user_balance >= 0 {
-        return Ok(false);
+    let accepted_denoms = ACCEPTED_DENOMS.load(deps.storage)?;
+    for accepted_denom in accepted_denoms {
+        let user_balance = USER_BALANCES
+            .may_load(deps.storage, (user.clone(), accepted_denom.denom.as_str()))?
+            .unwrap_or(0);
+
+        // If the balance is negative (debt), check if it exceeds the max_debt amount
+        if user_balance < 0 {
+            // Convert the negative balance to a positive amount for comparison
+            let debt_amount = (-user_balance) as u128;
+            // Check if the debt exceeds the max_debt limit
+            if debt_amount > accepted_denom.max_debt.u128() {
+                return Ok(true);
+            }
+        }
     }
-    
-    // If the balance is negative (debt), check if it exceeds the max_debt amount
-    // Convert the negative balance to a positive amount for comparison
-    let debt_amount = (-user_balance) as u128;
-    
-    // Check if the debt exceeds the max_debt limit
-    let has_exceeded = debt_amount > config.max_debt.amount.u128();
-    
-    Ok(has_exceeded)
+    Ok(false)    
 }
 
 pub fn get_user_balances(deps: Deps, user: Addr) -> StdResult<crate::msg::UserBalancesResponse> {
@@ -643,13 +636,13 @@ pub fn get_user_balances(deps: Deps, user: Addr) -> StdResult<crate::msg::UserBa
     let mut balances = Vec::new();
     
     // Get balance for each accepted denom
-    for denom in accepted_denoms {
+    for accepted_denom in accepted_denoms {
         let balance = USER_BALANCES
-            .may_load(deps.storage, (user.clone(), denom.as_str()))?
+            .may_load(deps.storage, (user.clone(), accepted_denom.denom.as_str()))?
             .unwrap_or(0);
         
         balances.push(crate::msg::UserBalance {
-            denom,
+            denom: accepted_denom.denom,
             balance,
         });
     }
@@ -667,15 +660,15 @@ pub fn get_creator_fees(deps: Deps, creator: Addr) -> StdResult<crate::msg::Crea
     let mut fees = Vec::new();
     
     // Get creator fees for each accepted denom
-    for denom in accepted_denoms {
+    for accepted_denom in accepted_denoms {
         let balance = CREATOR_FEES
-            .may_load(deps.storage, (&creator, denom.as_str()))?
+            .may_load(deps.storage, (&creator, accepted_denom.denom.as_str()))?
             .unwrap_or(Uint128::zero());
         
         // Only include denoms with non-zero balance
         if balance > Uint128::zero() {
-            fees.push(crate::msg::CreatorFeeBalance {
-                denom,
+            fees.push(crate::msg::FeeBalance {
+                denom: accepted_denom.denom,
                 balance,
             });
         }
@@ -695,27 +688,27 @@ pub fn get_non_creator_fees(deps: Deps) -> StdResult<crate::msg::NonCreatorFeesR
     let mut distribution_fees = Vec::new();
     
     // Get execution and distribution fees for each accepted denom
-    for denom in accepted_denoms {
+    for accepted_denom in accepted_denoms {
         // Check execution fees
         let execution_balance = EXECUTION_FEES
-            .may_load(deps.storage, denom.as_str())?
+            .may_load(deps.storage, accepted_denom.denom.as_str())?
             .unwrap_or(Uint128::zero());
         
         if execution_balance > Uint128::zero() {
             execution_fees.push(crate::msg::FeeBalance {
-                denom: denom.clone(),
+                denom: accepted_denom.denom.clone(),
                 balance: execution_balance,
             });
         }
         
         // Check distribution fees
         let distribution_balance = DISTRIBUTION_FEES
-            .may_load(deps.storage, denom.as_str())?
+            .may_load(deps.storage, accepted_denom.denom.as_str())?
             .unwrap_or(Uint128::zero());
         
         if distribution_balance > Uint128::zero() {
             distribution_fees.push(crate::msg::FeeBalance {
-                denom,
+                denom: accepted_denom.denom,
                 balance: distribution_balance,
             });
         }

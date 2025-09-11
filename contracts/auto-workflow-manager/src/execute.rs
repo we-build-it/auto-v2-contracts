@@ -1,16 +1,21 @@
 use std::{collections::HashMap, str::FromStr};
 
+use cosmwasm_std::to_json_string;
 use cosmwasm_std::{
     to_json_binary, Addr, Binary, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response, Uint128, WasmMsg,
     Reply, SubMsg
 };
 
+use auto_fee_manager::msg::ExecuteMsg as FeeManagerExecuteMsg;
+use auto_fee_manager::msg::Fee as FeeManagerFee;
+use auto_fee_manager::msg::FeeType as FeeManagerFeeType;
+use auto_fee_manager::msg::UserFees as FeeManagerUserFees;
+
 use crate::{
     msg::{
-        ActionParamValue, ExecutionType, FeeType, NewWorkflowMsg, UserFee, WorkflowInstanceState,
-        WorkflowState, WorkflowVisibility,
+        ActionParamValue, ExecutionType, FeeType, NewWorkflowMsg, UserFee, WorkflowInstanceState, WorkflowState, WorkflowVisibility
     },
-    state::{load_user_payment_config, load_config, PaymentSource},
+    state::{load_config, load_user_payment_config, PaymentSource},
     ContractError,
 };
 use cw_storage_plus::Map;
@@ -22,7 +27,6 @@ pub struct FeeEventData {
     pub denom: String,
     pub amount_charged: Uint128,
     pub fee_type: FeeType,
-    pub instance_id: u64,
 }
 
 // Temporary storage for fee event data
@@ -672,7 +676,7 @@ pub fn set_user_payment_config(
     Ok(Response::new()
         .add_attribute("method", "set_user_payment_config")
         .add_attribute("user_address", user_address)
-        .add_attribute("allowance_usd", payment_config.allowance_usd.to_string())
+        .add_attribute("allowance", payment_config.allowance.to_string())
         .add_attribute("source", format!("{:?}", payment_config.source)))
 }
 
@@ -710,28 +714,8 @@ pub fn charge_fees(
         .add_attribute("method", "charge_fees")
         .add_attribute("batch_id", batch_id.clone());
 
-    // Collect unique denominations to emit rate events
-    let mut unique_denoms = std::collections::HashSet::new();
-    for user_fee in &fees {
-        for fee_total in &user_fee.totals {
-            unique_denoms.insert(fee_total.denom.clone());
-        }
-    }
-
-    // Get quotes for all unique denominations
-    let quotes = get_quotes(&unique_denoms);
-
-    // Emit rate events for each unique denomination
-    for denom in &unique_denoms {
-        let quote = quotes.get(denom).unwrap();
-        let usd_rate = convert_quote_to_usd_decimal(*quote);
-
-        response = response.add_event(
-            cosmwasm_std::Event::new("fee-rate")
-                .add_attribute("denom", denom.clone())
-                .add_attribute("oracle_usd_rate", usd_rate.to_string()),
-        );
-    }
+    // Cumulative quotes for all denominations
+    let mut quotes = HashMap::<String, Decimal>::new();
 
     // Load config to get fee manager address
     let config = load_config(deps.storage)?;
@@ -744,37 +728,50 @@ pub fn charge_fees(
     for user_fee in fees {
         // Get the payment config for this user
         let requester = deps.api.addr_validate(&user_fee.address)?;
-        let payment_config = load_user_payment_config(deps.storage, &requester)?;
+        let payment_config = load_user_payment_config(deps.storage, &requester.clone())?;
 
         // Accumulate fees and funds for this user
         let mut accumulated_fees = Vec::new();
         let mut accumulated_funds = Vec::new();
         let mut accumulated_fee_events = Vec::new();
-        let mut current_allowance = payment_config.allowance_usd;
+        let mut current_allowance = payment_config.allowance;
 
         for fee_total in &user_fee.totals {
             // Get the quote for this denomination
-            let quote = quotes.get(&fee_total.denom).unwrap();
+            let quote = get_quote(&mut quotes, &fee_total.denom);
 
             // TODO: skip fee if quote not found
             
-            // Simplified calculation to avoid Decimal precision issues
-            let fee_total_amount_usd = (fee_total.amount * quote) / Uint128::new(10_u128.pow(fee_total.denom_decimals as u32));
+            let quote_allowance_denom = get_quote(&mut quotes, &config.allowance_denom.clone());
+            let allowance_denom_decimals = 8;
 
-            // Get the workflow instance to extract the executor
-            let workflow_instance =
-                load_workflow_instance(deps.storage, &requester, &fee_total.instance_id)?;
+            // We need to handle two cases, when fee_total.denom is config.allowance_denom and when it's not
+            let fee_total_amount_allowance_denom = if fee_total.denom == config.allowance_denom.clone() {
+                fee_total.amount
+            } else {
+                let amount_usd = Decimal::from_ratio (fee_total.amount, Uint128::new(10_u128.pow(fee_total.denom_decimals as u32))) * quote;
+                let amount_allowance_denom = Uint128::from( (amount_usd / quote_allowance_denom).atomics() / Uint128::new(10_u128.pow(allowance_denom_decimals as u32)));
+                amount_allowance_denom
+            };
 
-            let (amount_charged, amount_charged_usd) = 
-                // Case 1: allowance >= fee_total.amount_usd
-                if current_allowance >= fee_total_amount_usd
-                {
-                    (fee_total.amount, fee_total_amount_usd)
+            let (amount_charged, amount_charged_allowance_denom) = 
+                // Case 1: allowance >= fee_total.amount_allowance_denom
+                if current_allowance >= fee_total_amount_allowance_denom {
+                    (fee_total.amount, fee_total_amount_allowance_denom)
                 }
-                // Case 2: 0 < allowance < fee_total.amount_usd => charge what allowance represents
+                // Case 2: 0 < allowance < fee_total.amount_allowance_denom => charge what allowance represents
                 else if current_allowance > Uint128::zero() {
-                    // Simplified calculation: convert allowance USD to denom amount
-                    let amount_to_charge = (current_allowance * Uint128::new(10_u128.pow(fee_total.denom_decimals as u32))) / quote;
+                    // Simplified calculation: convert allowance to denom amount
+                    // amount_to_charge = current_allowance * quote_allowance_denom * 10^denom_decimals / (10^allowance_denom_decimals * quote_denom)
+                    let amount_to_charge = current_allowance
+                        .checked_mul(Uint128::from(quote_allowance_denom.atomics()))
+                        .unwrap()
+                        .checked_mul(Uint128::new(10_u128.pow(fee_total.denom_decimals as u32)))
+                        .unwrap()
+                        .checked_div(Uint128::new(10_u128.pow(allowance_denom_decimals as u32)))
+                        .unwrap()
+                        .checked_div(Uint128::from(quote.atomics()))
+                        .unwrap();
 
                     (amount_to_charge, current_allowance)
                 }
@@ -786,44 +783,41 @@ pub fn charge_fees(
             // Only process if there's something to charge
             if amount_charged > Uint128::zero() {
                 // Update current allowance for next iteration
-                current_allowance -= amount_charged_usd;
+                current_allowance -= amount_charged_allowance_denom;
 
-                // Accumulate the fee
-                let fee_data = {
-                    let mut fee = serde_json::json!({
-                        "timestamp": _env.block.time.seconds(),
-                        "amount": amount_charged.to_string(),
-                        "denom": fee_total.denom,
-                        "fee_type": fee_total.fee_type.to_string()
-                    });
-                    
-                    if matches!(fee_total.fee_type, FeeType::Creator) {
-                        let workflow = load_workflow(deps.storage, &workflow_instance.workflow_id)?;
-                        let creator = workflow.publisher.clone();
-                        fee["creator_address"] = serde_json::Value::String(creator.to_string());
-                    } else {
-                        fee["creator_address"] = serde_json::Value::Null;
-                    }
-                    
-                    fee
+                let (fee_amount, fee_denom) = match payment_config.source {
+                    PaymentSource::Wallet => (amount_charged, fee_total.denom.clone()),
+                    PaymentSource::Prepaid => (amount_charged_allowance_denom, config.allowance_denom.clone()),
                 };
-                accumulated_fees.push(fee_data);
+
+                let fee = FeeManagerFee {
+                    fee_type: match fee_total.fee_type {
+                        FeeType::Creator { instance_id } => {
+                            let workflow_instance = load_workflow_instance(deps.storage, &requester.clone(), &instance_id)?;
+                            let workflow = load_workflow(deps.storage, &workflow_instance.workflow_id)?;
+                            FeeManagerFeeType::Creator { creator_address: workflow.publisher.clone() }
+                        },
+                        FeeType::Execution => FeeManagerFeeType::Execution,
+                    },
+                    denom: fee_denom.clone(),
+                    amount: fee_amount.clone(),
+                };
+                accumulated_fees.push(fee);
 
                 // Accumulate funds for Wallet payment source
                 if matches!(payment_config.source, PaymentSource::Wallet) {
                     accumulated_funds.push(cosmwasm_std::Coin {
-                        denom: fee_total.denom.clone(),
-                        amount: amount_charged,
+                        denom: fee_denom.clone(),
+                        amount: fee_amount.clone(),
                     });
                 }
 
                 // Create FeeEventData for this specific fee
                 let fee_event_data = FeeEventData {
                     user_address: user_fee.address.clone(),
-                    denom: fee_total.denom.clone(),
-                    amount_charged: amount_charged_usd,
+                    denom: fee_denom.clone(),
+                    amount_charged: fee_amount.clone(),
                     fee_type: fee_total.fee_type.clone(),
-                    instance_id: fee_total.instance_id,
                 };
                 accumulated_fee_events.push(fee_event_data);
             }
@@ -834,9 +828,9 @@ pub fn charge_fees(
             // Update user's allowance in storage
             save_user_payment_config(
                 deps.storage,
-                &requester,
+                &requester.clone(),
                 &PaymentConfig {
-                    allowance_usd: current_allowance,
+                    allowance: current_allowance,
                     source: payment_config.source.clone(),
                 },
             )?;
@@ -844,21 +838,17 @@ pub fn charge_fees(
             // Create the fee message based on payment source
             let fee_msg = match payment_config.source {
                 PaymentSource::Wallet => {
-                    serde_json::json!({
-                        "charge_fees_from_message_coins": {
-                            "fees": accumulated_fees
-                        }
-                    })
+                    FeeManagerExecuteMsg::ChargeFeesFromMessageCoins {
+                        fees: accumulated_fees,
+                    }
                 },
                 PaymentSource::Prepaid => {
-                    serde_json::json!({
-                        "charge_fees_from_user_balance": {
-                            "batch": [{
-                                "user": requester.to_string(),
-                                "fees": accumulated_fees
-                            }]
-                        }
-                    })
+                    FeeManagerExecuteMsg::ChargeFeesFromUserBalance {
+                        batch: vec![FeeManagerUserFees {
+                            user: requester.clone(),
+                            fees: accumulated_fees,
+                        }],
+                    }
                 }
             };
 
@@ -871,9 +861,9 @@ pub fn charge_fees(
                     // Build AUTHZ message in name of requester
                     let authz_msg = build_authz_execute_contract_msg(
                         &_env,
-                        &requester,
+                        &requester.clone(),
                         &config.fee_manager_address,
-                        &fee_msg.to_string(),
+                        &to_json_string(&fee_msg)?,
                         &accumulated_funds,
                     )?;
                     
@@ -890,7 +880,8 @@ pub fn charge_fees(
                     };
                     
                     // Create submessage with reply
-                    let sub_msg = SubMsg::reply_always(wasm_msg, reply_id);
+                    // TODO: review if we should replay_always instead of reply_on_success
+                    let sub_msg = SubMsg::reply_on_success(wasm_msg, reply_id);
                     response = response.add_submessage(sub_msg);
                 },
             }
@@ -900,30 +891,40 @@ pub fn charge_fees(
         }
     }
 
+    // Emit rate events for each unique denomination
+    for denom_quote in quotes.iter() {
+        let denom = denom_quote.0;
+        let quote = denom_quote.1;
+
+        response = response.add_event(
+            cosmwasm_std::Event::new("fee-rate")
+                .add_attribute("denom", denom.clone())
+                .add_attribute("rate", quote.to_string()),
+        );
+    }
+
     Ok(response)
 }
 
+
 /// Mock function to get USD quotes for different denominations
 /// TODO: Replace with actual oracle integration
-fn get_quotes(denoms: &std::collections::HashSet<String>) -> HashMap<String, Uint128> {
-    let mut quotes = HashMap::new();
-
-    for denom in denoms {
-        // Mock: all tokens quote at 0.5 USD
-        // In real implementation, this would fetch from oracle
-        // Oracle returns 8 decimal precision, so 0.5 USD = 50000000
-        quotes.insert(denom.clone(), Uint128::new(50000000));
+fn get_quote(quotes: &mut HashMap<String, Decimal>, denom: &String) -> Decimal {
+    // Check if the denomination already exists in the quotes map
+    if let Some(quote) = quotes.get(denom) {
+        return *quote;
     }
-
-    quotes
-}
-
-/// Convert oracle quote to USD decimal value
-/// Oracle returns 8 decimal precision, so we need to convert to Decimal
-fn convert_quote_to_usd_decimal(quote: Uint128) -> Decimal {
-    // Oracle returns 8 decimal precision (e.g., 50000000 for 0.5 USD)
-    // Convert to Decimal with 8 decimal places
-    Decimal::from_ratio(quote, Uint128::new(100000000))
+    
+    // If not found, fetch the quote using a function
+    // Mock: all tokens quote at 0.5 USD
+    // In real implementation, this would fetch from oracle
+    // Oracle returns 8 decimal precision, so 0.5 USD = 50000000
+    let quote = Decimal::from_str("0.5").unwrap();
+    
+    // Insert the quote into the map for future use
+    quotes.insert(denom.clone(), quote);
+    
+    quote
 }
 
 /// Handle reply from fee manager contract
@@ -946,7 +947,6 @@ pub fn handle_fee_manager_reply(
                     .add_attribute("user_address", fee_event_data.user_address)
                     .add_attribute("denom", fee_event_data.denom)
                     .add_attribute("fee_type", fee_event_data.fee_type.to_string())
-                    .add_attribute("instance_id", fee_event_data.instance_id.to_string())
                     .add_attribute("error", "true")
                     .add_attribute("details", error_msg.clone())
             );
@@ -976,7 +976,6 @@ pub fn handle_fee_manager_reply(
                 .add_attribute("denom", fee_event_data.denom)
                 .add_attribute("amount_charged", fee_event_data.amount_charged.to_string())
                 .add_attribute("fee_type", fee_event_data.fee_type.to_string())
-                .add_attribute("instance_id", fee_event_data.instance_id.to_string())
         );
     }
     

@@ -173,6 +173,7 @@ name = "auto-workflow-manager"
 version = "0.1.0"
 dependencies = [
  "anybuf",
+ "auto-fee-manager",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",

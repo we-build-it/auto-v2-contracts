@@ -16,6 +16,7 @@ pub struct Config {
     pub allowed_action_executors: HashSet<Addr>,
     pub referral_memo: String,
     pub fee_manager_address: Addr,
+    pub allowance_denom: String,
 }
 
 #[cw_serde]
@@ -44,7 +45,7 @@ pub struct WorkflowInstance {
 
 #[cw_serde]
 pub struct PaymentConfig {
-    pub allowance_usd: Uint128,
+    pub allowance: Uint128,
     pub source: PaymentSource,
 }
 

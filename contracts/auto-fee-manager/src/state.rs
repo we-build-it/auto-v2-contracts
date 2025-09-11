@@ -1,15 +1,15 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Coin, Uint128};
+use cosmwasm_std::{Addr, Uint128};
 use cw_storage_plus::{Item, Map};
+
+use crate::msg::AcceptedDenom;
 
 #[cw_serde]
 pub struct Config {
-    pub max_debt: Coin,
-    pub min_balance_threshold: Coin,
     pub execution_fees_destination_address: Addr,
     pub distribution_fees_destination_address: Addr,
     pub crank_authorized_address: Addr,
-    pub workflow_manager_address: Addr,
+    pub workflow_manager_address: Option<Addr>,
     pub creator_distribution_fee: Uint128,
 }
 
@@ -28,7 +28,7 @@ pub const EXECUTION_FEES: Map<&str, Uint128> = Map::new("execution_fees");
 pub const DISTRIBUTION_FEES: Map<&str, Uint128> = Map::new("distribution_fees");
 
 // Defines which tokens are accepted for deposits
-pub const ACCEPTED_DENOMS: Item<Vec<String>> = Item::new("accepted_denoms");
+pub const ACCEPTED_DENOMS: Item<Vec<AcceptedDenom>> = Item::new("accepted_denoms");
 
 // creator address → subscription status for fee distribution
 pub const SUBSCRIBED_CREATORS: Map<&Addr, bool> = Map::new("subscribed_creators");

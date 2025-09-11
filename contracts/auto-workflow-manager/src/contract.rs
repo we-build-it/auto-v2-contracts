@@ -44,6 +44,7 @@ pub fn instantiate(
         allowed_action_executors: msg.allowed_action_executors,
         referral_memo: msg.referral_memo,
         fee_manager_address: msg.fee_manager_address,
+        allowance_denom: msg.allowance_denom,
     };
 
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -170,6 +171,17 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         } => to_json_binary(&query_workflow_instance(deps, user_address, instance_id)?),
         QueryMsg::GetUserPaymentConfig { user_address } => {
             to_json_binary(&query_user_payment_config(deps, user_address)?)
+        }
+        QueryMsg::GetConfig {} => {
+            let config = load_config(deps.storage)?;
+            let result = InstantiateMsg {
+                allowed_publishers: config.allowed_publishers.clone(),
+                allowed_action_executors: config.allowed_action_executors.clone(),
+                referral_memo: config.referral_memo,
+                fee_manager_address: config.fee_manager_address,
+                allowance_denom: config.allowance_denom,
+            };
+            to_json_binary(&result)
         }
     }
 }
