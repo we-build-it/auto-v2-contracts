@@ -28,7 +28,7 @@ fn test_crank_authorized_functions_require_authorization() {
         execution_fees_destination_address.clone(),
         distribution_fees_destination_address,
         crank_authorized_address.clone(),
-        workflow_manager_address,
+        workflow_manager_address.clone(),
         Uint128::from(5u128), // 5% distribution fee
     ).unwrap();
     // Test that unauthorized address cannot call crank functions
@@ -80,7 +80,7 @@ fn test_crank_authorized_functions_require_authorization() {
     let result = execute_charge_fees_from_user_balance(
         deps.as_mut(),
         env.clone(),
-        crank_authorized_address.clone(),
+        workflow_manager_address.clone(),
         vec![test_user_fees],
     );
     assert!(result.is_ok());
@@ -208,16 +208,16 @@ fn test_sudo_set_crank_authorized_address() {
         accepted_denoms,
         execution_fees_destination_address.clone(),
         distribution_fees_destination_address,
-        crank_authorized_address.clone(),
-        workflow_manager_address,
+        crank_authorized_address,
+        workflow_manager_address.clone(),
         Uint128::from(5u128), // 5% distribution fee
     ).unwrap();
     // Change crank authorized address via sudo
-    let new_crank_authorized_address = api.addr_make("new_crank_authorized");
-    let result = sudo_set_crank_authorized_address(
+    let new_workflow_manager_address = api.addr_make("new_workflow_manager");
+    let result = sudo_set_workflow_manager_address(
         deps.as_mut(),
         env.clone(),
-        new_crank_authorized_address.clone(),
+        new_workflow_manager_address.clone(),
     );
     assert!(result.is_ok());
     // Test that old crank authorized address can no longer call restricted functions
@@ -225,13 +225,13 @@ fn test_sudo_set_crank_authorized_address() {
     let result = execute_charge_fees_from_user_balance(
         deps.as_mut(),
         env.clone(),
-        crank_authorized_address.clone(),
+        workflow_manager_address.clone(),
         vec![test_user_fees],
     );
     assert!(result.is_err());
     match result {
         Err(ContractError::NotAuthorized { address }) => {
-            assert_eq!(address, crank_authorized_address.to_string());
+            assert_eq!(address, workflow_manager_address.to_string());
         },
         _ => panic!("Expected NotAuthorized error"),
     }
@@ -240,7 +240,7 @@ fn test_sudo_set_crank_authorized_address() {
     let result = execute_charge_fees_from_user_balance(
         deps.as_mut(),
         env,
-        new_crank_authorized_address,
+        new_workflow_manager_address,
         vec![test_user_fees],
     );
     assert!(result.is_ok());

@@ -33,8 +33,8 @@ fn test_get_creator_fees_with_balance() {
         accepted_denoms,
         execution_fees_destination_address,
         distribution_fees_destination_address,
-        crank_authorized_address.clone(),
-        workflow_manager_address,
+        crank_authorized_address,
+        workflow_manager_address.clone(),
         Uint128::from(5u128), // 5% distribution fee
     ).unwrap();
 
@@ -64,7 +64,7 @@ fn test_get_creator_fees_with_balance() {
     execute_charge_fees_from_user_balance(
         deps.as_mut(),
         env.clone(),
-        crank_authorized_address.clone(),
+        workflow_manager_address.clone(),
         vec![test_fees],
     ).unwrap();
 
@@ -212,8 +212,8 @@ fn test_has_exceeded_debt_limit() {
         accepted_denoms,
         execution_fees_destination_address,
         distribution_fees_destination_address,
-        crank_authorized_address.clone(),
-        workflow_manager_address,
+        crank_authorized_address,
+        workflow_manager_address.clone(),
         Uint128::from(5u128), // 5% distribution fee
     ).unwrap();
 
@@ -239,7 +239,7 @@ fn test_has_exceeded_debt_limit() {
     execute_charge_fees_from_user_balance(
         deps.as_mut(),
         env.clone(),
-        crank_authorized_address.clone(),
+        workflow_manager_address.clone(),
         vec![test_fees],
     ).unwrap();
 
@@ -278,8 +278,8 @@ fn test_get_non_creator_fees() {
         accepted_denoms,
         execution_fees_destination_address,
         distribution_fees_destination_address,
-        crank_authorized_address.clone(),
-        workflow_manager_address,
+        crank_authorized_address,
+        workflow_manager_address.clone(),
         Uint128::from(5u128), // 5% distribution fee
     ).unwrap();
 
@@ -322,7 +322,7 @@ fn test_get_non_creator_fees() {
     execute_charge_fees_from_user_balance(
         deps.as_mut(),
         env.clone(),
-        crank_authorized_address.clone(),
+        workflow_manager_address.clone(),
         vec![test_fees],
     ).unwrap();
 

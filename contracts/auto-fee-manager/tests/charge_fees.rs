@@ -28,8 +28,8 @@ fn test_charge_fees_from_user_balance_success() {
         accepted_denoms,
         execution_fees_destination_address.clone(),
         distribution_fees_destination_address,
-        crank_authorized_address.clone(),
-        workflow_manager_address,
+        crank_authorized_address,
+        workflow_manager_address.clone(),
         Uint128::from(5u128), // 5% distribution fee
     ).unwrap();
     // Create a user and give them some balance
@@ -51,7 +51,7 @@ fn test_charge_fees_from_user_balance_success() {
     let response = execute_charge_fees_from_user_balance(
         deps.as_mut(),
         env,
-        crank_authorized_address,
+        workflow_manager_address,
         vec![test_user_fees],
     ).unwrap();
     // Verify response attributes
@@ -135,8 +135,8 @@ fn test_charge_fees_from_user_balance_invalid_denom() {
         accepted_denoms,
         execution_fees_destination_address.clone(),
         distribution_fees_destination_address,
-        crank_authorized_address.clone(),
-        workflow_manager_address,
+        crank_authorized_address,
+        workflow_manager_address.clone(),
         Uint128::from(5u128), // 5% distribution fee
     ).unwrap();
     // Create test fees with invalid denom
@@ -154,7 +154,7 @@ fn test_charge_fees_from_user_balance_invalid_denom() {
     let result = execute_charge_fees_from_user_balance(
         deps.as_mut(),
         env,
-        crank_authorized_address,
+        workflow_manager_address,
         vec![test_user_fees],
     );
     // Verify error
@@ -189,8 +189,8 @@ fn test_charge_fees_from_user_balance_below_threshold_event() {
         accepted_denoms,
         execution_fees_destination_address.clone(),
         distribution_fees_destination_address,
-        crank_authorized_address.clone(),
-        workflow_manager_address,
+        crank_authorized_address,
+        workflow_manager_address.clone(),
         Uint128::from(5u128), // 5% distribution fee
     ).unwrap();
     // Create a user and give them some balance
@@ -221,7 +221,7 @@ fn test_charge_fees_from_user_balance_below_threshold_event() {
     let response = execute_charge_fees_from_user_balance(
         deps.as_mut(),
         env,
-        crank_authorized_address,
+        workflow_manager_address,
         vec![test_user_fees],
     ).unwrap();
     // Verify event was emitted
@@ -262,8 +262,8 @@ fn test_charge_fees_from_user_balance_storage_tracking() {
         accepted_denoms,
         execution_fees_destination_address.clone(),
         distribution_fees_destination_address,
-        crank_authorized_address.clone(),
-        workflow_manager_address,
+        crank_authorized_address,
+        workflow_manager_address.clone(),
         Uint128::from(5u128), // 5% distribution fee
     ).unwrap();
     // Create a user and give them some balance
@@ -300,7 +300,7 @@ fn test_charge_fees_from_user_balance_storage_tracking() {
     let result = execute_charge_fees_from_user_balance(
         deps.as_mut(),
         env,
-        crank_authorized_address,
+        workflow_manager_address,
         vec![test_user_fees],
     );
     assert!(result.is_ok());
@@ -347,8 +347,8 @@ fn test_charge_fees_from_user_balance_partial_execution_fee() {
         accepted_denoms,
         execution_fees_destination_address.clone(),
         distribution_fees_destination_address,
-        crank_authorized_address.clone(),
-        workflow_manager_address,
+        crank_authorized_address,
+        workflow_manager_address.clone(),
         Uint128::from(5u128), // 5% distribution fee
     ).unwrap();
     // Create a user and give them some balance (10 uusdc)
@@ -378,7 +378,7 @@ fn test_charge_fees_from_user_balance_partial_execution_fee() {
     let result = execute_charge_fees_from_user_balance(
         deps.as_mut(),
         env,
-        crank_authorized_address,
+        workflow_manager_address,
         vec![test_user_fees],
     );
     assert!(result.is_ok());
