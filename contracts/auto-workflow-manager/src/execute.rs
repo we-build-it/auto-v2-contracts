@@ -157,8 +157,7 @@ pub fn cancel_run(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    instance_id: u64,
-    run_id: String,
+    instance_id: u64
 ) -> Result<Response, ContractError> {
     // Load the instance
     let instance =
@@ -168,23 +167,29 @@ pub fn cancel_run(
             }
         })?;
 
-    // Only remove the instance if it's OneShot
+    // Only cancel run if it's OneShot
     if matches!(instance.execution_type, ExecutionType::OneShot) {
-        remove_workflow_instance(deps.storage, &info.sender, &instance_id)?;
+        return Err(ContractError::GenericError(
+            "Can't cancel run for one shot instances, use cancel_instance instead".to_string(),
+        ));
+    } else {
+        let mut updated_instance = instance;
+        // if instance is recurrent, reset last_executed_action to None
+        updated_instance.last_executed_action = None;        
+        save_workflow_instance(deps.storage, &info.sender, &instance_id, &updated_instance)?;
     }
 
     Ok(Response::new()
         .add_attribute("method", "cancel_run")
         .add_attribute("instance_id", instance_id.to_string())
-        .add_attribute("run_id", run_id)
         .add_attribute("canceller", info.sender.to_string()))
 }
 
-pub fn cancel_schedule(
+pub fn cancel_instance(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    instance_id: u64,
+    instance_id: u64
 ) -> Result<Response, ContractError> {
     // Load the instance
     let instance =
@@ -194,21 +199,49 @@ pub fn cancel_schedule(
             }
         })?;
 
-    // Check if instance is NOT Recurrent (only Recurrent instances can have their schedule changed)
-    if !matches!(instance.execution_type, ExecutionType::Recurrent) {
-        return Err(ContractError::GenericError(
-            "Can't change schedule for non-recurrent instances".to_string(),
-        ));
-    }
-
-    // Remove the instance
-    remove_workflow_instance(deps.storage, &info.sender, &instance_id)?;
+    let mut updated_instance = instance;
+    updated_instance.state = WorkflowInstanceState::Cancelled;
+    updated_instance.last_executed_action = None;
+    save_workflow_instance(deps.storage, &info.sender, &instance_id, &updated_instance)?;
 
     Ok(Response::new()
-        .add_attribute("method", "cancel_schedule")
+        .add_attribute("method", "cancel_instance")
         .add_attribute("instance_id", instance_id.to_string())
         .add_attribute("canceller", info.sender.to_string()))
 }
+
+// pub fn cancel_schedule(
+//     deps: DepsMut,
+//     _env: Env,
+//     info: MessageInfo,
+//     instance_id: u64,
+// ) -> Result<Response, ContractError> {
+//     // Load the instance
+//     let instance =
+//         load_workflow_instance(deps.storage, &info.sender, &instance_id).map_err(|_| {
+//             ContractError::InstanceNotFound {
+//                 instance_id: instance_id.to_string(),
+//             }
+//         })?;
+
+//     // Check if instance is NOT Recurrent (only Recurrent instances can have their schedule changed)
+//     if !matches!(instance.execution_type, ExecutionType::Recurrent) {
+//         return Err(ContractError::GenericError(
+//             "Can't change schedule for non-recurrent instances".to_string(),
+//         ));
+//     }
+
+//     // Cancel the instance
+//     // remove_workflow_instance(deps.storage, &info.sender, &instance_id)?;
+//     let mut updated_instance = instance;
+//     updated_instance.state = WorkflowInstanceState::Cancelled;
+//     save_workflow_instance(deps.storage, &info.sender, &instance_id, &updated_instance)?;
+
+//     Ok(Response::new()
+//         .add_attribute("method", "cancel_schedule")
+//         .add_attribute("instance_id", instance_id.to_string())
+//         .add_attribute("canceller", info.sender.to_string()))
+// }
 
 pub fn pause_schedule(
     deps: DepsMut,
@@ -315,6 +348,15 @@ pub fn execute_action(
         ));
     }
 
+    // Instance must be running or finished (if recurrent)
+    if !(matches!(user_instance.state, WorkflowInstanceState::Running) || 
+        (matches!(user_instance.state, WorkflowInstanceState::Finished) && matches!(user_instance.execution_type, ExecutionType::Recurrent))) 
+        {
+        return Err(ContractError::GenericError(
+            "Instance is not running".to_string(),
+        ));
+    }
+
     // Load workflow from user_instance.workflow_id
     let workflow = load_workflow(deps.storage, &user_instance.workflow_id)?;
 
@@ -407,6 +449,14 @@ pub fn execute_action(
     // Update instance with last executed action
     let mut updated_instance = user_instance;
     updated_instance.last_executed_action = Some(action_id.clone());
+    
+    // Update instance state based on whether this is an end action
+    if workflow.end_actions.contains(&action_id) {
+        updated_instance.state = WorkflowInstanceState::Finished;
+    } else {
+        updated_instance.state = WorkflowInstanceState::Running;
+    }
+    
     save_workflow_instance(deps.storage, &user_addr, &instance_id, &updated_instance)?;
 
     Ok(Response::new()
@@ -567,6 +617,41 @@ fn resolve_template_funds(
 }
 
 //=========== DYNAMIC TEMPLATE ACTION (END) ============
+
+pub fn purge_instances(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    instance_ids: Vec<u64>,
+) -> Result<Response, ContractError> {
+    // Validate sender is admin
+    validate_sender_is_admin(deps.storage, &info)?;
+
+    let mut purged_instance_ids = Vec::new();
+    let mut not_found_instance_ids = Vec::new();
+    let mut not_purgued_instance_ids = Vec::new();
+
+    for instance_id in instance_ids {
+        let instance_result = load_workflow_instance(deps.storage, &info.sender, &instance_id);
+        if instance_result.is_ok() {
+            let instance = instance_result.unwrap();
+            if matches!(instance.state, WorkflowInstanceState::Cancelled) || matches!(instance.state, WorkflowInstanceState::Finished) {
+                purged_instance_ids.push(instance_id.to_string());
+                remove_workflow_instance(deps.storage, &info.sender, &instance_id)?;
+            } else {
+                not_purgued_instance_ids.push(instance_id.to_string());
+            }
+        } else {
+            not_found_instance_ids.push(instance_id.to_string());
+        }
+    }
+
+    Ok(Response::new()
+        .add_attribute("method", "purge_instances")
+        .add_attribute("purged_instance_ids", purged_instance_ids.join(","))
+        .add_attribute("not_found_instance_ids", not_found_instance_ids.join(","))
+        .add_attribute("not_purgued_instance_ids", not_purgued_instance_ids.join(",")))
+}
 
 pub fn set_user_payment_config(
     deps: DepsMut,

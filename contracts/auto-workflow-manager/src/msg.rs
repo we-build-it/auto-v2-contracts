@@ -43,6 +43,8 @@ impl fmt::Display for WorkflowState {
 pub enum WorkflowInstanceState {
     Running,
     Paused,
+    Finished,
+    Cancelled
 }
 
 #[cw_serde]
@@ -102,11 +104,13 @@ pub enum ExecuteMsg {
     },
     CancelRun {
         instance_id: InstanceId,
-        run_id: String,
     },
-    CancelSchedule {
+    CancelInstance {
         instance_id: InstanceId,
     },
+    // CancelSchedule {
+    //     instance_id: InstanceId,
+    // },
     PauseSchedule {
         instance_id: InstanceId,
     },
@@ -119,6 +123,9 @@ pub enum ExecuteMsg {
         action_id: ActionId,
         template_id: TemplateId, // Now required, not optional
         params: Option<HashMap<ParamId, ActionParamValue>>
+    },
+    PurgeInstances {
+        instance_ids: Vec<InstanceId>,
     },
     SetUserPaymentConfig {
         user_address: String,

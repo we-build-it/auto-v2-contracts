@@ -8,9 +8,7 @@ use cw2::set_contract_version;
 use crate::{
     error::ContractError,
     execute::{
-        cancel_run, cancel_schedule, charge_fees, execute_action, execute_instance, pause_schedule,
-        publish_workflow, remove_user_payment_config_execute, resume_schedule,
-        set_user_payment_config,
+        cancel_instance, cancel_run, charge_fees, execute_action, execute_instance, pause_schedule, publish_workflow, purge_instances, remove_user_payment_config_execute, resume_schedule, set_user_payment_config
     },
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg, SudoMsg},
     query::{
@@ -70,11 +68,9 @@ pub fn execute(
     match msg {
         ExecuteMsg::PublishWorkflow { workflow } => publish_workflow(deps, env, info, workflow),
         ExecuteMsg::ExecuteInstance { instance } => execute_instance(deps, env, info, instance),
-        ExecuteMsg::CancelRun {
-            instance_id,
-            run_id,
-        } => cancel_run(deps, env, info, instance_id, run_id),
-        ExecuteMsg::CancelSchedule { instance_id } => cancel_schedule(deps, env, info, instance_id),
+        ExecuteMsg::CancelRun {instance_id} => cancel_run(deps, env, info, instance_id),
+        ExecuteMsg::CancelInstance {instance_id} => cancel_instance(deps, env, info, instance_id),
+        // ExecuteMsg::CancelSchedule { instance_id } => cancel_schedule(deps, env, info, instance_id),
         ExecuteMsg::PauseSchedule { instance_id } => pause_schedule(deps, env, info, instance_id),
         ExecuteMsg::ResumeSchedule { instance_id } => resume_schedule(deps, env, info, instance_id),
         ExecuteMsg::ExecuteAction {
@@ -101,6 +97,7 @@ pub fn execute(
             remove_user_payment_config_execute(deps, env, info, user_address)
         }
         ExecuteMsg::ChargeFees { batch_id, fees } => charge_fees(deps, env, info, batch_id, fees),
+        ExecuteMsg::PurgeInstances { instance_ids } => purge_instances(deps, env, info, instance_ids),
         // TODO: temporal AuthZ test, remove this
         ExecuteMsg::TestAuthz { } => {
             let daodao_msg = "{ \"echo\": { \"message\": \"T3BlcmFjaW9uIGRlIFN0YWtl\", \"attributes\": [[\"priority\", \"high\"],[\"timestamp\", \"1640995200\"]] } }";
