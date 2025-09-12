@@ -5,7 +5,7 @@ use cosmwasm_std::{
 
 use auto_fee_manager::{
     contract::{execute, instantiate, sudo},
-    msg::{ExecuteMsg, InstantiateMsg, SudoMsg, UserFees, Fee, FeeType},
+    msg::{AcceptedDenom, ExecuteMsg, Fee, FeeType, InstantiateMsg, SudoMsg, UserFees},
     ContractError,
 };
 
@@ -16,23 +16,19 @@ pub fn instantiate_contract(
     deps: DepsMut,
     env: Env,
     admin: Addr,
-    max_debt: Coin,
-    min_balance_threshold: Coin,
+    accepted_denoms: Vec<AcceptedDenom>,
     execution_fees_destination_address: Addr,
     distribution_fees_destination_address: Addr,
-    accepted_denoms: Vec<String>,
     crank_authorized_address: Addr,
     workflow_manager_address: Addr,
     creator_distribution_fee: Uint128,
 ) -> Result<Response, ContractError> {
     let instantiate_msg = InstantiateMsg {
-        max_debt,
-        min_balance_threshold,
+        accepted_denoms,
         execution_fees_destination_address,
         distribution_fees_destination_address,
-        accepted_denoms,
         crank_authorized_address,
-        workflow_manager_address,
+        workflow_manager_address: Some(workflow_manager_address),
         creator_distribution_fee,
     };
     let instantiate_info = message_info(&admin, &[]);
@@ -47,24 +43,14 @@ pub fn create_test_user_fees(user: Addr) -> UserFees {
         user,
         fees: vec![
             Fee {
-                workflow_instance_id: "test-instance-1".to_string(),
-                action_id: "test-action-1".to_string(),
-                description: "Test execution fee".to_string(),
-                timestamp: 1234567890,
                 amount: Uint128::from(1000u128),
                 denom: "uusdc".to_string(),
                 fee_type: FeeType::Execution,
-                creator_address: None,
             },
             Fee {
-                workflow_instance_id: "test-instance-2".to_string(),
-                action_id: "test-action-2".to_string(),
-                description: "Test creator fee".to_string(),
-                timestamp: 1234567891,
                 amount: Uint128::from(2000u128),
                 denom: "uusdc".to_string(),
-                fee_type: FeeType::Creator,
-                creator_address: Some(user_clone),
+                fee_type: FeeType::Creator { creator_address: user_clone.clone() },
             },
         ],
     }
@@ -82,14 +68,9 @@ pub fn create_test_user_fees_with_creator(
         user,
         fees: vec![
             Fee {
-                workflow_instance_id: "test-instance-1".to_string(),
-                action_id: "test-action-1".to_string(),
-                description: "Test creator fee".to_string(),
-                timestamp: 1234567890,
                 amount,
                 denom,
-                fee_type: FeeType::Creator,
-                creator_address: Some(creator),
+                fee_type: FeeType::Creator { creator_address: creator.clone() },
             },
         ],
     }

@@ -1,7 +1,7 @@
 use cosmwasm_std::{Addr, Deps, StdResult};
 use crate::{
-    msg::{ActionMsg, GetInstancesResponse, GetWorkflowInstanceResponse, GetWorkflowResponse, InstanceId, NewInstanceMsg, NewWorkflowMsg, WorkflowInstanceResponse, WorkflowResponse}, 
-    state::{load_workflow, load_workflow_action_params, load_workflow_action_templates, load_workflow_action_contracts, load_workflow_actions, load_workflow_instance, load_workflow_instance_params, load_workflow_instances_by_requester, WorkflowInstance},
+    msg::{ActionMsg, GetInstancesResponse, GetWorkflowInstanceResponse, GetWorkflowResponse, GetUserPaymentConfigResponse, InstanceId, NewInstanceMsg, NewWorkflowMsg, WorkflowInstanceResponse, WorkflowResponse}, 
+    state::{load_workflow, load_workflow_action_params, load_workflow_action_templates, load_workflow_action_contracts, load_workflow_actions, load_workflow_instance, load_workflow_instance_params, load_workflow_instances_by_requester, load_user_payment_config, WorkflowInstance},
 };
 
 pub fn query_workflow_by_id(deps: Deps, workflow_id: String) -> StdResult<GetWorkflowResponse> {
@@ -53,10 +53,25 @@ fn to_workflow_instance_response(deps: Deps, requester: &Addr, instance_id: &Ins
             execution_type: instance.execution_type.clone(),
             expiration_time: instance.expiration_time,
             onchain_parameters: load_workflow_instance_params(deps.storage, &requester, &instance_id).unwrap_or_default(),
+            offchain_parameters: std::collections::HashMap::new(),
+            // TODO: this field is not in state, we need a new Msg to avoid return None
+            cron_expression: None,
         },
         id: instance_id.clone(),
         state: instance.state.clone(),
         requester: requester.clone(),
         last_executed_action: instance.last_executed_action.clone(),
     }
+}
+
+pub fn query_user_payment_config(deps: Deps, user_address: String) -> StdResult<GetUserPaymentConfigResponse> {
+    let user_addr = deps.api.addr_validate(&user_address)?;
+    
+    // Try to load existing config, or return None if not found
+    let payment_config = match load_user_payment_config(deps.storage, &user_addr) {
+        Ok(config) => Some(config),
+        Err(_) => None,
+    };
+    
+    Ok(GetUserPaymentConfigResponse { payment_config })
 }

@@ -52,7 +52,7 @@ pub fn is_authorized(deps: Deps, address: &Addr) -> Result<bool, ContractError> 
 /// Helper function to check if an address is the workflow manager
 pub fn is_workflow_manager(deps: Deps, address: &Addr) -> Result<bool, ContractError> {
     let config: Config = CONFIG.load(deps.storage)?;
-    Ok(config.workflow_manager_address == *address)
+    Ok(config.workflow_manager_address == Some(address.clone()))
 }
 
 /// Helper function to verify authorization for restricted functions

@@ -1,11 +1,11 @@
 use cosmwasm_std::{
-    testing::{message_info, mock_dependencies, mock_env, MockApi, MockQuerier, MockStorage}, Addr, DepsMut, Empty, Env, OwnedDeps, Response
+    testing::{message_info, mock_dependencies, mock_env, MockApi, MockQuerier, MockStorage}, Addr, DepsMut, Empty, Env, OwnedDeps, Response, Timestamp
 };
 use std::collections::{HashMap, HashSet};
 
 use auto_workflow_manager::{
     contract::{execute, instantiate},
-    msg::{ExecuteMsg, InstantiateMsg, NewWorkflowMsg, WorkflowVisibility, ActionMsg, ActionParamValue, Template},
+    msg::{ActionMsg, ActionParamValue, ExecuteMsg, ExecutionType, InstantiateMsg, NewInstanceMsg, NewWorkflowMsg, Template, WorkflowVisibility},
 };
 
 /// Initialize the contract with the given parameters
@@ -15,11 +15,14 @@ pub fn instantiate_contract(
     admin: Addr,
     allowed_publishers: HashSet<Addr>,
     allowed_action_executors: HashSet<Addr>,
+    fee_manager_address: Addr,
 ) -> Result<Response, auto_workflow_manager::error::ContractError> {
     let instantiate_msg = InstantiateMsg {
         allowed_publishers,
         allowed_action_executors,
         referral_memo: "test-referral-memo".to_string(),
+        fee_manager_address: fee_manager_address,
+        allowance_denom: "uusdc".to_string(),
     };
     
     let instantiate_info = message_info(&admin, &[]);
@@ -208,6 +211,35 @@ pub fn publish_workflow(
 }
 
 #[allow(dead_code)]
+pub fn create_oneshot_test_instance(workflow_id: String) -> NewInstanceMsg {
+    NewInstanceMsg {
+        workflow_id,
+        onchain_parameters: std::collections::HashMap::new(),
+        offchain_parameters: std::collections::HashMap::new(),
+        execution_type: ExecutionType::OneShot,
+        expiration_time: Timestamp::from_seconds(1000000000), // Far future
+        cron_expression: None,
+    }
+}
+
+#[allow(dead_code)]
+pub fn execute_instance(
+    deps: &mut cosmwasm_std::OwnedDeps<
+        cosmwasm_std::testing::MockStorage,
+        cosmwasm_std::testing::MockApi,
+        cosmwasm_std::testing::MockQuerier,
+        cosmwasm_std::Empty,
+    >,
+    env: cosmwasm_std::Env,
+    user: Addr,
+    instance: NewInstanceMsg,
+) -> Result<cosmwasm_std::Response, auto_workflow_manager::error::ContractError> {
+    let execute_msg = ExecuteMsg::ExecuteInstance { instance };
+    let execute_info = cosmwasm_std::testing::message_info(&user, &[]);
+    execute(deps.as_mut(), env, execute_info, execute_msg)
+}
+
+#[allow(dead_code)]
 pub fn create_test_environment() -> (OwnedDeps<MockStorage, MockApi, MockQuerier, Empty>, Env, MockApi, Addr, Addr, Addr) {
     let mut deps = mock_dependencies();
     let env = mock_env();
@@ -228,6 +260,7 @@ pub fn create_test_environment() -> (OwnedDeps<MockStorage, MockApi, MockQuerier
         admin_address.clone(),
         allowed_publishers,
         allowed_action_executors,
+        api.addr_make("fee_manager_address"),
     ).unwrap();
 
     (deps, env, api, admin_address.clone(), publisher_address.clone(), executor_address.clone())

@@ -1,7 +1,7 @@
 use cosmwasm_std::testing::{mock_dependencies, mock_env, message_info};
-use cosmwasm_std::{Coin, Uint128, CosmosMsg, BankMsg};
+use cosmwasm_std::{Uint128, CosmosMsg, BankMsg};
 use auto_fee_manager::contract::{execute, query};
-use auto_fee_manager::msg::{ExecuteMsg, QueryMsg};
+use auto_fee_manager::msg::{AcceptedDenom, ExecuteMsg, QueryMsg};
 
 mod utils;
 use crate::utils::*;
@@ -16,27 +16,28 @@ fn test_enable_creator_fee_distribution() {
     let admin_address = api.addr_make("admin");
     let execution_fees_destination_address = api.addr_make("execution_dest");
     let distribution_fees_destination_address = api.addr_make("distribution_dest");
-    let accepted_denoms = vec!["uusdc".to_string(), "uatom".to_string()];
     let crank_authorized_address = api.addr_make("crank_auth");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let max_debt = Coin {
-        denom: "uusdc".to_string(),
-        amount: Uint128::from(1000u128),
-    };
-    let min_balance_threshold = Coin {
-        denom: "uusdc".to_string(),
-        amount: Uint128::from(100u128),
-    };
+    let accepted_denoms = vec![
+        AcceptedDenom {
+            denom: "uusdc".to_string(),
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        },
+        AcceptedDenom {
+            denom: "uatom".to_string(),
+            max_debt: Uint128::zero(),
+            min_balance_threshold: Uint128::zero(),
+        },
+    ];
     
     instantiate_contract(
         deps.as_mut(),
         env.clone(),
         admin_address,
-        max_debt,
-        min_balance_threshold,
+        accepted_denoms,
         execution_fees_destination_address,
         distribution_fees_destination_address,
-        accepted_denoms,
         crank_authorized_address,
         workflow_manager_address,
         Uint128::from(5u128), // 5%
@@ -70,27 +71,28 @@ fn test_disable_creator_fee_distribution() {
     let admin_address = api.addr_make("admin");
     let execution_fees_destination_address = api.addr_make("execution_dest");
     let distribution_fees_destination_address = api.addr_make("distribution_dest");
-    let accepted_denoms = vec!["uusdc".to_string(), "uatom".to_string()];
     let crank_authorized_address = api.addr_make("crank_auth");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let max_debt = Coin {
-        denom: "uusdc".to_string(),
-        amount: Uint128::from(1000u128),
-    };
-    let min_balance_threshold = Coin {
-        denom: "uusdc".to_string(),
-        amount: Uint128::from(100u128),
-    };
+    let accepted_denoms = vec![
+        AcceptedDenom {
+            denom: "uusdc".to_string(),
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        },
+        AcceptedDenom {
+            denom: "uatom".to_string(),
+            max_debt: Uint128::zero(),
+            min_balance_threshold: Uint128::zero(),
+        },
+    ];
     
     instantiate_contract(
         deps.as_mut(),
         env.clone(),
         admin_address,
-        max_debt,
-        min_balance_threshold,
+        accepted_denoms,
         execution_fees_destination_address,
         distribution_fees_destination_address,
-        accepted_denoms,
         crank_authorized_address,
         workflow_manager_address,
         Uint128::from(5u128), // 5%
@@ -124,27 +126,28 @@ fn test_is_creator_subscribed() {
     let admin_address = api.addr_make("admin");
     let execution_fees_destination_address = api.addr_make("execution_dest");
     let distribution_fees_destination_address = api.addr_make("distribution_dest");
-    let accepted_denoms = vec!["uusdc".to_string(), "uatom".to_string()];
     let crank_authorized_address = api.addr_make("crank_auth");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let max_debt = Coin {
-        denom: "uusdc".to_string(),
-        amount: Uint128::from(1000u128),
-    };
-    let min_balance_threshold = Coin {
-        denom: "uusdc".to_string(),
-        amount: Uint128::from(100u128),
-    };
+    let accepted_denoms = vec![
+        AcceptedDenom {
+            denom: "uusdc".to_string(),
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        },
+        AcceptedDenom {
+            denom: "uatom".to_string(),
+            max_debt: Uint128::zero(),
+            min_balance_threshold: Uint128::zero(),
+        },
+    ];
     
     instantiate_contract(
         deps.as_mut(),
         env.clone(),
         admin_address,
-        max_debt,
-        min_balance_threshold,
+        accepted_denoms,
         execution_fees_destination_address,
         distribution_fees_destination_address,
-        accepted_denoms,
         crank_authorized_address,
         workflow_manager_address,
         Uint128::from(5u128), // 5%
@@ -220,27 +223,28 @@ fn test_get_subscribed_creators() {
     let admin_address = api.addr_make("admin");
     let execution_fees_destination_address = api.addr_make("execution_dest");
     let distribution_fees_destination_address = api.addr_make("distribution_dest");
-    let accepted_denoms = vec!["uusdc".to_string(), "uatom".to_string()];
     let crank_authorized_address = api.addr_make("crank_auth");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let max_debt = Coin {
-        denom: "uusdc".to_string(),
-        amount: Uint128::from(1000u128),
-    };
-    let min_balance_threshold = Coin {
-        denom: "uusdc".to_string(),
-        amount: Uint128::from(100u128),
-    };
+    let accepted_denoms = vec![
+        AcceptedDenom {
+            denom: "uusdc".to_string(),
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        },
+        AcceptedDenom {
+            denom: "uatom".to_string(),
+            max_debt: Uint128::zero(),
+            min_balance_threshold: Uint128::zero(),
+        },
+    ];
     
     instantiate_contract(
         deps.as_mut(),
         env.clone(),
         admin_address,
-        max_debt,
-        min_balance_threshold,
+        accepted_denoms,
         execution_fees_destination_address,
         distribution_fees_destination_address,
-        accepted_denoms,
         crank_authorized_address,
         workflow_manager_address,
         Uint128::from(5u128), // 5%
@@ -319,27 +323,28 @@ fn test_distribute_creator_fees_only_subscribed() {
     let admin_address = api.addr_make("admin");
     let execution_fees_destination_address = api.addr_make("execution_dest");
     let distribution_fees_destination_address = api.addr_make("distribution_dest");
-    let accepted_denoms = vec!["uusdc".to_string(), "uatom".to_string()];
     let crank_authorized_address = api.addr_make("crank_auth");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let max_debt = Coin {
-        denom: "uusdc".to_string(),
-        amount: Uint128::from(1000u128),
-    };
-    let min_balance_threshold = Coin {
-        denom: "uusdc".to_string(),
-        amount: Uint128::from(100u128),
-    };
+    let accepted_denoms = vec![
+        AcceptedDenom {
+            denom: "uusdc".to_string(),
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        },
+        AcceptedDenom {
+            denom: "uatom".to_string(),
+            max_debt: Uint128::zero(),
+            min_balance_threshold: Uint128::zero(),
+        },
+    ];
     
     instantiate_contract(
         deps.as_mut(),
         env.clone(),
         admin_address,
-        max_debt,
-        min_balance_threshold,
+        accepted_denoms,
         execution_fees_destination_address,
         distribution_fees_destination_address,
-        accepted_denoms,
         crank_authorized_address.clone(),
         workflow_manager_address,
         Uint128::from(5u128), // 5%

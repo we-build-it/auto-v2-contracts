@@ -1,26 +1,51 @@
 use std::{collections::HashMap, str::FromStr};
 
+use cosmwasm_std::to_json_string;
 use cosmwasm_std::{
-    Addr, Binary, CosmosMsg, DepsMut, Env, MessageInfo, Response, Uint128, WasmMsg
+    to_json_binary, Addr, Binary, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response, Uint128, WasmMsg,
+    Reply, SubMsg
 };
+
+use auto_fee_manager::msg::ExecuteMsg as FeeManagerExecuteMsg;
+use auto_fee_manager::msg::Fee as FeeManagerFee;
+use auto_fee_manager::msg::FeeType as FeeManagerFeeType;
+use auto_fee_manager::msg::UserFees as FeeManagerUserFees;
 
 use crate::{
     msg::{
-        ActionParamValue, ExecutionType, NewWorkflowMsg, WorkflowInstanceState, WorkflowState,
-        WorkflowVisibility,
+        ActionParamValue, ExecutionType, FeeType, NewWorkflowMsg, UserFee, WorkflowInstanceState, WorkflowState, WorkflowVisibility
     },
+    state::{load_config, load_user_payment_config, PaymentSource},
     ContractError,
 };
+use cw_storage_plus::Map;
+
+// Data structure to pass from execute to reply
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct FeeEventData {
+    pub user_address: String,
+    pub denom: String,
+    pub amount_charged: Uint128,
+    pub amount_charged_allowance_denom: Uint128,
+    pub fee_type: FeeType,
+    pub creator_address: Option<String>,
+}
+
+// Temporary storage for fee event data
+pub const FEE_EVENT_DATA: Map<u64, Vec<FeeEventData>> = Map::new("fed");
+
+
 use crate::{
     msg::{NewInstanceMsg, ParamId, TemplateId},
     state::{
         load_next_instance_id, load_workflow, load_workflow_action, load_workflow_action_params,
         load_workflow_action_template, load_workflow_instance, load_workflow_instance_params,
-        remove_workflow_instance, save_workflow, save_workflow_action,
-        save_workflow_action_contracts, save_workflow_action_params,
-        save_workflow_action_templates, save_workflow_instance, save_workflow_instance_params,
-        validate_contract_is_whitelisted, validate_sender_is_action_executor,
-        validate_sender_is_publisher, Action, Workflow, WorkflowInstance,
+        remove_user_payment_config, remove_workflow_instance, save_user_payment_config,
+        save_workflow, save_workflow_action, save_workflow_action_contracts,
+        save_workflow_action_params, save_workflow_action_templates, save_workflow_instance,
+        save_workflow_instance_params, validate_contract_is_whitelisted,
+        validate_sender_is_action_executor, validate_sender_is_admin, validate_sender_is_publisher,
+        Action, PaymentConfig, Workflow, WorkflowInstance,
     },
     utils::build_authz_execute_contract_msg,
 };
@@ -115,6 +140,7 @@ pub fn execute_instance(
         last_executed_action: None,
         execution_type: instance.execution_type,
         expiration_time: instance.expiration_time,
+        // requester: info.sender.clone(),
     };
 
     // Save the instance
@@ -137,8 +163,7 @@ pub fn cancel_run(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    instance_id: u64,
-    run_id: String,
+    instance_id: u64
 ) -> Result<Response, ContractError> {
     // Load the instance
     let instance =
@@ -148,23 +173,29 @@ pub fn cancel_run(
             }
         })?;
 
-    // Only remove the instance if it's OneShot
+    // Only cancel run if it's OneShot
     if matches!(instance.execution_type, ExecutionType::OneShot) {
-        remove_workflow_instance(deps.storage, &info.sender, &instance_id)?;
+        return Err(ContractError::GenericError(
+            "Can't cancel run for one shot instances, use cancel_instance instead".to_string(),
+        ));
+    } else {
+        let mut updated_instance = instance;
+        // if instance is recurrent, reset last_executed_action to None
+        updated_instance.last_executed_action = None;        
+        save_workflow_instance(deps.storage, &info.sender, &instance_id, &updated_instance)?;
     }
 
     Ok(Response::new()
         .add_attribute("method", "cancel_run")
         .add_attribute("instance_id", instance_id.to_string())
-        .add_attribute("run_id", run_id)
         .add_attribute("canceller", info.sender.to_string()))
 }
 
-pub fn cancel_schedule(
+pub fn cancel_instance(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    instance_id: u64,
+    instance_id: u64
 ) -> Result<Response, ContractError> {
     // Load the instance
     let instance =
@@ -174,21 +205,49 @@ pub fn cancel_schedule(
             }
         })?;
 
-    // Check if instance is NOT Recurrent (only Recurrent instances can have their schedule changed)
-    if !matches!(instance.execution_type, ExecutionType::Recurrent) {
-        return Err(ContractError::GenericError(
-            "Can't change schedule for non-recurrent instances".to_string(),
-        ));
-    }
-
-    // Remove the instance
-    remove_workflow_instance(deps.storage, &info.sender, &instance_id)?;
+    let mut updated_instance = instance;
+    updated_instance.state = WorkflowInstanceState::Cancelled;
+    updated_instance.last_executed_action = None;
+    save_workflow_instance(deps.storage, &info.sender, &instance_id, &updated_instance)?;
 
     Ok(Response::new()
-        .add_attribute("method", "cancel_schedule")
+        .add_attribute("method", "cancel_instance")
         .add_attribute("instance_id", instance_id.to_string())
         .add_attribute("canceller", info.sender.to_string()))
 }
+
+// pub fn cancel_schedule(
+//     deps: DepsMut,
+//     _env: Env,
+//     info: MessageInfo,
+//     instance_id: u64,
+// ) -> Result<Response, ContractError> {
+//     // Load the instance
+//     let instance =
+//         load_workflow_instance(deps.storage, &info.sender, &instance_id).map_err(|_| {
+//             ContractError::InstanceNotFound {
+//                 instance_id: instance_id.to_string(),
+//             }
+//         })?;
+
+//     // Check if instance is NOT Recurrent (only Recurrent instances can have their schedule changed)
+//     if !matches!(instance.execution_type, ExecutionType::Recurrent) {
+//         return Err(ContractError::GenericError(
+//             "Can't change schedule for non-recurrent instances".to_string(),
+//         ));
+//     }
+
+//     // Cancel the instance
+//     // remove_workflow_instance(deps.storage, &info.sender, &instance_id)?;
+//     let mut updated_instance = instance;
+//     updated_instance.state = WorkflowInstanceState::Cancelled;
+//     save_workflow_instance(deps.storage, &info.sender, &instance_id, &updated_instance)?;
+
+//     Ok(Response::new()
+//         .add_attribute("method", "cancel_schedule")
+//         .add_attribute("instance_id", instance_id.to_string())
+//         .add_attribute("canceller", info.sender.to_string()))
+// }
 
 pub fn pause_schedule(
     deps: DepsMut,
@@ -295,6 +354,15 @@ pub fn execute_action(
         ));
     }
 
+    // Instance must be running or finished (if recurrent)
+    if !(matches!(user_instance.state, WorkflowInstanceState::Running) || 
+        (matches!(user_instance.state, WorkflowInstanceState::Finished) && matches!(user_instance.execution_type, ExecutionType::Recurrent))) 
+        {
+        return Err(ContractError::GenericError(
+            "Instance is not running".to_string(),
+        ));
+    }
+
     // Load workflow from user_instance.workflow_id
     let workflow = load_workflow(deps.storage, &user_instance.workflow_id)?;
 
@@ -387,6 +455,14 @@ pub fn execute_action(
     // Update instance with last executed action
     let mut updated_instance = user_instance;
     updated_instance.last_executed_action = Some(action_id.clone());
+    
+    // Update instance state based on whether this is an end action
+    if workflow.end_actions.contains(&action_id) {
+        updated_instance.state = WorkflowInstanceState::Finished;
+    } else {
+        updated_instance.state = WorkflowInstanceState::Running;
+    }
+    
     save_workflow_instance(deps.storage, &user_addr, &instance_id, &updated_instance)?;
 
     Ok(Response::new()
@@ -547,3 +623,364 @@ fn resolve_template_funds(
 }
 
 //=========== DYNAMIC TEMPLATE ACTION (END) ============
+
+pub fn purge_instances(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    instance_ids: Vec<u64>,
+) -> Result<Response, ContractError> {
+    // Validate sender is admin
+    validate_sender_is_admin(deps.storage, &info)?;
+
+    let mut purged_instance_ids = Vec::new();
+    let mut not_found_instance_ids = Vec::new();
+    let mut not_purgued_instance_ids = Vec::new();
+
+    for instance_id in instance_ids {
+        let instance_result = load_workflow_instance(deps.storage, &info.sender, &instance_id);
+        if instance_result.is_ok() {
+            let instance = instance_result.unwrap();
+            if matches!(instance.state, WorkflowInstanceState::Cancelled) || matches!(instance.state, WorkflowInstanceState::Finished) {
+                purged_instance_ids.push(instance_id.to_string());
+                remove_workflow_instance(deps.storage, &info.sender, &instance_id)?;
+            } else {
+                not_purgued_instance_ids.push(instance_id.to_string());
+            }
+        } else {
+            not_found_instance_ids.push(instance_id.to_string());
+        }
+    }
+
+    Ok(Response::new()
+        .add_attribute("method", "purge_instances")
+        .add_attribute("purged_instance_ids", purged_instance_ids.join(","))
+        .add_attribute("not_found_instance_ids", not_found_instance_ids.join(","))
+        .add_attribute("not_purgued_instance_ids", not_purgued_instance_ids.join(",")))
+}
+
+pub fn set_user_payment_config(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    payment_config: PaymentConfig,
+) -> Result<Response, ContractError> {
+    // Validate user address
+    let user_addr = deps.api.addr_validate(&info.sender.to_string())?;
+
+    // Save the payment config
+    save_user_payment_config(deps.storage, &user_addr, &payment_config)?;
+
+    Ok(Response::new()
+        .add_attribute("method", "set_user_payment_config")
+        .add_attribute("user_address", info.sender.to_string())
+        .add_attribute("allowance", payment_config.allowance.to_string())
+        .add_attribute("source", format!("{:?}", payment_config.source)))
+}
+
+pub fn remove_user_payment_config_execute(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+) -> Result<Response, ContractError> {
+    // Validate user address
+    let user_addr = deps.api.addr_validate(&info.sender.to_string())?;
+
+    // Remove the payment config
+    remove_user_payment_config(deps.storage, &user_addr)?;
+
+    Ok(Response::new()
+        .add_attribute("method", "remove_user_payment_config")
+        .add_attribute("user_address", info.sender.to_string()))
+}
+
+pub fn charge_fees(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    batch_id: String,
+    fees: Vec<UserFee>,
+) -> Result<Response, ContractError> {
+    // Validate sender is admin
+    validate_sender_is_admin(deps.storage, &info)?;
+
+    let mut response = Response::new()
+        .add_attribute("method", "charge_fees")
+        .add_attribute("batch_id", batch_id.clone());
+
+    // Cumulative quotes for all denominations
+    let mut quotes = HashMap::<String, Decimal>::new();
+
+    // Load config to get fee manager address
+    let config = load_config(deps.storage)?;
+
+    // deps.querier.query_all_balances(&config.fee_manager_address)?;
+    // Initialize reply ID counter starting from 100
+    let mut reply_id = 1000u64;
+    
+    // Process fees for each user
+    for user_fee in fees {
+        // Get the payment config for this user
+        let requester = deps.api.addr_validate(&user_fee.address)?;
+        let payment_config = load_user_payment_config(deps.storage, &requester.clone())?;
+
+        // Accumulate fees and funds for this user
+        let mut accumulated_fees = Vec::new();
+        let mut accumulated_funds = Vec::new();
+        let mut accumulated_fee_events = Vec::new();
+        let mut current_allowance = payment_config.allowance;
+
+        for fee_total in &user_fee.totals {
+            // Get the quote for this denomination
+            let quote = get_quote(&mut quotes, &fee_total.denom);
+
+            // TODO: skip fee if quote not found
+            
+            let quote_allowance_denom = get_quote(&mut quotes, &config.allowance_denom.clone());
+            let allowance_denom_decimals = 8;
+
+            // We need to handle two cases, when fee_total.denom is config.allowance_denom and when it's not
+            let fee_total_amount_allowance_denom = if fee_total.denom == config.allowance_denom.clone() {
+                fee_total.amount
+            } else {
+                let amount_usd = Decimal::from_ratio (fee_total.amount, Uint128::new(10_u128.pow(fee_total.denom_decimals as u32))) * quote;
+                let amount_allowance_denom = Uint128::from( (amount_usd / quote_allowance_denom).atomics() / Uint128::new(10_u128.pow(allowance_denom_decimals as u32)));
+                amount_allowance_denom
+            };
+
+            let (amount_charged, amount_charged_allowance_denom) = 
+                // Case 1: allowance >= fee_total.amount_allowance_denom
+                if current_allowance >= fee_total_amount_allowance_denom {
+                    (fee_total.amount, fee_total_amount_allowance_denom)
+                }
+                // Case 2: 0 < allowance < fee_total.amount_allowance_denom => charge what allowance represents
+                else if current_allowance > Uint128::zero() {
+                    // Simplified calculation: convert allowance to denom amount
+                    // amount_to_charge = current_allowance * quote_allowance_denom * 10^denom_decimals / (10^allowance_denom_decimals * quote_denom)
+                    let amount_to_charge = current_allowance
+                        .checked_mul(Uint128::from(quote_allowance_denom.atomics()))
+                        .unwrap()
+                        .checked_mul(Uint128::new(10_u128.pow(fee_total.denom_decimals as u32)))
+                        .unwrap()
+                        .checked_div(Uint128::new(10_u128.pow(allowance_denom_decimals as u32)))
+                        .unwrap()
+                        .checked_div(Uint128::from(quote.atomics()))
+                        .unwrap();
+
+                    (amount_to_charge, current_allowance)
+                }
+                // Case 3: allowance = 0 => charge nothing
+                else {
+                    (Uint128::zero(), Uint128::zero())
+                };
+
+            // Only process if there's something to charge
+            if amount_charged > Uint128::zero() {
+                // Update current allowance for next iteration
+                current_allowance -= amount_charged_allowance_denom;
+
+                let (fee_amount, fee_denom) = match payment_config.source {
+                    PaymentSource::Wallet => (amount_charged.clone(), fee_total.denom.clone()),
+                    PaymentSource::Prepaid => (amount_charged_allowance_denom.clone(), config.allowance_denom.clone()),
+                };
+
+                let fee = FeeManagerFee {
+                    fee_type: match fee_total.fee_type {
+                        FeeType::Creator { instance_id } => {
+                            let workflow_instance = load_workflow_instance(deps.storage, &requester.clone(), &instance_id)?;
+                            let workflow = load_workflow(deps.storage, &workflow_instance.workflow_id)?;
+                            FeeManagerFeeType::Creator { creator_address: workflow.publisher.clone() }
+                        },
+                        FeeType::Execution => FeeManagerFeeType::Execution,
+                    },
+                    denom: fee_denom.clone(),
+                    amount: fee_amount.clone(),
+                };
+                accumulated_fees.push(fee.clone());
+
+                // Accumulate funds for Wallet payment source
+                if matches!(payment_config.source, PaymentSource::Wallet) {
+                    accumulated_funds.push(cosmwasm_std::Coin {
+                        denom: fee_denom.clone(),
+                        amount: fee_amount.clone(),
+                    });
+                }
+
+                // Create FeeEventData for this specific fee
+                let fee_event_data = FeeEventData {
+                    user_address: user_fee.address.clone(),
+                    denom: fee_total.denom.clone(),
+                    amount_charged: amount_charged.clone(),
+                    amount_charged_allowance_denom: amount_charged_allowance_denom.clone(),
+                    fee_type: fee_total.fee_type.clone(),
+                    creator_address: match fee.fee_type.clone() {
+                        FeeManagerFeeType::Creator { creator_address } => Some(creator_address.to_string()),
+                        _ => None,
+                    },
+                };
+                accumulated_fee_events.push(fee_event_data);
+            }
+        }
+
+        // Send single submessage per user if there are fees to process
+        if !accumulated_fees.is_empty() {
+            // Update user's allowance in storage
+            save_user_payment_config(
+                deps.storage,
+                &requester.clone(),
+                &PaymentConfig {
+                    allowance: current_allowance,
+                    source: payment_config.source.clone(),
+                },
+            )?;
+
+            // Create the fee message based on payment source
+            let fee_msg = match payment_config.source {
+                PaymentSource::Wallet => {
+                    FeeManagerExecuteMsg::ChargeFeesFromMessageCoins {
+                        fees: accumulated_fees,
+                    }
+                },
+                PaymentSource::Prepaid => {
+                    FeeManagerExecuteMsg::ChargeFeesFromUserBalance {
+                        batch: vec![FeeManagerUserFees {
+                            user: requester.clone(),
+                            fees: accumulated_fees,
+                        }],
+                    }
+                }
+            };
+
+            // Store accumulated fee event data for reply
+            FEE_EVENT_DATA.save(deps.storage, reply_id, &accumulated_fee_events)?;
+            
+            // Send message to fee manager with reply
+            match payment_config.source {
+                PaymentSource::Wallet => {
+                    // Build AUTHZ message in name of requester
+                    let authz_msg = build_authz_execute_contract_msg(
+                        &_env,
+                        &requester.clone(),
+                        &config.fee_manager_address,
+                        &to_json_string(&fee_msg)?,
+                        &accumulated_funds,
+                    )?;
+                    
+                    // Create submessage with reply
+                    let sub_msg = SubMsg::reply_always(authz_msg, reply_id);
+                    response = response.add_submessage(sub_msg);
+                },
+                PaymentSource::Prepaid => {
+                    // Direct call to fee manager
+                    let wasm_msg = WasmMsg::Execute {
+                        contract_addr: config.fee_manager_address.to_string(),
+                        msg: to_json_binary(&fee_msg)?,
+                        funds: vec![],
+                    };
+                    
+                    // Create submessage with reply
+                    // TODO: review if we should replay_always instead of reply_on_success
+                    let sub_msg = SubMsg::reply_on_success(wasm_msg, reply_id);
+                    response = response.add_submessage(sub_msg);
+                },
+            }
+            
+            // Increment reply_id for next user
+            reply_id += 1;
+        }
+    }
+
+    // Emit rate events for each unique denomination
+    for denom_quote in quotes.iter() {
+        let denom = denom_quote.0;
+        let quote = denom_quote.1;
+
+        response = response.add_event(
+            cosmwasm_std::Event::new("fee-rate")
+                .add_attribute("denom", denom.clone())
+                .add_attribute("rate", quote.to_string()),
+        );
+    }
+
+    Ok(response)
+}
+
+
+/// Mock function to get USD quotes for different denominations
+/// TODO: Replace with actual oracle integration
+fn get_quote(quotes: &mut HashMap<String, Decimal>, denom: &String) -> Decimal {
+    // Check if the denomination already exists in the quotes map
+    if let Some(quote) = quotes.get(denom) {
+        return *quote;
+    }
+    
+    // If not found, fetch the quote using a function
+    // Mock: all tokens quote at 0.5 USD
+    // In real implementation, this would fetch from oracle
+    // Oracle returns 8 decimal precision, so 0.5 USD = 50000000
+    let quote = Decimal::from_str("0.5").unwrap();
+    
+    // Insert the quote into the map for future use
+    quotes.insert(denom.clone(), quote);
+    
+    quote
+}
+
+/// Handle reply from fee manager contract
+pub fn handle_fee_manager_reply(
+    deps: DepsMut,
+    _env: Env,
+    reply: Reply,
+) -> Result<Response, ContractError> {
+    // Check if there was an error
+    if let cosmwasm_std::SubMsgResult::Err(error_msg) = reply.result {
+        // Load fee event data from storage for error event
+        let fee_event_data_vec = FEE_EVENT_DATA.load(deps.storage, reply.id)?;
+        
+        let mut response = Response::new();
+        
+        // Emit error event for each fee
+        for fee_event_data in fee_event_data_vec {
+            response = response.add_event(
+                cosmwasm_std::Event::new("fee-error")
+                    .add_attribute("user_address", fee_event_data.user_address)
+                    .add_attribute("denom", fee_event_data.denom)
+                    .add_attribute("fee_type", fee_event_data.fee_type.to_string())
+                    .add_attribute("error", "true")
+                    .add_attribute("details", error_msg.clone())
+            );
+        }
+        
+        // Clean up the temporary data
+        FEE_EVENT_DATA.remove(deps.storage, reply.id);
+        
+        return Ok(response);
+    }
+    
+    // Success case - extract the reply data
+    let _reply_data = reply.result.into_result().map_err(|_| {
+        ContractError::GenericError("Fee manager contract execution failed".to_string())
+    })?;
+    
+    // Load fee event data from storage
+    let fee_event_data_vec = FEE_EVENT_DATA.load(deps.storage, reply.id)?;
+    
+    let mut response = Response::new();
+    
+    // Emit fee-charged event for each fee
+    for fee_event_data in fee_event_data_vec {
+        response = response.add_event(
+            cosmwasm_std::Event::new("fee-charged")
+                .add_attribute("user_address", fee_event_data.user_address)
+                .add_attribute("denom", fee_event_data.denom)
+                .add_attribute("amount_charged", fee_event_data.amount_charged.to_string())
+                .add_attribute("amount_charged_allowance_denom", fee_event_data.amount_charged_allowance_denom.to_string())
+                .add_attribute("fee_type", fee_event_data.fee_type.to_string())
+                .add_attribute("creator_address", fee_event_data.creator_address.unwrap_or_default()));
+    }
+    
+    // Clean up the temporary data
+    FEE_EVENT_DATA.remove(deps.storage, reply.id);
+    
+    Ok(response)
+}

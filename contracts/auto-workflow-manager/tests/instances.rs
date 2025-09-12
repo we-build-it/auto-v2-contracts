@@ -14,8 +14,10 @@ fn create_oneshot_test_instance(workflow_id: String) -> NewInstanceMsg {
     NewInstanceMsg {
         workflow_id,
         onchain_parameters: std::collections::HashMap::new(),
+        offchain_parameters: std::collections::HashMap::new(),
         execution_type: ExecutionType::OneShot,
         expiration_time: Timestamp::from_seconds(1000000000), // Far future
+        cron_expression: None,
     }
 }
 
@@ -23,8 +25,10 @@ fn create_recurrent_test_instance(workflow_id: String) -> NewInstanceMsg {
     NewInstanceMsg {
         workflow_id,
         onchain_parameters: std::collections::HashMap::new(),
+        offchain_parameters: std::collections::HashMap::new(),
         execution_type: ExecutionType::Recurrent,
         expiration_time: Timestamp::from_seconds(1000000000), // Far future
+        cron_expression: None,
     }
 }
 
@@ -53,18 +57,16 @@ fn cancel_run(
     >,
     env: cosmwasm_std::Env,
     user: Addr,
-    instance_id: u64,
-    run_id: String,
+    instance_id: u64
 ) -> Result<cosmwasm_std::Response, auto_workflow_manager::error::ContractError> {
     let execute_msg = ExecuteMsg::CancelRun {
-        instance_id,
-        run_id,
+        instance_id
     };
     let execute_info = cosmwasm_std::testing::message_info(&user, &[]);
     execute(deps.as_mut(), env, execute_info, execute_msg)
 }
 
-fn cancel_schedule(
+fn cancel_instance(
     deps: &mut cosmwasm_std::OwnedDeps<
         cosmwasm_std::testing::MockStorage,
         cosmwasm_std::testing::MockApi,
@@ -75,7 +77,7 @@ fn cancel_schedule(
     user: Addr,
     instance_id: u64,
 ) -> Result<cosmwasm_std::Response, auto_workflow_manager::error::ContractError> {
-    let execute_msg = ExecuteMsg::CancelSchedule { instance_id };
+    let execute_msg = ExecuteMsg::CancelInstance { instance_id };
     let execute_info = cosmwasm_std::testing::message_info(&user, &[]);
     execute(deps.as_mut(), env, execute_info, execute_msg)
 }
@@ -212,7 +214,7 @@ fn test_cancel_instance_run_not_found() {
     let user_address = api.addr_make("user");
 
     // Try to cancel non-existent instance
-    let result = cancel_run(&mut deps, env, user_address, 999, "run_id".to_string());
+    let result = cancel_run(&mut deps, env, user_address, 999);
 
     // Verify that the operation fails
     assert!(result.is_err());
@@ -226,7 +228,7 @@ fn test_cancel_instance_run_not_found() {
 }
 
 #[test]
-fn test_cancel_oneshot_instance_run_ok() {
+fn test_cancel_instance_oneshot_ok() {
     let (mut deps, env, api, _admin_address, publisher_address, _executor_address) =
         create_test_environment();
     let user_address = api.addr_make("user");
@@ -246,33 +248,30 @@ fn test_cancel_oneshot_instance_run_ok() {
     execute_instance(&mut deps, env.clone(), user_address.clone(), instance).unwrap();
 
     // Cancel the instance
-    let response = cancel_run(
+    let response = cancel_instance(
         &mut deps,
         env,
         user_address.clone(),
-        1,
-        "run_id".to_string(),
+        1
     )
     .unwrap();
 
     // Check that the instance no longer exists in the contract state
-    let instance_query = query_workflow_instance(deps.as_ref(), user_address.to_string(), 1);
-    assert!(instance_query.is_err());
+    let instance_query = query_workflow_instance(deps.as_ref(), user_address.to_string(), 1).unwrap();
+    assert_eq!(instance_query.instance.state, WorkflowInstanceState::Cancelled);
 
     // Verify response attributes
-    assert_eq!(response.attributes.len(), 4);
+    assert_eq!(response.attributes.len(), 3);
     assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "cancel_run");
+    assert_eq!(response.attributes[0].value, "cancel_instance");
     assert_eq!(response.attributes[1].key, "instance_id");
     assert_eq!(response.attributes[1].value, "1");
-    assert_eq!(response.attributes[2].key, "run_id");
-    assert_eq!(response.attributes[2].value, "run_id");
-    assert_eq!(response.attributes[3].key, "canceller");
-    assert_eq!(response.attributes[3].value, user_address.to_string());
+    assert_eq!(response.attributes[2].key, "canceller");
+    assert_eq!(response.attributes[2].value, user_address.to_string());
 }
 
 #[test]
-fn test_cancel_recurrent_instance_run_ok() {
+fn test_cancel_instance_recurrent_ok() {
     let (mut deps, env, api, _admin_address, publisher_address, _executor_address) =
         create_test_environment();
     let user_address = api.addr_make("user");
@@ -292,12 +291,11 @@ fn test_cancel_recurrent_instance_run_ok() {
     execute_instance(&mut deps, env.clone(), user_address.clone(), instance).unwrap();
 
     // Cancel the instance
-    let response = cancel_run(
+    let response = cancel_instance(
         &mut deps,
         env,
         user_address.clone(),
-        1,
-        "run_id".to_string(),
+        1
     )
     .unwrap();
 
@@ -306,15 +304,13 @@ fn test_cancel_recurrent_instance_run_ok() {
     assert!(instance_query.is_ok());
 
     // Verify response attributes
-    assert_eq!(response.attributes.len(), 4);
+    assert_eq!(response.attributes.len(), 3);
     assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "cancel_run");
+    assert_eq!(response.attributes[0].value, "cancel_instance");
     assert_eq!(response.attributes[1].key, "instance_id");
     assert_eq!(response.attributes[1].value, "1");
-    assert_eq!(response.attributes[2].key, "run_id");
-    assert_eq!(response.attributes[2].value, "run_id");
-    assert_eq!(response.attributes[3].key, "canceller");
-    assert_eq!(response.attributes[3].value, user_address.to_string());
+    assert_eq!(response.attributes[2].key, "canceller");
+    assert_eq!(response.attributes[2].value, user_address.to_string());
 }
 
 // ---------------------------------------------------------------------------------------
@@ -322,13 +318,13 @@ fn test_cancel_recurrent_instance_run_ok() {
 // ---------------------------------------------------------------------------------------
 
 #[test]
-fn test_cancel_instance_schedule_not_found() {
+fn test_cancel_run_not_found() {
     let (mut deps, env, api, _admin_address, _publisher_address, _executor_address) =
         create_test_environment();
     let user_address = api.addr_make("user");
 
     // Try to cancel non-existent instance
-    let result = cancel_schedule(&mut deps, env, user_address, 999);
+    let result = cancel_run(&mut deps, env, user_address, 999);
 
     // Verify that the operation fails
     assert!(result.is_err());
@@ -342,7 +338,7 @@ fn test_cancel_instance_schedule_not_found() {
 }
 
 #[test]
-fn test_cancel_oneshot_instance_schedule_fail() {
+fn test_cancel_run_oneshot_fail() {
     let (mut deps, env, api, _admin_address, publisher_address, _executor_address) =
         create_test_environment();
     let user_address = api.addr_make("user");
@@ -362,19 +358,19 @@ fn test_cancel_oneshot_instance_schedule_fail() {
     execute_instance(&mut deps, env.clone(), user_address.clone(), instance).unwrap();
 
     // Cancel the instance
-    let result = cancel_schedule(&mut deps, env, user_address.clone(), 1);
+    let result = cancel_run(&mut deps, env, user_address.clone(), 1);
     assert!(result.is_err());
 
     match result {
         Err(ContractError::GenericError(message)) => {
-            assert_eq!(message, "Can't change schedule for non-recurrent instances");
+            assert_eq!(message, "Can't cancel run for one shot instances, use cancel_instance instead");
         }
-        _ => panic!("Expected GenericError with 'Can't change schedule for non-recurrent instances', got different error"),
+        _ => panic!("Expected GenericError with 'Can't cancel run for one shot instances, use cancel_instance instead', got different error"),
     }
 }
 
 #[test]
-fn test_cancel_recurrent_instance_schedule_ok() {
+fn test_cancel_run_recurrent_ok() {
     let (mut deps, env, api, _admin_address, publisher_address, _executor_address) =
         create_test_environment();
     let user_address = api.addr_make("user");
@@ -390,24 +386,19 @@ fn test_cancel_recurrent_instance_schedule_ok() {
     .unwrap();
 
     // Execute instance
-    let instance = create_recurrent_test_instance("simple-test-workflow".to_string());
+    let instance = create_oneshot_test_instance("simple-test-workflow".to_string());
     execute_instance(&mut deps, env.clone(), user_address.clone(), instance).unwrap();
 
     // Cancel the instance
-    let response = cancel_schedule(&mut deps, env, user_address.clone(), 1).unwrap();
+    let result = cancel_run(&mut deps, env, user_address.clone(), 1);
+    assert!(result.is_err());
 
-    // Check that the instance no longer exists in the contract state
-    let instance_query = query_workflow_instance(deps.as_ref(), user_address.to_string(), 1);
-    assert!(instance_query.is_err());
-
-    // Verify response attributes
-    assert_eq!(response.attributes.len(), 3);
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "cancel_schedule");
-    assert_eq!(response.attributes[1].key, "instance_id");
-    assert_eq!(response.attributes[1].value, "1");
-    assert_eq!(response.attributes[2].key, "canceller");
-    assert_eq!(response.attributes[2].value, user_address.to_string());
+    match result {
+        Err(ContractError::GenericError(message)) => {
+            assert_eq!(message, "Can't cancel run for one shot instances, use cancel_instance instead");
+        }
+        _ => panic!("Expected GenericError with 'Can't cancel run for one shot instances, use cancel_instance instead', got different error"),
+    }
 }
 
 // --------------------------------------------------------------------------------------

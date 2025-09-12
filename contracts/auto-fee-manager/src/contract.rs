@@ -1,6 +1,6 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128};
+use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 use cw2::set_contract_version;
 
 use crate::error::ContractError;
@@ -18,20 +18,6 @@ pub fn instantiate(
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, crate::CONTRACT_NAME, crate::CONTRACT_VERSION)?;
 
-    // Validate max_debt is not negative (can be zero)
-    if msg.max_debt.amount < Uint128::zero() {
-        return Err(ContractError::InvalidMaxDebt {
-            reason: "max_debt cannot be negative".to_string(),
-        });
-    }
-
-    // Validate min_balance_threshold is not negative (can be zero)
-    if msg.min_balance_threshold.amount < Uint128::zero() {
-        return Err(ContractError::InvalidMaxDebt {
-            reason: "min_balance_threshold cannot be negative".to_string(),
-        });
-    }
-
     // Validate execution_fees_destination_address is not empty and is a valid address
     validate_address(&deps, &msg.execution_fees_destination_address.as_str(), "execution_fees_destination_address")?;
 
@@ -41,8 +27,10 @@ pub fn instantiate(
     // Validate authorized_address is not empty and is a valid address
     validate_address(&deps, &msg.crank_authorized_address.as_str(), "authorized_address")?;
 
-    // Validate workflow_manager_address is not empty and is a valid address
-    validate_address(&deps, &msg.workflow_manager_address.as_str(), "workflow_manager_address")?;
+    // if workflow_manager_address is not empty, validate it is a valid address
+    if let Some(workflow_manager_address) = msg.workflow_manager_address.clone() {
+        validate_address(&deps, &workflow_manager_address.as_str(), "workflow_manager_address")?;
+    }
 
     // Validate accepted_denoms is not empty
     if msg.accepted_denoms.is_empty() {
@@ -53,8 +41,6 @@ pub fn instantiate(
     ACCEPTED_DENOMS.save(deps.storage, &msg.accepted_denoms)?;
 
     let config = Config {
-        max_debt: msg.max_debt,
-        min_balance_threshold: msg.min_balance_threshold,
         execution_fees_destination_address: msg.execution_fees_destination_address,
         distribution_fees_destination_address: msg.distribution_fees_destination_address,
         crank_authorized_address: msg.crank_authorized_address,
@@ -124,6 +110,19 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             let result = get_subscribed_creators(deps)?;
             cosmwasm_std::to_json_binary(&result)
         }
+        QueryMsg::GetConfig {} => {
+            let config = CONFIG.load(deps.storage)?;
+            let accepted_denoms = ACCEPTED_DENOMS.load(deps.storage)?;
+            let result = InstantiateMsg {
+                accepted_denoms: accepted_denoms,
+                execution_fees_destination_address: config.execution_fees_destination_address,
+                distribution_fees_destination_address: config.distribution_fees_destination_address,
+                crank_authorized_address: config.crank_authorized_address,
+                workflow_manager_address: config.workflow_manager_address,
+                creator_distribution_fee: config.creator_distribution_fee,
+            };
+            cosmwasm_std::to_json_binary(&result)
+        }
     }
 }
 
@@ -140,7 +139,7 @@ pub fn sudo(deps: DepsMut, _env: Env, msg: SudoMsg) -> Result<Response, Contract
         SudoMsg::SetWorkflowManagerAddress { address } => {
             validate_address(&deps, &address.as_str(), "workflow_manager_address")?;
             let mut config = CONFIG.load(deps.storage)?;
-            config.workflow_manager_address = address;
+            config.workflow_manager_address = Some(address);
             CONFIG.save(deps.storage, &config)?;
             Ok(Response::new().add_attribute("method", "sudo_set_workflow_manager_address"))
         }
