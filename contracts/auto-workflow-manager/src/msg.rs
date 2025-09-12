@@ -130,11 +130,9 @@ pub enum ExecuteMsg {
         instance_ids: Vec<InstanceId>,
     },
     SetUserPaymentConfig {
-        user_address: String,
         payment_config: PaymentConfig,
     },
     RemoveUserPaymentConfig {
-        user_address: String,
     },
     ChargeFees {
         batch_id: String,
@@ -218,12 +216,6 @@ pub struct FeeTotal {
 pub struct UserFee {
     pub address: String,
     pub totals: Vec<FeeTotal>,
-}
-
-#[cw_serde]
-pub struct ChargeFeesMsg {
-    pub batch_id: String,
-    pub fees: Vec<UserFee>,
 }
 
 #[cw_serde]

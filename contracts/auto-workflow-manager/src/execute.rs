@@ -26,7 +26,9 @@ pub struct FeeEventData {
     pub user_address: String,
     pub denom: String,
     pub amount_charged: Uint128,
+    pub amount_charged_allowance_denom: Uint128,
     pub fee_type: FeeType,
+    pub creator_address: Option<String>,
 }
 
 // Temporary storage for fee event data
@@ -661,21 +663,17 @@ pub fn set_user_payment_config(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    user_address: String,
     payment_config: PaymentConfig,
 ) -> Result<Response, ContractError> {
-    // Validate sender is admin
-    validate_sender_is_admin(deps.storage, &info)?;
-
     // Validate user address
-    let user_addr = deps.api.addr_validate(&user_address)?;
+    let user_addr = deps.api.addr_validate(&info.sender.to_string())?;
 
     // Save the payment config
     save_user_payment_config(deps.storage, &user_addr, &payment_config)?;
 
     Ok(Response::new()
         .add_attribute("method", "set_user_payment_config")
-        .add_attribute("user_address", user_address)
+        .add_attribute("user_address", info.sender.to_string())
         .add_attribute("allowance", payment_config.allowance.to_string())
         .add_attribute("source", format!("{:?}", payment_config.source)))
 }
@@ -684,20 +682,16 @@ pub fn remove_user_payment_config_execute(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    user_address: String,
 ) -> Result<Response, ContractError> {
-    // Validate sender is admin
-    validate_sender_is_admin(deps.storage, &info)?;
-
     // Validate user address
-    let user_addr = deps.api.addr_validate(&user_address)?;
+    let user_addr = deps.api.addr_validate(&info.sender.to_string())?;
 
     // Remove the payment config
     remove_user_payment_config(deps.storage, &user_addr)?;
 
     Ok(Response::new()
         .add_attribute("method", "remove_user_payment_config")
-        .add_attribute("user_address", user_address))
+        .add_attribute("user_address", info.sender.to_string()))
 }
 
 pub fn charge_fees(
@@ -786,8 +780,8 @@ pub fn charge_fees(
                 current_allowance -= amount_charged_allowance_denom;
 
                 let (fee_amount, fee_denom) = match payment_config.source {
-                    PaymentSource::Wallet => (amount_charged, fee_total.denom.clone()),
-                    PaymentSource::Prepaid => (amount_charged_allowance_denom, config.allowance_denom.clone()),
+                    PaymentSource::Wallet => (amount_charged.clone(), fee_total.denom.clone()),
+                    PaymentSource::Prepaid => (amount_charged_allowance_denom.clone(), config.allowance_denom.clone()),
                 };
 
                 let fee = FeeManagerFee {
@@ -802,7 +796,7 @@ pub fn charge_fees(
                     denom: fee_denom.clone(),
                     amount: fee_amount.clone(),
                 };
-                accumulated_fees.push(fee);
+                accumulated_fees.push(fee.clone());
 
                 // Accumulate funds for Wallet payment source
                 if matches!(payment_config.source, PaymentSource::Wallet) {
@@ -815,9 +809,14 @@ pub fn charge_fees(
                 // Create FeeEventData for this specific fee
                 let fee_event_data = FeeEventData {
                     user_address: user_fee.address.clone(),
-                    denom: fee_denom.clone(),
-                    amount_charged: fee_amount.clone(),
+                    denom: fee_total.denom.clone(),
+                    amount_charged: amount_charged.clone(),
+                    amount_charged_allowance_denom: amount_charged_allowance_denom.clone(),
                     fee_type: fee_total.fee_type.clone(),
+                    creator_address: match fee.fee_type.clone() {
+                        FeeManagerFeeType::Creator { creator_address } => Some(creator_address.to_string()),
+                        _ => None,
+                    },
                 };
                 accumulated_fee_events.push(fee_event_data);
             }
@@ -975,8 +974,9 @@ pub fn handle_fee_manager_reply(
                 .add_attribute("user_address", fee_event_data.user_address)
                 .add_attribute("denom", fee_event_data.denom)
                 .add_attribute("amount_charged", fee_event_data.amount_charged.to_string())
+                .add_attribute("amount_charged_allowance_denom", fee_event_data.amount_charged_allowance_denom.to_string())
                 .add_attribute("fee_type", fee_event_data.fee_type.to_string())
-        );
+                .add_attribute("creator_address", fee_event_data.creator_address.unwrap_or_default()));
     }
     
     // Clean up the temporary data

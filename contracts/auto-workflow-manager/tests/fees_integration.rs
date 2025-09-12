@@ -96,7 +96,6 @@ fn test_charge_fees_ok() {
 
   // Set user payment config
   let set_user_payment_config_msg = WorkflowManagerExecuteMsg::SetUserPaymentConfig {
-    user_address: creator_address.to_string(),
     payment_config: WorkflowManagerPaymentConfig {
       allowance: Uint128::from(100_000_000u128),
       source: WorkflowManagerPaymentSource::Prepaid,

@@ -91,11 +91,10 @@ pub fn execute(
             params,
         ),
         ExecuteMsg::SetUserPaymentConfig {
-            user_address,
             payment_config,
-        } => set_user_payment_config(deps, env, info, user_address, payment_config),
-        ExecuteMsg::RemoveUserPaymentConfig { user_address } => {
-            remove_user_payment_config_execute(deps, env, info, user_address)
+        } => set_user_payment_config(deps, env, info, payment_config),
+        ExecuteMsg::RemoveUserPaymentConfig { } => {
+            remove_user_payment_config_execute(deps, env, info)
         }
         ExecuteMsg::ChargeFees { batch_id, fees } => charge_fees(deps, env, info, batch_id, fees),
         ExecuteMsg::PurgeInstances { instance_ids } => purge_instances(deps, env, info, instance_ids),

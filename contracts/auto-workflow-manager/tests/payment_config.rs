@@ -1,4 +1,4 @@
-use auto_workflow_manager::{msg::NewInstanceMsg, ContractError};
+use auto_workflow_manager::{msg::NewInstanceMsg};
 use cosmwasm_std::{Addr, Uint128};
 
 mod utils;
@@ -20,15 +20,13 @@ fn set_user_payment_config(
         cosmwasm_std::Empty,
     >,
     env: cosmwasm_std::Env,
-    admin: Addr,
-    user_address: String,
+    user_address: Addr,
     payment_config: PaymentConfig,
 ) -> Result<cosmwasm_std::Response, auto_workflow_manager::error::ContractError> {
     let execute_msg = ExecuteMsg::SetUserPaymentConfig {
-        user_address,
         payment_config,
     };
-    let execute_info = cosmwasm_std::testing::message_info(&admin, &[]);
+    let execute_info = cosmwasm_std::testing::message_info(&user_address, &[]);
     execute(deps.as_mut(), env, execute_info, execute_msg)
 }
 
@@ -40,11 +38,10 @@ fn remove_user_payment_config(
         cosmwasm_std::Empty,
     >,
     env: cosmwasm_std::Env,
-    admin: Addr,
-    user_address: String,
+    user_address: Addr,
 ) -> Result<cosmwasm_std::Response, auto_workflow_manager::error::ContractError> {
-    let execute_msg = ExecuteMsg::RemoveUserPaymentConfig { user_address };
-    let execute_info = cosmwasm_std::testing::message_info(&admin, &[]);
+    let execute_msg = ExecuteMsg::RemoveUserPaymentConfig { };
+    let execute_info = cosmwasm_std::testing::message_info(&user_address, &[]);
     execute(deps.as_mut(), env, execute_info, execute_msg)
 }
 
@@ -83,7 +80,7 @@ fn create_test_payment_config_prepaid() -> PaymentConfig {
 
 #[test]
 fn test_set_user_payment_config_ok() {
-    let (mut deps, env, api, admin_address, _publisher_address, _executor_address) =
+    let (mut deps, env, api, _admin_address, _publisher_address, _executor_address) =
         create_test_environment();
     let user_address = api.addr_make("user");
 
@@ -92,8 +89,7 @@ fn test_set_user_payment_config_ok() {
     let response = set_user_payment_config(
         &mut deps,
         env,
-        admin_address.clone(),
-        user_address.to_string(),
+        user_address.clone(),
         payment_config.clone(),
     )
     .unwrap();
@@ -118,54 +114,8 @@ fn test_set_user_payment_config_ok() {
 }
 
 #[test]
-fn test_set_user_payment_config_unauthorized() {
-    let (mut deps, env, api, _admin_address, publisher_address, _executor_address) =
-        create_test_environment();
-    let user_address = api.addr_make("user");
-
-    // Try to set payment config with non-admin user
-    let payment_config = create_test_payment_config();
-    let result = set_user_payment_config(
-        &mut deps,
-        env,
-        publisher_address, // Using publisher instead of admin
-        user_address.to_string(),
-        payment_config,
-    );
-
-    // Verify that the operation fails
-    assert!(result.is_err());
-
-    match result {
-        Err(ContractError::Unauthorized {}) => {
-            // Expected error
-        }
-        _ => panic!("Expected Unauthorized error, got different error"),
-    }
-}
-
-#[test]
-fn test_set_user_payment_config_invalid_address() {
-    let (mut deps, env, _api, admin_address, _publisher_address, _executor_address) =
-        create_test_environment();
-
-    // Try to set payment config with invalid address
-    let payment_config = create_test_payment_config();
-    let result = set_user_payment_config(
-        &mut deps,
-        env,
-        admin_address,
-        "invalid-address".to_string(),
-        payment_config,
-    );
-
-    // Verify that the operation fails
-    assert!(result.is_err());
-}
-
-#[test]
 fn test_query_user_payment_config_ok() {
-    let (mut deps, env, api, admin_address, _publisher_address, _executor_address) =
+    let (mut deps, env, api, _admin_address, _publisher_address, _executor_address) =
         create_test_environment();
     let user_address = api.addr_make("user");
 
@@ -174,8 +124,7 @@ fn test_query_user_payment_config_ok() {
     set_user_payment_config(
         &mut deps,
         env,
-        admin_address,
-        user_address.to_string(),
+        user_address.clone(),
         payment_config.clone(),
     )
     .unwrap();
@@ -205,7 +154,7 @@ fn test_query_user_payment_config_not_found() {
 
 #[test]
 fn test_remove_user_payment_config_ok() {
-    let (mut deps, env, api, admin_address, _publisher_address, _executor_address) =
+    let (mut deps, env, api, _admin_address, _publisher_address, _executor_address) =
         create_test_environment();
     let user_address = api.addr_make("user");
 
@@ -214,8 +163,7 @@ fn test_remove_user_payment_config_ok() {
     set_user_payment_config(
         &mut deps,
         env.clone(),
-        admin_address.clone(),
-        user_address.to_string(),
+        user_address.clone(),
         payment_config,
     )
     .unwrap();
@@ -226,7 +174,7 @@ fn test_remove_user_payment_config_ok() {
 
     // Remove the payment config
     let response =
-        remove_user_payment_config(&mut deps, env, admin_address, user_address.to_string())
+        remove_user_payment_config(&mut deps, env, user_address.clone())
             .unwrap();
 
     // Verify response attributes
@@ -242,33 +190,8 @@ fn test_remove_user_payment_config_ok() {
 }
 
 #[test]
-fn test_remove_user_payment_config_unauthorized() {
-    let (mut deps, env, api, _admin_address, publisher_address, _executor_address) =
-        create_test_environment();
-    let user_address = api.addr_make("user");
-
-    // Try to remove payment config with non-admin user
-    let result = remove_user_payment_config(
-        &mut deps,
-        env,
-        publisher_address, // Using publisher instead of admin
-        user_address.to_string(),
-    );
-
-    // Verify that the operation fails
-    assert!(result.is_err());
-
-    match result {
-        Err(ContractError::Unauthorized {}) => {
-            // Expected error
-        }
-        _ => panic!("Expected Unauthorized error, got different error"),
-    }
-}
-
-#[test]
 fn test_payment_config_prepaid_source() {
-    let (mut deps, env, api, admin_address, _publisher_address, _executor_address) =
+    let (mut deps, env, api, _admin_address, _publisher_address, _executor_address) =
         create_test_environment();
     let user_address = api.addr_make("user");
 
@@ -277,8 +200,7 @@ fn test_payment_config_prepaid_source() {
     let response = set_user_payment_config(
         &mut deps,
         env.clone(),
-        admin_address.clone(),
-        user_address.to_string(),
+        user_address.clone(),
         payment_config.clone(),
     )
     .unwrap();
@@ -307,7 +229,7 @@ fn test_payment_config_prepaid_source() {
 
 #[test]
 fn test_update_user_payment_config() {
-    let (mut deps, env, api, admin_address, _publisher_address, _executor_address) =
+    let (mut deps, env, api, _admin_address, _publisher_address, _executor_address) =
         create_test_environment();
     let user_address = api.addr_make("user");
 
@@ -316,8 +238,7 @@ fn test_update_user_payment_config() {
     set_user_payment_config(
         &mut deps,
         env.clone(),
-        admin_address.clone(),
-        user_address.to_string(),
+        user_address.clone(),
         initial_config,
     )
     .unwrap();
@@ -330,8 +251,7 @@ fn test_update_user_payment_config() {
     set_user_payment_config(
         &mut deps,
         env,
-        admin_address,
-        user_address.to_string(),
+        user_address.clone(),
         updated_config.clone(),
     )
     .unwrap();
@@ -378,16 +298,14 @@ fn test_charge_fees_events() {
     set_user_payment_config(
         &mut deps,
         env.clone(),
-        admin_address.clone(),
-        user1.to_string(),
+        user1.clone(),
         payment_config.clone(),
     )
     .unwrap();
     set_user_payment_config(
         &mut deps,
         env.clone(),
-        admin_address.clone(),
-        user2.to_string(),
+        user2.clone(),
         payment_config.clone(),
     )
     .unwrap();
@@ -490,6 +408,8 @@ fn test_handle_fee_manager_reply() {
         user_address: "thor1test".to_string(),
         denom: "RUNE".to_string(),
         amount_charged: Uint128::new(1000),
+        amount_charged_allowance_denom: Uint128::new(1000),
+        creator_address: Some("thor1test".to_string()),
         fee_type: FeeType::Execution,
     };
     
@@ -525,7 +445,7 @@ fn test_handle_fee_manager_reply() {
     assert_eq!(response.events.len(), 1);
     let fee_event = &response.events[0];
     assert_eq!(fee_event.ty, "fee-charged");
-    assert_eq!(fee_event.attributes.len(), 4);
+    assert_eq!(fee_event.attributes.len(), 6);
     
     // Check specific attributes
     assert!(fee_event.attributes.iter().any(|attr| 
@@ -534,8 +454,12 @@ fn test_handle_fee_manager_reply() {
         attr.key == "denom" && attr.value == "RUNE"));
     assert!(fee_event.attributes.iter().any(|attr| 
         attr.key == "amount_charged" && attr.value == "1000"));
-    assert!(fee_event.attributes.iter().any(|attr| 
+        assert!(fee_event.attributes.iter().any(|attr| 
+            attr.key == "amount_charged_allowance_denom" && attr.value == "1000"));
+        assert!(fee_event.attributes.iter().any(|attr| 
         attr.key == "fee_type" && attr.value == "execution"));
+    assert!(fee_event.attributes.iter().any(|attr| 
+        attr.key == "creator_address" && attr.value == "thor1test"));
 }
 
 fn charge_fees(
