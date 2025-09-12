@@ -139,7 +139,6 @@ fn test_charge_fees_ok() {
       totals: vec![
         WorkflowManagerFeeTotal {
           denom: "uusdc".to_string(),
-          denom_decimals: 6,
           amount: Uint128::from(500_000u128),
           fee_type: WorkflowManagerFeeType::Execution,
         },

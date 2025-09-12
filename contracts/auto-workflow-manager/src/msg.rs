@@ -207,7 +207,6 @@ impl fmt::Display for FeeType {
 #[cw_serde]
 pub struct FeeTotal {
     pub denom: String,
-    pub denom_decimals: u8,
     pub amount: Uint128,
     pub fee_type: FeeType,
 }

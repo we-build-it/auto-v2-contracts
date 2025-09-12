@@ -327,13 +327,11 @@ fn test_charge_fees_events() {
                     denom: "RUNE".to_string(),
                     amount: Uint128::new(100000000),
                     fee_type: FeeType::Execution,
-                    denom_decimals: 8,
                 },
                 FeeTotal {
                     denom: "AUTO".to_string(),
                     amount: Uint128::new(10000000000),
                     fee_type: FeeType::Creator { instance_id: 1 },
-                    denom_decimals: 10,
                 },
             ],
         },
@@ -343,7 +341,6 @@ fn test_charge_fees_events() {
                 denom: "TCY".to_string(),
                 amount: Uint128::new(1000000000000),
                 fee_type: FeeType::Execution,
-                denom_decimals: 12,
             }],
         },
     ];

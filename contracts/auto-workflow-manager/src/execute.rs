@@ -737,15 +737,12 @@ pub fn charge_fees(
             // TODO: skip fee if quote not found
             
             let quote_allowance_denom = get_quote(&mut quotes, &config.allowance_denom.clone());
-            let allowance_denom_decimals = 8;
 
             // We need to handle two cases, when fee_total.denom is config.allowance_denom and when it's not
             let fee_total_amount_allowance_denom = if fee_total.denom == config.allowance_denom.clone() {
                 fee_total.amount
             } else {
-                let amount_usd = Decimal::from_ratio (fee_total.amount, Uint128::new(10_u128.pow(fee_total.denom_decimals as u32))) * quote;
-                let amount_allowance_denom = Uint128::from( (amount_usd / quote_allowance_denom).atomics() / Uint128::new(10_u128.pow(allowance_denom_decimals as u32)));
-                amount_allowance_denom
+                (Decimal::from_atomics(fee_total.amount, 0).unwrap() * quote / quote_allowance_denom).atomics()
             };
 
             let (amount_charged, amount_charged_allowance_denom) = 
@@ -756,13 +753,9 @@ pub fn charge_fees(
                 // Case 2: 0 < allowance < fee_total.amount_allowance_denom => charge what allowance represents
                 else if current_allowance > Uint128::zero() {
                     // Simplified calculation: convert allowance to denom amount
-                    // amount_to_charge = current_allowance * quote_allowance_denom * 10^denom_decimals / (10^allowance_denom_decimals * quote_denom)
+                    // amount_to_charge = current_allowance * quote_allowance_denom / quote_denom
                     let amount_to_charge = current_allowance
                         .checked_mul(Uint128::from(quote_allowance_denom.atomics()))
-                        .unwrap()
-                        .checked_mul(Uint128::new(10_u128.pow(fee_total.denom_decimals as u32)))
-                        .unwrap()
-                        .checked_div(Uint128::new(10_u128.pow(allowance_denom_decimals as u32)))
                         .unwrap()
                         .checked_div(Uint128::from(quote.atomics()))
                         .unwrap();
