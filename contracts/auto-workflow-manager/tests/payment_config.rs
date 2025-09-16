@@ -1,5 +1,7 @@
+use std::{collections::HashMap, str::FromStr};
+
 use auto_workflow_manager::{msg::NewInstanceMsg};
-use cosmwasm_std::{Addr, Uint128};
+use cosmwasm_std::{Addr, Decimal, Uint128};
 
 mod utils;
 use utils::{create_simple_test_workflow, create_test_environment, publish_workflow};
@@ -27,6 +29,24 @@ fn set_user_payment_config(
         payment_config,
     };
     let execute_info = cosmwasm_std::testing::message_info(&user_address, &[]);
+    execute(deps.as_mut(), env, execute_info, execute_msg)
+}
+
+fn set_denom_prices(
+    deps: &mut cosmwasm_std::OwnedDeps<
+        cosmwasm_std::testing::MockStorage,
+        cosmwasm_std::testing::MockApi,
+        cosmwasm_std::testing::MockQuerier,
+        cosmwasm_std::Empty,
+    >,
+    env: cosmwasm_std::Env,
+    admin: Addr,
+    denom_prices: HashMap<String, Decimal>,
+) -> Result<cosmwasm_std::Response, auto_workflow_manager::error::ContractError> {
+    let execute_msg = ExecuteMsg::SetDenomPrices {
+        denom_prices,
+    };
+    let execute_info = cosmwasm_std::testing::message_info(&admin, &[]);
     execute(deps.as_mut(), env, execute_info, execute_msg)
 }
 
@@ -309,6 +329,15 @@ fn test_charge_fees_events() {
         payment_config.clone(),
     )
     .unwrap();
+
+    // Set denom prices
+    let denom_prices = HashMap::from([
+        ("RUNE".to_string(), Decimal::from_str("0.5").unwrap()),
+        ("AUTO".to_string(), Decimal::from_str("0.5").unwrap()),
+        ("TCY".to_string(), Decimal::from_str("0.5").unwrap()),
+        ("uusdc".to_string(), Decimal::from_str("0.5").unwrap()),
+    ]);
+    set_denom_prices(&mut deps, env.clone(), admin_address.clone(), denom_prices).unwrap();
 
     // Execute instance
     let instance1: NewInstanceMsg =

@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Timestamp, Uint128};
+use cosmwasm_std::{Addr, Decimal, Timestamp, Uint128};
 
 use crate::state::{PaymentConfig};
 
@@ -140,6 +140,10 @@ pub enum ExecuteMsg {
     },
     // TODO: temporal AuthZ test, remove this
     TestAuthz { },
+    // TODO: temporal, remove this
+    SetDenomPrices {
+        denom_prices: HashMap<String, Decimal>,
+    },
 }
 
 #[cw_serde]

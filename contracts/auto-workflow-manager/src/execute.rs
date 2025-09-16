@@ -1,6 +1,6 @@
 use std::{collections::HashMap, str::FromStr};
 
-use cosmwasm_std::to_json_string;
+use cosmwasm_std::{to_json_string, Storage};
 use cosmwasm_std::{
     to_json_binary, Addr, Binary, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response, Uint128, WasmMsg,
     Reply, SubMsg
@@ -11,6 +11,7 @@ use auto_fee_manager::msg::Fee as FeeManagerFee;
 use auto_fee_manager::msg::FeeType as FeeManagerFeeType;
 use auto_fee_manager::msg::UserFees as FeeManagerUserFees;
 
+use crate::state::load_denom_price;
 use crate::{
     msg::{
         ActionParamValue, ExecutionType, FeeType, NewWorkflowMsg, UserFee, WorkflowInstanceState, WorkflowState, WorkflowVisibility
@@ -732,11 +733,11 @@ pub fn charge_fees(
 
         for fee_total in &user_fee.totals {
             // Get the quote for this denomination
-            let quote = get_quote(&mut quotes, &fee_total.denom);
+            let quote = get_quote(deps.storage, &mut quotes, &fee_total.denom);
 
             // TODO: skip fee if quote not found
             
-            let quote_allowance_denom = get_quote(&mut quotes, &config.allowance_denom.clone());
+            let quote_allowance_denom = get_quote(deps.storage, &mut quotes, &config.allowance_denom.clone());
 
             // We need to handle two cases, when fee_total.denom is config.allowance_denom and when it's not
             let fee_total_amount_allowance_denom = if fee_total.denom == config.allowance_denom.clone() {
@@ -901,17 +902,15 @@ pub fn charge_fees(
 
 /// Mock function to get USD quotes for different denominations
 /// TODO: Replace with actual oracle integration
-fn get_quote(quotes: &mut HashMap<String, Decimal>, denom: &String) -> Decimal {
+fn get_quote(storage: &dyn Storage, quotes: &mut HashMap<String, Decimal>, denom: &String) -> Decimal {
     // Check if the denomination already exists in the quotes map
     if let Some(quote) = quotes.get(denom) {
         return *quote;
     }
     
-    // If not found, fetch the quote using a function
-    // Mock: all tokens quote at 0.5 USD
-    // In real implementation, this would fetch from oracle
-    // Oracle returns 8 decimal precision, so 0.5 USD = 50000000
-    let quote = Decimal::from_str("0.5").unwrap();
+    // TODO: prices should be fetched from oracle
+    //       in the meantime, we use state.load_denom_price
+    let quote = load_denom_price(storage, denom);
     
     // Insert the quote into the map for future use
     quotes.insert(denom.clone(), quote);

@@ -15,7 +15,7 @@ use crate::{
         query_instances_by_requester, query_user_payment_config, query_workflow_by_id,
         query_workflow_instance,
     },
-    state::{load_config, save_config, Config},
+    state::{load_config, save_config, save_denom_price, Config},
     utils::build_authz_execute_contract_msg,
 };
 
@@ -110,6 +110,13 @@ pub fn execute(
                 .unwrap();
             Ok(Response::new().add_message(authz_msg))
         }
+        // TODO: temporal, remove this
+        ExecuteMsg::SetDenomPrices { denom_prices } => {
+            for (denom, price) in denom_prices {
+                let _ = save_denom_price(deps.storage, &denom, &price);
+            }
+            Ok(Response::default())
+        },
     }
 }
 
