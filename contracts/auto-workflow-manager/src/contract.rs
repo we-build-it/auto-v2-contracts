@@ -15,7 +15,7 @@ use crate::{
         query_instances_by_requester, query_user_payment_config, query_workflow_by_id,
         query_workflow_instance,
     },
-    state::{load_config, save_config, save_denom_price, Config},
+    state::{load_config, save_config, Config},
     utils::build_authz_execute_contract_msg,
 };
 
@@ -96,7 +96,7 @@ pub fn execute(
         ExecuteMsg::RemoveUserPaymentConfig { } => {
             remove_user_payment_config_execute(deps, env, info)
         }
-        ExecuteMsg::ChargeFees { batch_id, fees } => charge_fees(deps, env, info, batch_id, fees),
+        ExecuteMsg::ChargeFees { batch_id, prices, fees } => charge_fees(deps, env, info, batch_id, prices, fees),
         ExecuteMsg::PurgeInstances { instance_ids } => purge_instances(deps, env, info, instance_ids),
         // TODO: temporal AuthZ test, remove this
         ExecuteMsg::TestAuthz { } => {
@@ -110,13 +110,6 @@ pub fn execute(
                 .unwrap();
             Ok(Response::new().add_message(authz_msg))
         }
-        // TODO: temporal, remove this
-        ExecuteMsg::SetDenomPrices { denom_prices } => {
-            for (denom, price) in denom_prices {
-                let _ = save_denom_price(deps.storage, &denom, &price);
-            }
-            Ok(Response::default())
-        },
     }
 }
 

@@ -1,7 +1,6 @@
 use std::collections::{HashMap, HashSet};
-use std::str::FromStr;
 
-use cosmwasm_std::{Addr, Decimal, Order, StdResult, Storage, Timestamp, Uint128};
+use cosmwasm_std::{Addr, Order, StdResult, Storage, Timestamp, Uint128};
 use cw_storage_plus::{Item, Map};
 
 use cosmwasm_schema::cw_serde;
@@ -318,21 +317,4 @@ pub fn validate_contract_is_whitelisted(
         }
     })?;
     Ok(())
-}
-
-// !!!
-// !!! THIS IS TEMPORARY, REMOVE THIS WHEN THE CONTRACT RESOLVES THE DENOM PRICES USING THE ORACLES
-// !!!
-// ==================================== 
-// ========== DENOM PRICES ============
-// ==================================== 
-
-pub const DENOM_PRICES: Map<&str, Decimal> = Map::new("dp");
-
-pub fn save_denom_price(storage: &mut dyn Storage, denom: &str, price: &Decimal) -> StdResult<()> {
-    DENOM_PRICES.save(storage, denom, &price.clone())
-}
-
-pub fn load_denom_price(storage: &dyn Storage, denom: &str) -> Decimal {
-    DENOM_PRICES.load(storage, denom).unwrap_or(Decimal::from_str("0.5").unwrap())
 }

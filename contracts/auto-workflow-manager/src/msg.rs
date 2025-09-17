@@ -136,14 +136,11 @@ pub enum ExecuteMsg {
     },
     ChargeFees {
         batch_id: String,
+        prices: HashMap<String, Decimal>,
         fees: Vec<UserFee>,
     },
     // TODO: temporal AuthZ test, remove this
     TestAuthz { },
-    // TODO: temporal, remove this
-    SetDenomPrices {
-        denom_prices: HashMap<String, Decimal>,
-    },
 }
 
 #[cw_serde]

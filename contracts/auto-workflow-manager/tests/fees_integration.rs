@@ -1,7 +1,7 @@
 use cosmwasm_std::{
-  coins, Coin, Uint128
+  coins, Coin, Decimal, Uint128
 };
-use std::collections::{HashSet};
+use std::{collections::{HashMap, HashSet}, str::FromStr};
 
 
 use auto_workflow_manager::{
@@ -133,6 +133,9 @@ fn test_charge_fees_ok() {
   println!("--------------------------------------------------");
 
   // Call ChargeFees
+  let prices = HashMap::from([
+    ("uusdc".to_string(), Decimal::from_str("1.0").unwrap()),
+  ]);  
   let fees = vec![
     WorkflowManagerUserFee {
       address: creator_address.to_string(),
@@ -147,6 +150,7 @@ fn test_charge_fees_ok() {
   ];
   let charge_fees_msg = WorkflowManagerExecuteMsg::ChargeFees {
     batch_id: "1".to_string(),
+    prices: prices,
     fees: fees,
   };
   app.execute_contract(

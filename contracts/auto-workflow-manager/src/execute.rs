@@ -1,6 +1,6 @@
 use std::{collections::HashMap, str::FromStr};
 
-use cosmwasm_std::{to_json_string, Storage};
+use cosmwasm_std::{to_json_string};
 use cosmwasm_std::{
     to_json_binary, Addr, Binary, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response, Uint128, WasmMsg,
     Reply, SubMsg
@@ -11,7 +11,6 @@ use auto_fee_manager::msg::Fee as FeeManagerFee;
 use auto_fee_manager::msg::FeeType as FeeManagerFeeType;
 use auto_fee_manager::msg::UserFees as FeeManagerUserFees;
 
-use crate::state::load_denom_price;
 use crate::{
     msg::{
         ActionParamValue, ExecutionType, FeeType, NewWorkflowMsg, UserFee, WorkflowInstanceState, WorkflowState, WorkflowVisibility
@@ -700,6 +699,7 @@ pub fn charge_fees(
     _env: Env,
     info: MessageInfo,
     batch_id: String,
+    prices: HashMap<String, Decimal>,
     fees: Vec<UserFee>,
 ) -> Result<Response, ContractError> {
     // Validate sender is admin
@@ -708,9 +708,6 @@ pub fn charge_fees(
     let mut response = Response::new()
         .add_attribute("method", "charge_fees")
         .add_attribute("batch_id", batch_id.clone());
-
-    // Cumulative quotes for all denominations
-    let mut quotes = HashMap::<String, Decimal>::new();
 
     // Load config to get fee manager address
     let config = load_config(deps.storage)?;
@@ -732,18 +729,17 @@ pub fn charge_fees(
         let mut current_allowance = payment_config.allowance;
 
         for fee_total in &user_fee.totals {
-            // Get the quote for this denomination
-            let quote = get_quote(deps.storage, &mut quotes, &fee_total.denom);
+            let denom_price = prices.get(&fee_total.denom).ok_or(ContractError::GenericError(format!("Price not found for denomination: {}", fee_total.denom)))?;
 
             // TODO: skip fee if quote not found
             
-            let quote_allowance_denom = get_quote(deps.storage, &mut quotes, &config.allowance_denom.clone());
+            let allowance_denom_price = prices.get(&config.allowance_denom).ok_or(ContractError::GenericError(format!("Price not found for denomination: {}", fee_total.denom)))?;
 
             // We need to handle two cases, when fee_total.denom is config.allowance_denom and when it's not
             let fee_total_amount_allowance_denom = if fee_total.denom == config.allowance_denom.clone() {
                 fee_total.amount
             } else {
-                (Decimal::from_atomics(fee_total.amount, 0).unwrap() * quote / quote_allowance_denom).atomics()
+                (Decimal::from_atomics(fee_total.amount, 0).unwrap() * denom_price / allowance_denom_price).atomics()
             };
 
             let (amount_charged, amount_charged_allowance_denom) = 
@@ -756,9 +752,9 @@ pub fn charge_fees(
                     // Simplified calculation: convert allowance to denom amount
                     // amount_to_charge = current_allowance * quote_allowance_denom / quote_denom
                     let amount_to_charge = current_allowance
-                        .checked_mul(Uint128::from(quote_allowance_denom.atomics()))
+                        .checked_mul(Uint128::from(allowance_denom_price.atomics()))
                         .unwrap()
-                        .checked_div(Uint128::from(quote.atomics()))
+                        .checked_div(Uint128::from(denom_price.atomics()))
                         .unwrap();
 
                     (amount_to_charge, current_allowance)
@@ -884,39 +880,9 @@ pub fn charge_fees(
         }
     }
 
-    // Emit rate events for each unique denomination
-    for denom_quote in quotes.iter() {
-        let denom = denom_quote.0;
-        let quote = denom_quote.1;
-
-        response = response.add_event(
-            cosmwasm_std::Event::new("fee-rate")
-                .add_attribute("denom", denom.clone())
-                .add_attribute("rate", quote.to_string()),
-        );
-    }
-
     Ok(response)
 }
 
-
-/// Mock function to get USD quotes for different denominations
-/// TODO: Replace with actual oracle integration
-fn get_quote(storage: &dyn Storage, quotes: &mut HashMap<String, Decimal>, denom: &String) -> Decimal {
-    // Check if the denomination already exists in the quotes map
-    if let Some(quote) = quotes.get(denom) {
-        return *quote;
-    }
-    
-    // TODO: prices should be fetched from oracle
-    //       in the meantime, we use state.load_denom_price
-    let quote = load_denom_price(storage, denom);
-    
-    // Insert the quote into the map for future use
-    quotes.insert(denom.clone(), quote);
-    
-    quote
-}
 
 /// Handle reply from fee manager contract
 pub fn handle_fee_manager_reply(

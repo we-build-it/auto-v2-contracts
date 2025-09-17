@@ -32,24 +32,6 @@ fn set_user_payment_config(
     execute(deps.as_mut(), env, execute_info, execute_msg)
 }
 
-fn set_denom_prices(
-    deps: &mut cosmwasm_std::OwnedDeps<
-        cosmwasm_std::testing::MockStorage,
-        cosmwasm_std::testing::MockApi,
-        cosmwasm_std::testing::MockQuerier,
-        cosmwasm_std::Empty,
-    >,
-    env: cosmwasm_std::Env,
-    admin: Addr,
-    denom_prices: HashMap<String, Decimal>,
-) -> Result<cosmwasm_std::Response, auto_workflow_manager::error::ContractError> {
-    let execute_msg = ExecuteMsg::SetDenomPrices {
-        denom_prices,
-    };
-    let execute_info = cosmwasm_std::testing::message_info(&admin, &[]);
-    execute(deps.as_mut(), env, execute_info, execute_msg)
-}
-
 fn remove_user_payment_config(
     deps: &mut cosmwasm_std::OwnedDeps<
         cosmwasm_std::testing::MockStorage,
@@ -330,14 +312,13 @@ fn test_charge_fees_events() {
     )
     .unwrap();
 
-    // Set denom prices
-    let denom_prices = HashMap::from([
+    // Prices to use for the fees
+    let prices = HashMap::from([
         ("RUNE".to_string(), Decimal::from_str("0.5").unwrap()),
         ("AUTO".to_string(), Decimal::from_str("0.5").unwrap()),
         ("TCY".to_string(), Decimal::from_str("0.5").unwrap()),
         ("uusdc".to_string(), Decimal::from_str("0.5").unwrap()),
     ]);
-    set_denom_prices(&mut deps, env.clone(), admin_address.clone(), denom_prices).unwrap();
 
     // Execute instance
     let instance1: NewInstanceMsg =
@@ -377,7 +358,7 @@ fn test_charge_fees_events() {
     let batch_id = "test-batch-123".to_string();
 
     // Execute charge_fees
-    let response = charge_fees(&mut deps, env, admin_address, batch_id.clone(), fees).unwrap();
+    let response = charge_fees(&mut deps, env, admin_address, batch_id.clone(), prices, fees).unwrap();
 
     // Verify main response attributes
     assert_eq!(response.attributes.len(), 2);
@@ -385,33 +366,6 @@ fn test_charge_fees_events() {
     assert_eq!(response.attributes[0].value, "charge_fees");
     assert_eq!(response.attributes[1].key, "batch_id");
     assert_eq!(response.attributes[1].value, batch_id);
-
-    // Verify events from execute
-    assert_eq!(response.events.len(), 4); // Only rate events are emitted in execute
-
-    // Check rate events
-    let rate_events: Vec<_> = response
-        .events
-        .iter()
-        .filter(|event| event.ty == "fee-rate")
-        .collect();
-    assert_eq!(rate_events.len(), 4); // RUNE, AUTO, TCY, and USDC
-
-    // Verify rate events exist
-    let rune_rate_event = rate_events
-        .iter()
-        .find(|event| {
-            event
-                .attributes
-                .iter()
-                .any(|attr| attr.key == "denom" && attr.value == "RUNE")
-        })
-        .unwrap();
-
-    assert!(rune_rate_event
-        .attributes
-        .iter()
-        .any(|attr| attr.key == "rate" && attr.value == "0.5"));
 
     // Verify that submessages were created correctly
     assert_eq!(response.messages.len(), 2); // 2 submessages for 2 users (one per user)
@@ -498,9 +452,10 @@ fn charge_fees(
     env: cosmwasm_std::Env,
     admin: Addr,
     batch_id: String,
+    prices: HashMap<String, Decimal>,
     fees: Vec<UserFee>,
 ) -> Result<cosmwasm_std::Response, auto_workflow_manager::error::ContractError> {
-    let execute_msg = ExecuteMsg::ChargeFees { batch_id, fees };
+    let execute_msg = ExecuteMsg::ChargeFees { batch_id, prices, fees };
     let execute_info = cosmwasm_std::testing::message_info(&admin, &[]);
     execute(deps.as_mut(), env, execute_info, execute_msg)
 }
