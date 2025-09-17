@@ -180,8 +180,8 @@ pub fn cancel_run(
         ));
     } else {
         let mut updated_instance = instance;
-        // if instance is recurrent, reset last_executed_action to None
-        updated_instance.last_executed_action = None;        
+        // instance state remains Running, but last_executed_action is reset to None
+        updated_instance.last_executed_action = None;
         save_workflow_instance(deps.storage, &info.sender, &instance_id, &updated_instance)?;
     }
 
@@ -205,6 +205,12 @@ pub fn cancel_instance(
             }
         })?;
 
+    if matches!(instance.state, WorkflowInstanceState::Cancelled) || matches!(instance.state, WorkflowInstanceState::Finished) {
+        return Err(ContractError::GenericError(
+            "Can't cancel instance that is already cancelled or finished".to_string(),
+        ));
+    }
+
     let mut updated_instance = instance;
     updated_instance.state = WorkflowInstanceState::Cancelled;
     updated_instance.last_executed_action = None;
@@ -216,38 +222,6 @@ pub fn cancel_instance(
         .add_attribute("canceller", info.sender.to_string()))
 }
 
-// pub fn cancel_schedule(
-//     deps: DepsMut,
-//     _env: Env,
-//     info: MessageInfo,
-//     instance_id: u64,
-// ) -> Result<Response, ContractError> {
-//     // Load the instance
-//     let instance =
-//         load_workflow_instance(deps.storage, &info.sender, &instance_id).map_err(|_| {
-//             ContractError::InstanceNotFound {
-//                 instance_id: instance_id.to_string(),
-//             }
-//         })?;
-
-//     // Check if instance is NOT Recurrent (only Recurrent instances can have their schedule changed)
-//     if !matches!(instance.execution_type, ExecutionType::Recurrent) {
-//         return Err(ContractError::GenericError(
-//             "Can't change schedule for non-recurrent instances".to_string(),
-//         ));
-//     }
-
-//     // Cancel the instance
-//     // remove_workflow_instance(deps.storage, &info.sender, &instance_id)?;
-//     let mut updated_instance = instance;
-//     updated_instance.state = WorkflowInstanceState::Cancelled;
-//     save_workflow_instance(deps.storage, &info.sender, &instance_id, &updated_instance)?;
-
-//     Ok(Response::new()
-//         .add_attribute("method", "cancel_schedule")
-//         .add_attribute("instance_id", instance_id.to_string())
-//         .add_attribute("canceller", info.sender.to_string()))
-// }
 
 pub fn pause_schedule(
     deps: DepsMut,
@@ -457,11 +431,11 @@ pub fn execute_action(
     updated_instance.last_executed_action = Some(action_id.clone());
     
     // Update instance state based on whether this is an end action
-    if workflow.end_actions.contains(&action_id) {
-        updated_instance.state = WorkflowInstanceState::Finished;
-    } else {
-        updated_instance.state = WorkflowInstanceState::Running;
-    }
+    // if workflow.end_actions.contains(&action_id) {
+    //     updated_instance.state = WorkflowInstanceState::Finished;
+    // } else {
+    //     updated_instance.state = WorkflowInstanceState::Running;
+    // }
     
     save_workflow_instance(deps.storage, &user_addr, &instance_id, &updated_instance)?;
 
