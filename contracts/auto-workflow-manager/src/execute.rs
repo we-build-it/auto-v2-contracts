@@ -707,7 +707,7 @@ pub fn charge_fees(
 
             // TODO: skip fee if quote not found
             
-            let allowance_denom_price = prices.get(&config.allowance_denom).ok_or(ContractError::GenericError(format!("Price not found for denomination: {}", fee_total.denom)))?;
+            let allowance_denom_price = prices.get(&config.allowance_denom).ok_or(ContractError::GenericError(format!("Price not found for denomination: {}", config.allowance_denom)))?;
 
             // We need to handle two cases, when fee_total.denom is config.allowance_denom and when it's not
             let fee_total_amount_allowance_denom = if fee_total.denom == config.allowance_denom.clone() {
