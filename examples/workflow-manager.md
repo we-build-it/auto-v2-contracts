@@ -229,6 +229,64 @@ thornode tx wasm execute sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huu
 thornode query tx --type hash 7D960565B935527B4E2FE636D049EDB4CA77CF575EE3FF2CD4FBD7C1E0DB3BF7 --node https://stagenet-rpc.ninerealms.com:443
 ```
 
+## pause/resume/cancel/cancel-run
+
+```
+thornode tx wasm execute sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huuzmqalnv9z \
+'{
+	"pause_schedule": {
+		"instance_id": 15
+	}
+}' \
+--from test-stagenet-gus \
+--chain-id thorchain-stagenet-2 \
+--node https://stagenet-rpc.ninerealms.com/ \
+--gas auto --gas-adjustment 1.5
+```
+
+```
+thornode tx wasm execute sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huuzmqalnv9z \
+'{
+	"resume_schedule": {
+		"instance_id": 14
+	}
+}' \
+--from test-stagenet-gus \
+--chain-id thorchain-stagenet-2 \
+--node https://stagenet-rpc.ninerealms.com/ \
+--gas auto --gas-adjustment 1.5
+```
+
+```
+thornode tx wasm execute sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huuzmqalnv9z \
+'{
+	"cancel_instance": {
+		"instance_id": 16
+	}
+}' \
+--from test-stagenet-gus \
+--chain-id thorchain-stagenet-2 \
+--node https://stagenet-rpc.ninerealms.com/ \
+--gas auto --gas-adjustment 1.5
+```
+
+```
+thornode tx wasm execute sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huuzmqalnv9z \
+'{
+	"cancel_run": {
+		"instance_id": 15
+	}
+}' \
+--from test-stagenet-gus \
+--chain-id thorchain-stagenet-2 \
+--node https://stagenet-rpc.ninerealms.com/ \
+--gas auto --gas-adjustment 1.5
+```
+
+```
+thornode query tx --type hash 92EB209E2D8A25FD04354054689DA9BCCF1B888181661BE5F0E33C0BC31E1FD1 --node https://stagenet-rpc.ninerealms.com:443
+```
+
 ## execute action
 ```
 thornode tx wasm execute sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huuzmqalnv9z \
@@ -257,63 +315,6 @@ thornode tx wasm execute sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huu
 thornode query tx --type hash 33844EEB0318E1827AC3FD775A6B21FACD546E037D798155838853A177737AD5 --node https://stagenet-rpc.ninerealms.com:443
 ```
 
-## pause/resume/cancel/cancel-run
-
-```
-thornode tx wasm execute sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huuzmqalnv9z \
-'{
-	"pause_schedule": {
-		"instance_id": 14
-	}
-}' \
---from test-stagenet-gus \
---chain-id thorchain-stagenet-2 \
---node https://stagenet-rpc.ninerealms.com/ \
---gas auto --gas-adjustment 1.5
-```
-
-```
-thornode tx wasm execute sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huuzmqalnv9z \
-'{
-	"resume_schedule": {
-		"instance_id": 14
-	}
-}' \
---from test-stagenet-gus \
---chain-id thorchain-stagenet-2 \
---node https://stagenet-rpc.ninerealms.com/ \
---gas auto --gas-adjustment 1.5
-```
-
-```
-thornode tx wasm execute sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huuzmqalnv9z \
-'{
-	"cancel_instance": {
-		"instance_id": 14
-	}
-}' \
---from test-stagenet-gus \
---chain-id thorchain-stagenet-2 \
---node https://stagenet-rpc.ninerealms.com/ \
---gas auto --gas-adjustment 1.5
-```
-
-```
-thornode tx wasm execute sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huuzmqalnv9z \
-'{
-	"cancel_run": {
-		"instance_id": 15
-	}
-}' \
---from test-stagenet-gus \
---chain-id thorchain-stagenet-2 \
---node https://stagenet-rpc.ninerealms.com/ \
---gas auto --gas-adjustment 1.5
-```
-
-```
-thornode query tx --type hash 92EB209E2D8A25FD04354054689DA9BCCF1B888181661BE5F0E33C0BC31E1FD1 --node https://stagenet-rpc.ninerealms.com:443
-```
 ## charge fees
 ```
 thornode tx wasm execute sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huuzmqalnv9z \

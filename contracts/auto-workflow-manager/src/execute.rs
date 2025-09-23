@@ -13,7 +13,7 @@ use auto_fee_manager::msg::UserFees as FeeManagerUserFees;
 
 use crate::{
     msg::{
-        ActionParamValue, ExecutionType, FeeType, NewWorkflowMsg, UserFee, WorkflowInstanceState, WorkflowState, WorkflowVisibility
+        ActionParamValue, ExecutionType, FeeType, FinishInstanceRequest, NewWorkflowMsg, UserFee, WorkflowInstanceState, WorkflowState, WorkflowVisibility
     },
     state::{load_config, load_user_payment_config, PaymentSource},
     ContractError,
@@ -915,4 +915,51 @@ pub fn handle_fee_manager_reply(
     FEE_EVENT_DATA.remove(deps.storage, reply.id);
     
     Ok(response)
+}
+
+pub fn finish_instances(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    instances: Vec<FinishInstanceRequest>,
+) -> Result<Response, ContractError> {
+    // Validate sender is admin
+    validate_sender_is_admin(deps.storage, &info)?;
+
+    let mut finished_instance_ids = Vec::new();
+    let mut not_found_instance_ids = Vec::new();
+    let mut already_finished_instance_ids = Vec::new();
+
+    for request in instances {
+        let requester = deps.api.addr_validate(&request.requester)?;
+        
+        for instance_id in request.instance_ids {
+            // Load instance - O(1) access
+            match load_workflow_instance(deps.storage, &requester, &instance_id) {
+                Ok(instance) => {
+                    // Check if instance is already finished
+                    if matches!(instance.state, WorkflowInstanceState::Finished) {
+                        already_finished_instance_ids.push(format!("{}:{}", request.requester, instance_id));
+                        continue;
+                    }
+
+                    // Update instance state to Finished
+                    let mut updated_instance = instance;
+                    updated_instance.state = WorkflowInstanceState::Finished;
+                    save_workflow_instance(deps.storage, &requester, &instance_id, &updated_instance)?;
+                    
+                    finished_instance_ids.push(format!("{}:{}", request.requester, instance_id));
+                }
+                Err(_) => {
+                    not_found_instance_ids.push(format!("{}:{}", request.requester, instance_id));
+                }
+            }
+        }
+    }
+
+    Ok(Response::new()
+        .add_attribute("method", "finish_instances")
+        .add_attribute("finished_instance_ids", finished_instance_ids.join(","))
+        .add_attribute("not_found_instance_ids", not_found_instance_ids.join(","))
+        .add_attribute("already_finished_instance_ids", already_finished_instance_ids.join(",")))
 }

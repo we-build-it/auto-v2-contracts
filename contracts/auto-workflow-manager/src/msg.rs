@@ -97,6 +97,12 @@ pub struct NewInstanceMsg {
 }
 
 #[cw_serde]
+pub struct FinishInstanceRequest {
+    pub requester: String,
+    pub instance_ids: Vec<InstanceId>,
+}
+
+#[cw_serde]
 pub enum ExecuteMsg {
     PublishWorkflow {
         workflow: NewWorkflowMsg,
@@ -138,6 +144,9 @@ pub enum ExecuteMsg {
         batch_id: String,
         prices: HashMap<String, Decimal>,
         fees: Vec<UserFee>,
+    },
+    FinishInstances {
+        instances: Vec<FinishInstanceRequest>,
     },
     // TODO: temporal AuthZ test, remove this
     TestAuthz { },
