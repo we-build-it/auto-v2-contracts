@@ -214,7 +214,7 @@ thornode tx wasm execute sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huu
 				"protocolName": { "string": "AUTO" },
 				"notificationType": { "string": "telegram" }
 			},
-			"execution_type": "recurrent",
+			"execution_type": "one_shot",
 			"cron_expression": "*/5 * * * *",
 			"expiration_time": "1786448860000000000"
 		}
@@ -227,6 +227,10 @@ thornode tx wasm execute sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huu
 ```
 ```
 thornode query tx --type hash 7D960565B935527B4E2FE636D049EDB4CA77CF575EE3FF2CD4FBD7C1E0DB3BF7 --node https://stagenet-rpc.ninerealms.com:443
+```
+
+```
+thornode query wasm contract-state smart sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huuzmqalnv9z '{ "get_workflow_instance": {"user_address": "sthor1z6m4jukpzelp26f8k7jcua4xxsp2w2lpqzv6nr", "instance_id": 26 } }' --node https://stagenet-rpc.ninerealms.com:443
 ```
 
 ## pause/resume/cancel/cancel-run

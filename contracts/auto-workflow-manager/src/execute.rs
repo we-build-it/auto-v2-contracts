@@ -13,7 +13,7 @@ use auto_fee_manager::msg::UserFees as FeeManagerUserFees;
 
 use crate::{
     msg::{
-        ActionParamValue, ExecutionType, FeeType, FinishInstanceRequest, NewWorkflowMsg, UserFee, WorkflowInstanceState, WorkflowState, WorkflowVisibility
+        ActionParamValue, ExecutionType, FeeType, FinishInstanceRequest, InstanceId, NewWorkflowMsg, UserFee, WorkflowInstanceState, WorkflowState, WorkflowVisibility
     },
     state::{load_config, load_user_payment_config, PaymentSource},
     ContractError,
@@ -939,7 +939,7 @@ pub fn finish_instances(
                 Ok(instance) => {
                     // Check if instance is already finished
                     if matches!(instance.state, WorkflowInstanceState::Finished) {
-                        already_finished_instance_ids.push(format!("{}:{}", request.requester, instance_id));
+                        already_finished_instance_ids.push(instance_id.to_string());
                         continue;
                     }
 
@@ -948,10 +948,10 @@ pub fn finish_instances(
                     updated_instance.state = WorkflowInstanceState::Finished;
                     save_workflow_instance(deps.storage, &requester, &instance_id, &updated_instance)?;
                     
-                    finished_instance_ids.push(format!("{}:{}", request.requester, instance_id));
+                    finished_instance_ids.push(instance_id.to_string());
                 }
                 Err(_) => {
-                    not_found_instance_ids.push(format!("{}:{}", request.requester, instance_id));
+                    not_found_instance_ids.push(instance_id.to_string());
                 }
             }
         }
@@ -962,4 +962,47 @@ pub fn finish_instances(
         .add_attribute("finished_instance_ids", finished_instance_ids.join(","))
         .add_attribute("not_found_instance_ids", not_found_instance_ids.join(","))
         .add_attribute("already_finished_instance_ids", already_finished_instance_ids.join(",")))
+}
+
+pub fn reset_instance(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    user_address: String,
+    instance_id: InstanceId,
+) -> Result<Response, ContractError> {
+    // Validate sender is admin
+    validate_sender_is_admin(deps.storage, &info)?;
+
+    // Validate user address
+    let user_addr = deps.api.addr_validate(&user_address)?;
+
+    // Load the instance
+    let instance = load_workflow_instance(deps.storage, &user_addr, &instance_id).map_err(|_| {
+        ContractError::InstanceNotFound {
+            instance_id: instance_id.to_string(),
+        }
+    })?;
+
+    let mut updated_instance = instance;
+    
+    // Handle different execution types
+    if matches!(updated_instance.execution_type, ExecutionType::OneShot) {
+        // For OneShot instances, change state to Finished
+        updated_instance.state = WorkflowInstanceState::Finished;
+    } else {
+        // For Recurrent instances, reset last_executed_action to None
+        updated_instance.last_executed_action = None;
+    }
+    
+    save_workflow_instance(deps.storage, &user_addr, &instance_id, &updated_instance)?;
+
+    Ok(Response::new()
+        .add_attribute("method", "reset_instance")
+        .add_attribute("user_address", user_address)
+        .add_attribute("instance_id", instance_id.to_string())
+        .add_attribute("execution_type", match updated_instance.execution_type {
+            ExecutionType::OneShot => "oneshot",
+            ExecutionType::Recurrent => "recurrent",
+        }))
 }

@@ -114,11 +114,11 @@ fn test_finish_instances_success() {
     assert_eq!(response.attributes[0].key, "method");
     assert_eq!(response.attributes[0].value, "finish_instances");
     assert_eq!(response.attributes[1].key, "finished_instance_ids");
-    // Check that the finished instances contain the expected addresses and IDs
+    // Check that the finished instances contain the expected IDs
     let finished_ids = response.attributes[1].value.clone();
-    assert!(finished_ids.contains(&format!("{}:1", user1.to_string())));
-    assert!(finished_ids.contains(&format!("{}:2", user1.to_string())));
-    assert!(finished_ids.contains(&format!("{}:3", user2.to_string())));
+    assert!(finished_ids.contains("1"));
+    assert!(finished_ids.contains("2"));
+    assert!(finished_ids.contains("3"));
     assert_eq!(response.attributes[2].key, "not_found_instance_ids");
     assert_eq!(response.attributes[2].value, "");
     assert_eq!(response.attributes[3].key, "already_finished_instance_ids");
@@ -162,10 +162,10 @@ fn test_finish_instances_not_found() {
     assert_eq!(response.attributes[1].key, "finished_instance_ids");
     assert_eq!(response.attributes[1].value, "");
     assert_eq!(response.attributes[2].key, "not_found_instance_ids");
-    // Check that the not found instances contain the expected addresses and IDs
+    // Check that the not found instances contain the expected IDs
     let not_found_ids = response.attributes[2].value.clone();
-    assert!(not_found_ids.contains(&format!("{}:999", user1.to_string())));
-    assert!(not_found_ids.contains(&format!("{}:1000", user1.to_string())));
+    assert!(not_found_ids.contains("999"));
+    assert!(not_found_ids.contains("1000"));
     assert_eq!(response.attributes[3].key, "already_finished_instance_ids");
     assert_eq!(response.attributes[3].value, "");
 }
@@ -212,9 +212,9 @@ fn test_finish_instances_already_finished() {
     assert_eq!(response.attributes[2].key, "not_found_instance_ids");
     assert_eq!(response.attributes[2].value, "");
     assert_eq!(response.attributes[3].key, "already_finished_instance_ids");
-    // Check that the already finished instances contain the expected address and ID
+    // Check that the already finished instances contain the expected ID
     let already_finished_ids = response.attributes[3].value.clone();
-    assert!(already_finished_ids.contains(&format!("{}:1", user1.to_string())));
+    assert!(already_finished_ids.contains("1"));
 }
 
 #[test]
@@ -264,16 +264,16 @@ fn test_finish_instances_mixed_scenarios() {
     assert_eq!(response.attributes[1].key, "finished_instance_ids");
     // Check that only instance2 was finished
     let finished_ids = response.attributes[1].value.clone();
-    assert!(finished_ids.contains(&format!("{}:2", user1.to_string())));
+    assert!(finished_ids.contains("2"));
     assert_eq!(response.attributes[2].key, "not_found_instance_ids");
-    // Check that instance3 and user2:999 were not found
+    // Check that instance3 and 999 were not found
     let not_found_ids = response.attributes[2].value.clone();
-    assert!(not_found_ids.contains(&format!("{}:3", user1.to_string())));
-    assert!(not_found_ids.contains(&format!("{}:999", user2.to_string())));
+    assert!(not_found_ids.contains("3"));
+    assert!(not_found_ids.contains("999"));
     assert_eq!(response.attributes[3].key, "already_finished_instance_ids");
     // Check that instance1 was already finished
     let already_finished_ids = response.attributes[3].value.clone();
-    assert!(already_finished_ids.contains(&format!("{}:1", user1.to_string())));
+    assert!(already_finished_ids.contains("1"));
     
     // Verify instance2 is now Finished
     let instance2_query = query_workflow_instance(deps.as_ref(), user1.to_string(), 2).unwrap();
@@ -351,7 +351,7 @@ fn test_finish_instances_large_batch() {
     // Should contain all 10 instances
     let finished_ids = response.attributes[1].value.clone();
     for i in 1..=10 {
-        assert!(finished_ids.contains(&format!("{}:{}", user1.to_string(), i)));
+        assert!(finished_ids.contains(&i.to_string()));
     }
     assert_eq!(response.attributes[2].key, "not_found_instance_ids");
     assert_eq!(response.attributes[2].value, "");

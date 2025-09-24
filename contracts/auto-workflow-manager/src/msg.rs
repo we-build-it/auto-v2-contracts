@@ -148,6 +148,10 @@ pub enum ExecuteMsg {
     FinishInstances {
         instances: Vec<FinishInstanceRequest>,
     },
+    ResetInstance {
+        user_address: String,
+        instance_id: InstanceId,
+    },
     // TODO: temporal AuthZ test, remove this
     TestAuthz { },
 }

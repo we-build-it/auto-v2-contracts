@@ -8,7 +8,7 @@ use cw2::set_contract_version;
 use crate::{
     error::ContractError,
     execute::{
-        cancel_instance, cancel_run, charge_fees, execute_action, execute_instance, finish_instances, pause_schedule, publish_workflow, purge_instances, remove_user_payment_config_execute, resume_schedule, set_user_payment_config
+        cancel_instance, cancel_run, charge_fees, execute_action, execute_instance, finish_instances, pause_schedule, publish_workflow, purge_instances, remove_user_payment_config_execute, reset_instance, resume_schedule, set_user_payment_config
     },
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg, SudoMsg},
     query::{
@@ -99,6 +99,7 @@ pub fn execute(
         ExecuteMsg::ChargeFees { batch_id, prices, fees } => charge_fees(deps, env, info, batch_id, prices, fees),
         ExecuteMsg::PurgeInstances { instance_ids } => purge_instances(deps, env, info, instance_ids),
         ExecuteMsg::FinishInstances { instances } => finish_instances(deps, env, info, instances),
+        ExecuteMsg::ResetInstance { user_address, instance_id } => reset_instance(deps, env, info, user_address, instance_id),
         // TODO: temporal AuthZ test, remove this
         ExecuteMsg::TestAuthz { } => {
             let daodao_msg = "{ \"echo\": { \"message\": \"T3BlcmFjaW9uIGRlIFN0YWtl\", \"attributes\": [[\"priority\", \"high\"],[\"timestamp\", \"1640995200\"]] } }";
