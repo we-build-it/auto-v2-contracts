@@ -713,7 +713,7 @@ pub fn charge_fees(
             let fee_total_amount_allowance_denom = if fee_total.denom == config.allowance_denom.clone() {
                 fee_total.amount
             } else {
-                (Decimal::from_atomics(fee_total.amount, 0).unwrap() * denom_price / allowance_denom_price).atomics()
+                (Decimal::from_atomics(fee_total.amount, 0).unwrap() * denom_price / allowance_denom_price).to_uint_ceil()
             };
 
             let (amount_charged, amount_charged_allowance_denom) = 
@@ -725,12 +725,7 @@ pub fn charge_fees(
                 else if current_allowance > Uint128::zero() {
                     // Simplified calculation: convert allowance to denom amount
                     // amount_to_charge = current_allowance * quote_allowance_denom / quote_denom
-                    let amount_to_charge = current_allowance
-                        .checked_mul(Uint128::from(allowance_denom_price.atomics()))
-                        .unwrap()
-                        .checked_div(Uint128::from(denom_price.atomics()))
-                        .unwrap();
-
+                    let amount_to_charge = (Decimal::from_atomics(current_allowance, 0).unwrap() * allowance_denom_price / denom_price).to_uint_ceil();
                     (amount_to_charge, current_allowance)
                 }
                 // Case 3: allowance = 0 => charge nothing
