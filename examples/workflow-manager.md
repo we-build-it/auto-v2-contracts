@@ -2,7 +2,7 @@
 
 ## current contract addresses
 local testing (gus): sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huuzmqalnv9z
-stagenet: sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huuzmqalnv9z
+stagenet: sthor1gdhtg02g07v84qjvjk7w7md83ckc4xk2gmx7pe4tap0tnaghes7shlqvcu
 
 ## grants
 
@@ -74,6 +74,10 @@ thornode query tx --type hash 91DC62B732AE1172F1B0AAE41835FDA6ACA5B2C55A8ADAACFA
 key: _contract_address
 value: sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huuzmqalnv9z
 ```
+```
+thornode query wasm contract-state smart sthor1gdhtg02g07v84qjvjk7w7md83ckc4xk2gmx7pe4tap0tnaghes7shlqvcu '{ "get_config": { } }' --node https://stagenet-rpc.ninerealms.com:443
+```
+
 ## set payment config
 
 ```
