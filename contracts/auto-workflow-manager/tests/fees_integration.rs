@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-  coins, Coin, Decimal, Uint128
+  coins, Coin, Decimal, Event, Uint128
 };
 use std::{collections::{HashMap, HashSet}, str::FromStr};
 
@@ -16,8 +16,8 @@ use auto_workflow_manager::{
 };
 
 use auto_fee_manager::{
-    contract::{execute as execute_fee_manager, instantiate as instantiate_fee_manager, sudo as sudo_fee_manager, query as query_fee_manager},
-    msg::{AcceptedDenom, ExecuteMsg as FeeManagerExecuteMsg, InstantiateMsg as FeeManagerInstantiateMsg, SudoMsg as FeeManagerSudoMsg, QueryMsg as FeeManagerQueryMsg, UserBalancesResponse as FeeManagerUserBalancesResponse},
+    contract::{execute as execute_fee_manager, instantiate as instantiate_fee_manager, query as query_fee_manager, sudo as sudo_fee_manager},
+    msg::{AcceptedDenom, ExecuteMsg as FeeManagerExecuteMsg, InstantiateMsg as FeeManagerInstantiateMsg, QueryMsg as FeeManagerQueryMsg, SudoMsg as FeeManagerSudoMsg, UserBalancesResponse as FeeManagerUserBalancesResponse},
 };
 
 use cw_multi_test::{App, ContractWrapper, Executor};
@@ -135,6 +135,7 @@ fn test_charge_fees_ok() {
   // Call ChargeFees
   let prices = HashMap::from([
     ("uusdc".to_string(), Decimal::from_str("1.0").unwrap()),
+    ("rune".to_string(), Decimal::from_str("0.25").unwrap()),
   ]);  
   let fees = vec![
     WorkflowManagerUserFee {
@@ -145,6 +146,11 @@ fn test_charge_fees_ok() {
           amount: Uint128::from(500_000u128),
           fee_type: WorkflowManagerFeeType::Execution,
         },
+        WorkflowManagerFeeTotal {
+          denom: "rune".to_string(),
+          amount: Uint128::from(100_000u128),
+          fee_type: WorkflowManagerFeeType::Execution,
+        },
       ],
     },
   ];
@@ -153,15 +159,27 @@ fn test_charge_fees_ok() {
     prices: prices,
     fees: fees,
   };
-  app.execute_contract(
+  let charge_fees_result = app.execute_contract(
     creator_address.clone(), 
     workflow_manager_address.clone(), 
     &charge_fees_msg, 
     &[]
   ).unwrap();
+  println!("charge_fees_result: {:#?}", charge_fees_result);
+
+  let uusdc_charged_fee = get_fee_charged_event_amount(&charge_fees_result.events, creator_address.to_string(), "uusdc".to_string(), WorkflowManagerFeeType::Execution);
+  println!("usdc_charged_fee: {:?}", uusdc_charged_fee);
+  assert_eq!(uusdc_charged_fee.clone().unwrap().amount, "500000");
+  assert_eq!(uusdc_charged_fee.clone().unwrap().amount_in_allowance_denom, "500000");
+
+  let rune_charged_fee = get_fee_charged_event_amount(&charge_fees_result.events, creator_address.to_string(), "rune".to_string(), WorkflowManagerFeeType::Execution);
+  println!("rune_charged_fee: {:?}", rune_charged_fee);
+  assert_eq!(rune_charged_fee.clone().unwrap().amount, "100000");
+  assert_eq!(rune_charged_fee.clone().unwrap().amount_in_allowance_denom, "25000");
+
   println!("Charge fees done");
   println!("--------------------------------------------------");
-
+  
   // Query allowance and user balances
   // Get user payment config
   let user_payment_config: GetUserPaymentConfigResponse = app.wrap().query_wasm_smart(workflow_manager_address.clone(), &WorkflowManagerQueryMsg::GetUserPaymentConfig { user_address: creator_address.to_string() }).unwrap();
@@ -169,4 +187,29 @@ fn test_charge_fees_ok() {
   let user_balances: FeeManagerUserBalancesResponse = app.wrap().query_wasm_smart(fee_manager_address.clone(), &FeeManagerQueryMsg::GetUserBalances { user: creator_address.clone() }).unwrap();
   println!("user_balances: {:#?}", user_balances);
   println!("--------------------------------------------------");
+}
+
+#[derive(Debug)]
+#[derive(Clone)]
+#[allow(dead_code)]
+struct FeeChargedEventAmount {
+  amount: String,
+  amount_in_allowance_denom: String,
+}
+
+fn get_fee_charged_event_amount(
+  events: &Vec<Event>, 
+  user_address: String, 
+  denom: String,
+  fee_type: WorkflowManagerFeeType,
+) -> Option<FeeChargedEventAmount> {
+  let fee_charged_event = events.iter()
+    .find(|event| event.ty == "wasm-fee-charged" 
+      && event.attributes.iter().any(|attr| attr.key == "user_address" && attr.value == user_address) 
+      && event.attributes.iter().any(|attr| attr.key == "denom" && attr.value == denom) 
+      && event.attributes.iter().any(|attr| attr.key == "fee_type" && attr.value == fee_type.to_string()))
+  .unwrap();
+  let amount = fee_charged_event.attributes.iter().find(|attr| attr.key == "amount_charged").unwrap().value.clone();
+  let amount_in_allowance_denom = fee_charged_event.attributes.iter().find(|attr| attr.key == "amount_charged_allowance_denom").unwrap().value.clone();
+  Some(FeeChargedEventAmount { amount, amount_in_allowance_denom })
 }
