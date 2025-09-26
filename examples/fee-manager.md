@@ -116,5 +116,8 @@ thornode query tx --type hash 3A831E4D19E84B5FC6C41B067D0840E9202A204C870D9ADE73
 thornode query wasm contract-state smart sthor1whr8522407tmsfa9qhyqcu25t3cq9jvl46cg5meds6stkq4vzwjqzpl5ts '{ "get_user_balances": { "user": "sthor1z6m4jukpzelp26f8k7jcua4xxsp2w2lpqzv6nr" } }'  --node https://stagenet-rpc.ninerealms.com:443
 ```
 ```
-thornode query wasm contract-state smart sthor1whr8522407tmsfa9qhyqcu25t3cq9jvl46cg5meds6stkq4vzwjqzpl5ts '{ "get_creator_fees": { "user": "sthor1z6m4jukpzelp26f8k7jcua4xxsp2w2lpqzv6nr" } }'  --node https://stagenet-rpc.ninerealms.com:443
+thornode query wasm contract-state smart sthor1whr8522407tmsfa9qhyqcu25t3cq9jvl46cg5meds6stkq4vzwjqzpl5ts '{ "get_creator_fees": { "creator": "sthor1z6m4jukpzelp26f8k7jcua4xxsp2w2lpqzv6nr" } }'  --node https://stagenet-rpc.ninerealms.com:443
+```
+```
+thornode query wasm contract-state smart sthor1whr8522407tmsfa9qhyqcu25t3cq9jvl46cg5meds6stkq4vzwjqzpl5ts '{ "get_non_creator_fees": { } }'  --node https://stagenet-rpc.ninerealms.com:443
 ```

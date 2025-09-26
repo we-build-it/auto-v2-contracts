@@ -103,7 +103,7 @@ thornode query wasm contract-state smart sthor1fs54ndfnetj9aww5guxvvpryf60mft99r
 ```
 ## publish workflow
 ```
-thornode tx wasm execute sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huuzmqalnv9z \
+thornode tx wasm execute sthor1gdhtg02g07v84qjvjk7w7md83ckc4xk2gmx7pe4tap0tnaghes7shlqvcu \
 '{
 	"publish_workflow": {
 		"workflow": {
@@ -218,7 +218,7 @@ thornode tx wasm execute sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huu
 				"protocolName": { "string": "AUTO" },
 				"notificationType": { "string": "telegram" }
 			},
-			"execution_type": "one_shot",
+			"execution_type": "recurrent",
 			"cron_expression": "*/5 * * * *",
 			"expiration_time": "1786448860000000000"
 		}
@@ -234,7 +234,7 @@ thornode query tx --type hash 7D960565B935527B4E2FE636D049EDB4CA77CF575EE3FF2CD4
 ```
 
 ```
-thornode query wasm contract-state smart sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huuzmqalnv9z '{ "get_workflow_instance": {"user_address": "sthor1z6m4jukpzelp26f8k7jcua4xxsp2w2lpqzv6nr", "instance_id": 26 } }' --node https://stagenet-rpc.ninerealms.com:443
+thornode query wasm contract-state smart sthor1gdhtg02g07v84qjvjk7w7md83ckc4xk2gmx7pe4tap0tnaghes7shlqvcu '{ "get_workflow_instance": {"user_address": "sthor1t78mcm6nhh999lvu3dg4l7lm8976pkakpmw4e3", "instance_id": 26 } }' --node https://stagenet-rpc.ninerealms.com:443
 ```
 
 ## pause/resume/cancel/cancel-run
