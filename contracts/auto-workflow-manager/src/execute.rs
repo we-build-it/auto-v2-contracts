@@ -24,9 +24,10 @@ use cw_storage_plus::Map;
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct FeeEventData {
     pub user_address: String,
-    pub denom: String,
-    pub amount_charged: Uint128,
-    pub amount_charged_allowance_denom: Uint128,
+    pub original_denom: String,
+    pub original_amount_charged: Uint128,
+    pub discounted_from_allowance: Uint128,
+    pub debit_denom: String,
     pub fee_type: FeeType,
     pub creator_address: Option<String>,
 }
@@ -707,43 +708,50 @@ pub fn charge_fees(
 
             // TODO: skip fee if quote not found
             
-            let allowance_denom_price = prices.get(&config.allowance_denom).ok_or(ContractError::GenericError(format!("Price not found for denomination: {}", config.allowance_denom)))?;
+            let allowance_price = prices.get(&config.allowance_denom).ok_or(ContractError::GenericError(format!("Price not found for denomination: {}", config.allowance_denom)))?;
 
             // We need to handle two cases, when fee_total.denom is config.allowance_denom and when it's not
-            let fee_total_amount_allowance_denom = if fee_total.denom == config.allowance_denom.clone() {
+            let allowance_amount = if fee_total.denom == config.allowance_denom.clone() {
                 fee_total.amount
             } else {
-                (Decimal::from_atomics(fee_total.amount, 0).unwrap() * denom_price / allowance_denom_price).to_uint_ceil()
+                (Decimal::from_atomics(fee_total.amount, 0).unwrap() * denom_price / allowance_price).to_uint_ceil()
             };
 
-            let (amount_charged, amount_charged_allowance_denom) = 
-                // Case 1: allowance >= fee_total.amount_allowance_denom
-                if current_allowance >= fee_total_amount_allowance_denom {
-                    (fee_total.amount, fee_total_amount_allowance_denom)
+            let (amount_to_charge, allowance_to_charge) = 
+                // Case 1: current_allowance >= allowance_amount => We have enough allowance to charge the full amount
+                if current_allowance >= allowance_amount {
+                    (fee_total.amount, allowance_amount)
                 }
-                // Case 2: 0 < allowance < fee_total.amount_allowance_denom => charge what allowance represents
+                // Case 2: 0 < current_allowance < allowance_amount => charge up to current allowance
                 else if current_allowance > Uint128::zero() {
                     // Simplified calculation: convert allowance to denom amount
                     // amount_to_charge = current_allowance * quote_allowance_denom / quote_denom
-                    let amount_to_charge = (Decimal::from_atomics(current_allowance, 0).unwrap() * allowance_denom_price / denom_price).to_uint_ceil();
+                    let amount_to_charge = (Decimal::from_atomics(current_allowance, 0).unwrap() * allowance_price / denom_price).to_uint_ceil();
                     (amount_to_charge, current_allowance)
                 }
-                // Case 3: allowance = 0 => charge nothing
+                // Case 3: current_allowance == 0 => charge nothing
                 else {
                     (Uint128::zero(), Uint128::zero())
                 };
 
             // Only process if there's something to charge
-            if amount_charged > Uint128::zero() {
+            if amount_to_charge > Uint128::zero() {
                 // Update current allowance for next iteration
-                current_allowance -= amount_charged_allowance_denom;
+                current_allowance -= allowance_to_charge;
 
-                let (fee_amount, fee_denom) = match payment_config.source {
-                    PaymentSource::Wallet => (amount_charged.clone(), fee_total.denom.clone()),
-                    PaymentSource::Prepaid => (amount_charged_allowance_denom.clone(), config.allowance_denom.clone()),
+                let (actual_amount_to_charge, actual_denom_to_charge) = match payment_config.source {
+                    PaymentSource::Wallet => {
+                        // Accumulate funds for Wallet payment source
+                        accumulated_funds.push(cosmwasm_std::Coin {
+                            denom: fee_total.denom.clone(),
+                            amount: amount_to_charge.clone(),
+                        });
+                        (amount_to_charge.clone(), fee_total.denom.clone())
+                    },
+                    PaymentSource::Prepaid => (allowance_to_charge.clone(), config.allowance_denom.clone()),
                 };
 
-                let fee = FeeManagerFee {
+                let actual_fee = FeeManagerFee {
                     fee_type: match fee_total.fee_type {
                         FeeType::Creator { instance_id } => {
                             let workflow_instance = load_workflow_instance(deps.storage, &requester.clone(), &instance_id)?;
@@ -752,27 +760,20 @@ pub fn charge_fees(
                         },
                         FeeType::Execution => FeeManagerFeeType::Execution,
                     },
-                    denom: fee_denom.clone(),
-                    amount: fee_amount.clone(),
+                    denom: actual_denom_to_charge.clone(),
+                    amount: actual_amount_to_charge.clone(),
                 };
-                accumulated_fees.push(fee.clone());
-
-                // Accumulate funds for Wallet payment source
-                if matches!(payment_config.source, PaymentSource::Wallet) {
-                    accumulated_funds.push(cosmwasm_std::Coin {
-                        denom: fee_denom.clone(),
-                        amount: fee_amount.clone(),
-                    });
-                }
+                accumulated_fees.push(actual_fee.clone());
 
                 // Create FeeEventData for this specific fee
                 let fee_event_data = FeeEventData {
                     user_address: user_fee.address.clone(),
-                    denom: fee_total.denom.clone(),
-                    amount_charged: amount_charged.clone(),
-                    amount_charged_allowance_denom: amount_charged_allowance_denom.clone(),
+                    original_denom: fee_total.denom.clone(),
+                    original_amount_charged: amount_to_charge.clone(),
+                    discounted_from_allowance: allowance_to_charge.clone(),
+                    debit_denom: actual_denom_to_charge.clone(),
                     fee_type: fee_total.fee_type.clone(),
-                    creator_address: match fee.fee_type.clone() {
+                    creator_address: match actual_fee.fee_type.clone() {
                         FeeManagerFeeType::Creator { creator_address } => Some(creator_address.to_string()),
                         _ => None,
                     },
@@ -871,7 +872,7 @@ pub fn handle_fee_manager_reply(
             response = response.add_event(
                 cosmwasm_std::Event::new("fee-error")
                     .add_attribute("user_address", fee_event_data.user_address)
-                    .add_attribute("denom", fee_event_data.denom)
+                    .add_attribute("denom", fee_event_data.original_denom)
                     .add_attribute("fee_type", fee_event_data.fee_type.to_string())
                     .add_attribute("error", "true")
                     .add_attribute("details", error_msg.clone())
@@ -899,9 +900,10 @@ pub fn handle_fee_manager_reply(
         response = response.add_event(
             cosmwasm_std::Event::new("fee-charged")
                 .add_attribute("user_address", fee_event_data.user_address)
-                .add_attribute("denom", fee_event_data.denom)
-                .add_attribute("amount_charged", fee_event_data.amount_charged.to_string())
-                .add_attribute("amount_charged_allowance_denom", fee_event_data.amount_charged_allowance_denom.to_string())
+                .add_attribute("original_denom", fee_event_data.original_denom)
+                .add_attribute("original_amount_charged", fee_event_data.original_amount_charged.to_string())
+                .add_attribute("discounted_from_allowance", fee_event_data.discounted_from_allowance.to_string())
+                .add_attribute("debit_denom", fee_event_data.debit_denom)
                 .add_attribute("fee_type", fee_event_data.fee_type.to_string())
                 .add_attribute("creator_address", fee_event_data.creator_address.unwrap_or_default()));
     }

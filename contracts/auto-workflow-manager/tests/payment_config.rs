@@ -386,9 +386,10 @@ fn test_handle_fee_manager_reply() {
     // Create test fee event data
     let fee_event_data = auto_workflow_manager::execute::FeeEventData {
         user_address: "thor1test".to_string(),
-        denom: "RUNE".to_string(),
-        amount_charged: Uint128::new(1000),
-        amount_charged_allowance_denom: Uint128::new(1000),
+        original_denom: "RUNE".to_string(),
+        original_amount_charged: Uint128::new(1000),
+        discounted_from_allowance: Uint128::new(1000),
+        debit_denom: "RUNE".to_string(),
         creator_address: Some("thor1test".to_string()),
         fee_type: FeeType::Execution,
     };
@@ -425,18 +426,20 @@ fn test_handle_fee_manager_reply() {
     assert_eq!(response.events.len(), 1);
     let fee_event = &response.events[0];
     assert_eq!(fee_event.ty, "fee-charged");
-    assert_eq!(fee_event.attributes.len(), 6);
+    assert_eq!(fee_event.attributes.len(), 7);
     
     // Check specific attributes
     assert!(fee_event.attributes.iter().any(|attr| 
         attr.key == "user_address" && attr.value == "thor1test"));
     assert!(fee_event.attributes.iter().any(|attr| 
-        attr.key == "denom" && attr.value == "RUNE"));
+        attr.key == "original_denom" && attr.value == "RUNE"));
     assert!(fee_event.attributes.iter().any(|attr| 
-        attr.key == "amount_charged" && attr.value == "1000"));
-        assert!(fee_event.attributes.iter().any(|attr| 
-            attr.key == "amount_charged_allowance_denom" && attr.value == "1000"));
-        assert!(fee_event.attributes.iter().any(|attr| 
+        attr.key == "original_amount_charged" && attr.value == "1000"));
+    assert!(fee_event.attributes.iter().any(|attr| 
+        attr.key == "discounted_from_allowance" && attr.value == "1000"));
+    assert!(fee_event.attributes.iter().any(|attr| 
+        attr.key == "debit_denom" && attr.value == "RUNE"));
+    assert!(fee_event.attributes.iter().any(|attr| 
         attr.key == "fee_type" && attr.value == "execution"));
     assert!(fee_event.attributes.iter().any(|attr| 
         attr.key == "creator_address" && attr.value == "thor1test"));

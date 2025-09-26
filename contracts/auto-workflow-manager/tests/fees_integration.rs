@@ -169,13 +169,15 @@ fn test_charge_fees_ok() {
 
   let uusdc_charged_fee = get_fee_charged_event_amount(&charge_fees_result.events, creator_address.to_string(), "uusdc".to_string(), WorkflowManagerFeeType::Execution);
   println!("usdc_charged_fee: {:?}", uusdc_charged_fee);
-  assert_eq!(uusdc_charged_fee.clone().unwrap().amount, "500000");
-  assert_eq!(uusdc_charged_fee.clone().unwrap().amount_in_allowance_denom, "500000");
+  assert_eq!(uusdc_charged_fee.clone().unwrap().original_amount_charged, "500000");
+  assert_eq!(uusdc_charged_fee.clone().unwrap().discounted_from_allowance, "500000");
+  assert_eq!(uusdc_charged_fee.clone().unwrap().debit_denom, "uusdc");
 
   let rune_charged_fee = get_fee_charged_event_amount(&charge_fees_result.events, creator_address.to_string(), "rune".to_string(), WorkflowManagerFeeType::Execution);
   println!("rune_charged_fee: {:?}", rune_charged_fee);
-  assert_eq!(rune_charged_fee.clone().unwrap().amount, "100000");
-  assert_eq!(rune_charged_fee.clone().unwrap().amount_in_allowance_denom, "25000");
+  assert_eq!(rune_charged_fee.clone().unwrap().original_amount_charged, "100000");
+  assert_eq!(rune_charged_fee.clone().unwrap().discounted_from_allowance, "25000");
+  assert_eq!(rune_charged_fee.clone().unwrap().debit_denom, "uusdc");
 
   println!("Charge fees done");
   println!("--------------------------------------------------");
@@ -193,8 +195,9 @@ fn test_charge_fees_ok() {
 #[derive(Clone)]
 #[allow(dead_code)]
 struct FeeChargedEventAmount {
-  amount: String,
-  amount_in_allowance_denom: String,
+  original_amount_charged: String,
+  discounted_from_allowance: String,
+  debit_denom: String,
 }
 
 fn get_fee_charged_event_amount(
@@ -206,10 +209,11 @@ fn get_fee_charged_event_amount(
   let fee_charged_event = events.iter()
     .find(|event| event.ty == "wasm-fee-charged" 
       && event.attributes.iter().any(|attr| attr.key == "user_address" && attr.value == user_address) 
-      && event.attributes.iter().any(|attr| attr.key == "denom" && attr.value == denom) 
+      && event.attributes.iter().any(|attr| attr.key == "original_denom" && attr.value == denom) 
       && event.attributes.iter().any(|attr| attr.key == "fee_type" && attr.value == fee_type.to_string()))
   .unwrap();
-  let amount = fee_charged_event.attributes.iter().find(|attr| attr.key == "amount_charged").unwrap().value.clone();
-  let amount_in_allowance_denom = fee_charged_event.attributes.iter().find(|attr| attr.key == "amount_charged_allowance_denom").unwrap().value.clone();
-  Some(FeeChargedEventAmount { amount, amount_in_allowance_denom })
+  let amount = fee_charged_event.attributes.iter().find(|attr| attr.key == "original_amount_charged").unwrap().value.clone();
+  let allowance_charged = fee_charged_event.attributes.iter().find(|attr| attr.key == "discounted_from_allowance").unwrap().value.clone();
+  let denom_charged = fee_charged_event.attributes.iter().find(|attr| attr.key == "debit_denom").unwrap().value.clone();
+  Some(FeeChargedEventAmount { original_amount_charged: amount, discounted_from_allowance: allowance_charged, debit_denom: denom_charged })
 }
