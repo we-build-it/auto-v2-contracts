@@ -59,7 +59,7 @@ pub fn publish_workflow(
     input_workflow: NewWorkflowMsg,
 ) -> Result<Response, ContractError> {
     nonpayable(&info)?;
-    
+
     validate_sender_is_publisher(deps.storage, &info)?;
 
     // Check if workflow already exists
@@ -146,7 +146,6 @@ pub fn execute_instance(
         last_executed_action: None,
         execution_type: instance.execution_type,
         expiration_time: instance.expiration_time,
-        // requester: info.sender.clone(),
     };
 
     // Save the instance
