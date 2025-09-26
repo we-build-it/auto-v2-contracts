@@ -207,7 +207,7 @@ fn get_fee_charged_event_amount(
   fee_type: WorkflowManagerFeeType,
 ) -> Option<FeeChargedEventAmount> {
   let fee_charged_event = events.iter()
-    .find(|event| event.ty == "wasm-fee-charged" 
+    .find(|event| event.ty == "wasm-autorujira-workflow-manager/fee-charged"
       && event.attributes.iter().any(|attr| attr.key == "user_address" && attr.value == user_address) 
       && event.attributes.iter().any(|attr| attr.key == "original_denom" && attr.value == denom) 
       && event.attributes.iter().any(|attr| attr.key == "fee_type" && attr.value == fee_type.to_string()))

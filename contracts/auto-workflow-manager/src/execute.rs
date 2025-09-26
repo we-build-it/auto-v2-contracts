@@ -96,10 +96,12 @@ pub fn publish_workflow(
     }
 
     Ok(Response::new()
-        .add_attribute("method", "publish_workflow")
-        .add_attribute("workflow_id", input_workflow.id)
-        .add_attribute("publisher", info.sender.to_string())
-        .add_attribute("state", new_workflow.state.to_string()))
+        .add_event(
+            cosmwasm_std::Event::new("autorujira-workflow-manager/publish_workflow")
+                .add_attribute("workflow_id", input_workflow.id)
+                .add_attribute("publisher", info.sender.to_string())
+                .add_attribute("state", new_workflow.state.to_string())
+        ))
 }
 
 pub fn execute_instance(
@@ -153,10 +155,12 @@ pub fn execute_instance(
     )?;
 
     Ok(Response::new()
-        .add_attribute("method", "execute_instance")
-        .add_attribute("instance_id", instance_id.to_string())
-        .add_attribute("workflow_id", new_instance.workflow_id)
-        .add_attribute("requester", info.sender.to_string()))
+        .add_event(
+            cosmwasm_std::Event::new("autorujira-workflow-manager/execute_instance")
+                .add_attribute("instance_id", instance_id.to_string())
+                .add_attribute("workflow_id", new_instance.workflow_id)
+                .add_attribute("requester", info.sender.to_string())
+        ))
 }
 
 pub fn cancel_run(
@@ -186,9 +190,11 @@ pub fn cancel_run(
     }
 
     Ok(Response::new()
-        .add_attribute("method", "cancel_run")
-        .add_attribute("instance_id", instance_id.to_string())
-        .add_attribute("canceller", info.sender.to_string()))
+        .add_event(
+            cosmwasm_std::Event::new("autorujira-workflow-manager/cancel_run")
+                .add_attribute("instance_id", instance_id.to_string())
+                .add_attribute("canceller", info.sender.to_string())
+        ))
 }
 
 pub fn cancel_instance(
@@ -217,9 +223,11 @@ pub fn cancel_instance(
     save_workflow_instance(deps.storage, &info.sender, &instance_id, &updated_instance)?;
 
     Ok(Response::new()
-        .add_attribute("method", "cancel_instance")
-        .add_attribute("instance_id", instance_id.to_string())
-        .add_attribute("canceller", info.sender.to_string()))
+        .add_event(
+            cosmwasm_std::Event::new("autorujira-workflow-manager/cancel_instance")
+                .add_attribute("instance_id", instance_id.to_string())
+                .add_attribute("canceller", info.sender.to_string())
+        ))
 }
 
 
@@ -258,9 +266,11 @@ pub fn pause_schedule(
     save_workflow_instance(deps.storage, &info.sender, &instance_id, &instance)?;
 
     Ok(Response::new()
-        .add_attribute("method", "pause_schedule")
-        .add_attribute("instance_id", instance_id.to_string())
-        .add_attribute("pauser", info.sender.to_string()))
+        .add_event(
+            cosmwasm_std::Event::new("autorujira-workflow-manager/pause_schedule")
+                .add_attribute("instance_id", instance_id.to_string())
+                .add_attribute("pauser", info.sender.to_string())
+        ))
 }
 
 pub fn resume_schedule(
@@ -298,9 +308,11 @@ pub fn resume_schedule(
     save_workflow_instance(deps.storage, &info.sender, &instance_id, &instance)?;
 
     Ok(Response::new()
-        .add_attribute("method", "resume_schedule")
-        .add_attribute("instance_id", instance_id.to_string())
-        .add_attribute("resumer", info.sender.to_string()))
+        .add_event(
+            cosmwasm_std::Event::new("autorujira-workflow-manager/resume_schedule")
+                .add_attribute("instance_id", instance_id.to_string())
+                .add_attribute("resumer", info.sender.to_string())
+        ))
 }
 
 pub fn execute_action(
@@ -441,10 +453,12 @@ pub fn execute_action(
 
     Ok(Response::new()
         .add_messages(authz_msgs)
-        .add_attribute("method", "execute_action")
-        .add_attribute("user_address", user_address)
-        .add_attribute("instance_id", instance_id.to_string())
-        .add_attribute("action_id", action_id))
+        .add_event(
+            cosmwasm_std::Event::new("autorujira-workflow-manager/execute_action")
+                .add_attribute("user_address", user_address)
+                .add_attribute("instance_id", instance_id.to_string())
+                .add_attribute("action_id", action_id)
+        ))
 }
 
 fn resolve_param_value(
@@ -627,10 +641,12 @@ pub fn purge_instances(
     }
 
     Ok(Response::new()
-        .add_attribute("method", "purge_instances")
-        .add_attribute("purged_instance_ids", purged_instance_ids.join(","))
-        .add_attribute("not_found_instance_ids", not_found_instance_ids.join(","))
-        .add_attribute("not_purgued_instance_ids", not_purgued_instance_ids.join(",")))
+        .add_event(
+            cosmwasm_std::Event::new("autorujira-workflow-manager/purge_instances")
+                .add_attribute("purged_instance_ids", purged_instance_ids.join(","))
+                .add_attribute("not_found_instance_ids", not_found_instance_ids.join(","))
+                .add_attribute("not_purgued_instance_ids", not_purgued_instance_ids.join(","))
+        ))
 }
 
 pub fn set_user_payment_config(
@@ -646,10 +662,12 @@ pub fn set_user_payment_config(
     save_user_payment_config(deps.storage, &user_addr, &payment_config)?;
 
     Ok(Response::new()
-        .add_attribute("method", "set_user_payment_config")
-        .add_attribute("user_address", info.sender.to_string())
-        .add_attribute("allowance", payment_config.allowance.to_string())
-        .add_attribute("source", format!("{:?}", payment_config.source)))
+        .add_event(
+            cosmwasm_std::Event::new("autorujira-workflow-manager/set_user_payment_config")
+                .add_attribute("user_address", info.sender.to_string())
+                .add_attribute("allowance", payment_config.allowance.to_string())
+                .add_attribute("source", format!("{:?}", payment_config.source))
+        ))
 }
 
 pub fn remove_user_payment_config_execute(
@@ -664,8 +682,10 @@ pub fn remove_user_payment_config_execute(
     remove_user_payment_config(deps.storage, &user_addr)?;
 
     Ok(Response::new()
-        .add_attribute("method", "remove_user_payment_config")
-        .add_attribute("user_address", info.sender.to_string()))
+        .add_event(
+            cosmwasm_std::Event::new("autorujira-workflow-manager/remove_user_payment_config")
+                .add_attribute("user_address", info.sender.to_string())
+        ))
 }
 
 pub fn charge_fees(
@@ -680,8 +700,10 @@ pub fn charge_fees(
     validate_sender_is_admin(deps.storage, &info)?;
 
     let mut response = Response::new()
-        .add_attribute("method", "charge_fees")
-        .add_attribute("batch_id", batch_id.clone());
+        .add_event(
+            cosmwasm_std::Event::new("autorujira-workflow-manager/charge_fees")
+                .add_attribute("batch_id", batch_id.clone())
+        );
 
     // Load config to get fee manager address
     let config = load_config(deps.storage)?;
@@ -869,7 +891,7 @@ pub fn handle_fee_manager_reply(
         // Emit error event for each fee
         for fee_event_data in fee_event_data_vec {
             response = response.add_event(
-                cosmwasm_std::Event::new("fee-error")
+                cosmwasm_std::Event::new("autorujira-workflow-manager/fee-error")
                     .add_attribute("user_address", fee_event_data.user_address)
                     .add_attribute("denom", fee_event_data.original_denom)
                     .add_attribute("fee_type", fee_event_data.fee_type.to_string())
@@ -897,7 +919,7 @@ pub fn handle_fee_manager_reply(
     // Emit fee-charged event for each fee
     for fee_event_data in fee_event_data_vec {
         response = response.add_event(
-            cosmwasm_std::Event::new("fee-charged")
+            cosmwasm_std::Event::new("autorujira-workflow-manager/fee-charged")
                 .add_attribute("user_address", fee_event_data.user_address)
                 .add_attribute("original_denom", fee_event_data.original_denom)
                 .add_attribute("original_amount_charged", fee_event_data.original_amount_charged.to_string())
@@ -954,10 +976,12 @@ pub fn finish_instances(
     }
 
     Ok(Response::new()
-        .add_attribute("method", "finish_instances")
-        .add_attribute("finished_instance_ids", finished_instance_ids.join(","))
-        .add_attribute("not_found_instance_ids", not_found_instance_ids.join(","))
-        .add_attribute("already_finished_instance_ids", already_finished_instance_ids.join(",")))
+        .add_event(
+            cosmwasm_std::Event::new("autorujira-workflow-manager/finish_instances")
+                .add_attribute("finished_instance_ids", finished_instance_ids.join(","))
+                .add_attribute("not_found_instance_ids", not_found_instance_ids.join(","))
+                .add_attribute("already_finished_instance_ids", already_finished_instance_ids.join(","))
+        ))
 }
 
 pub fn reset_instance(
@@ -994,11 +1018,13 @@ pub fn reset_instance(
     save_workflow_instance(deps.storage, &user_addr, &instance_id, &updated_instance)?;
 
     Ok(Response::new()
-        .add_attribute("method", "reset_instance")
-        .add_attribute("user_address", user_address)
-        .add_attribute("instance_id", instance_id.to_string())
-        .add_attribute("execution_type", match updated_instance.execution_type {
-            ExecutionType::OneShot => "oneshot",
-            ExecutionType::Recurrent => "recurrent",
-        }))
+        .add_event(
+            cosmwasm_std::Event::new("autorujira-workflow-manager/reset_instance")
+                .add_attribute("user_address", user_address)
+                .add_attribute("instance_id", instance_id.to_string())
+                .add_attribute("execution_type", match updated_instance.execution_type {
+                    ExecutionType::OneShot => "oneshot",
+                    ExecutionType::Recurrent => "recurrent",
+                })
+        ))
 }

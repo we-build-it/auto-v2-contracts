@@ -97,16 +97,17 @@ fn test_reset_instance_success_recurrent() {
     // Reset the instance
     let response = reset_instance(&mut deps, env.clone(), admin_address.clone(), user1.to_string(), 1).unwrap();
     
-    // Verify response attributes
-    assert_eq!(response.attributes.len(), 4);
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "reset_instance");
-    assert_eq!(response.attributes[1].key, "user_address");
-    assert_eq!(response.attributes[1].value, user1.to_string());
-    assert_eq!(response.attributes[2].key, "instance_id");
-    assert_eq!(response.attributes[2].value, "1");
-    assert_eq!(response.attributes[3].key, "execution_type");
-    assert_eq!(response.attributes[3].value, "recurrent");
+    // Verify response events and attributes
+    assert_eq!(response.attributes.len(), 0);
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-workflow-manager/reset_instance");
+    assert_eq!(response.events[0].attributes.len(), 3);
+    assert_eq!(response.events[0].attributes[0].key, "user_address");
+    assert_eq!(response.events[0].attributes[0].value, user1.to_string());
+    assert_eq!(response.events[0].attributes[1].key, "instance_id");
+    assert_eq!(response.events[0].attributes[1].value, "1");
+    assert_eq!(response.events[0].attributes[2].key, "execution_type");
+    assert_eq!(response.events[0].attributes[2].value, "recurrent");
     
     // Verify instance last_executed_action is still None (reset successful)
     let instance_query = query_workflow_instance(deps.as_ref(), user1.to_string(), 1).unwrap();
@@ -135,16 +136,17 @@ fn test_reset_instance_success_oneshot() {
     // Reset the OneShot instance - should change state to Finished
     let response = reset_instance(&mut deps, env.clone(), admin_address.clone(), user1.to_string(), 1).unwrap();
     
-    // Verify response attributes
-    assert_eq!(response.attributes.len(), 4);
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "reset_instance");
-    assert_eq!(response.attributes[1].key, "user_address");
-    assert_eq!(response.attributes[1].value, user1.to_string());
-    assert_eq!(response.attributes[2].key, "instance_id");
-    assert_eq!(response.attributes[2].value, "1");
-    assert_eq!(response.attributes[3].key, "execution_type");
-    assert_eq!(response.attributes[3].value, "oneshot");
+    // Verify response events and attributes
+    assert_eq!(response.attributes.len(), 0);
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-workflow-manager/reset_instance");
+    assert_eq!(response.events[0].attributes.len(), 3);
+    assert_eq!(response.events[0].attributes[0].key, "user_address");
+    assert_eq!(response.events[0].attributes[0].value, user1.to_string());
+    assert_eq!(response.events[0].attributes[1].key, "instance_id");
+    assert_eq!(response.events[0].attributes[1].value, "1");
+    assert_eq!(response.events[0].attributes[2].key, "execution_type");
+    assert_eq!(response.events[0].attributes[2].value, "oneshot");
     
     // Verify instance state is now Finished
     let instance_query = query_workflow_instance(deps.as_ref(), user1.to_string(), 1).unwrap();

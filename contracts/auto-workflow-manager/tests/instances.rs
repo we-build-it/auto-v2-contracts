@@ -138,16 +138,17 @@ fn test_execute_instance_ok() {
     let instance = create_oneshot_test_instance("simple-test-workflow".to_string());
     let response = execute_instance(&mut deps, env, user_address.clone(), instance).unwrap();
 
-    // Verify response attributes
-    assert_eq!(response.attributes.len(), 4);
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "execute_instance");
-    assert_eq!(response.attributes[1].key, "instance_id");
-    assert_eq!(response.attributes[1].value, "1"); // First instance should have ID 1
-    assert_eq!(response.attributes[2].key, "workflow_id");
-    assert_eq!(response.attributes[2].value, "simple-test-workflow");
-    assert_eq!(response.attributes[3].key, "requester");
-    assert_eq!(response.attributes[3].value, user_address.to_string());
+    // Verify response events and attributes
+    assert_eq!(response.attributes.len(), 0);
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-workflow-manager/execute_instance");
+    assert_eq!(response.events[0].attributes.len(), 3);
+    assert_eq!(response.events[0].attributes[0].key, "instance_id");
+    assert_eq!(response.events[0].attributes[0].value, "1");
+    assert_eq!(response.events[0].attributes[1].key, "workflow_id");
+    assert_eq!(response.events[0].attributes[1].value, "simple-test-workflow");
+    assert_eq!(response.events[0].attributes[2].key, "requester");
+    assert_eq!(response.events[0].attributes[2].value, user_address.to_string());
 }
 
 #[test]
@@ -260,14 +261,15 @@ fn test_cancel_instance_oneshot_ok() {
     let instance_query = query_workflow_instance(deps.as_ref(), user_address.to_string(), 1).unwrap();
     assert_eq!(instance_query.instance.state, WorkflowInstanceState::Cancelled);
 
-    // Verify response attributes
-    assert_eq!(response.attributes.len(), 3);
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "cancel_instance");
-    assert_eq!(response.attributes[1].key, "instance_id");
-    assert_eq!(response.attributes[1].value, "1");
-    assert_eq!(response.attributes[2].key, "canceller");
-    assert_eq!(response.attributes[2].value, user_address.to_string());
+    // Verify response events and attributes
+    assert_eq!(response.attributes.len(), 0);
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-workflow-manager/cancel_instance");
+    assert_eq!(response.events[0].attributes.len(), 2);
+    assert_eq!(response.events[0].attributes[0].key, "instance_id");
+    assert_eq!(response.events[0].attributes[0].value, "1");
+    assert_eq!(response.events[0].attributes[1].key, "canceller");
+    assert_eq!(response.events[0].attributes[1].value, user_address.to_string());
 }
 
 #[test]
@@ -303,14 +305,15 @@ fn test_cancel_instance_recurrent_ok() {
     let instance_query = query_workflow_instance(deps.as_ref(), user_address.to_string(), 1);
     assert!(instance_query.is_ok());
 
-    // Verify response attributes
-    assert_eq!(response.attributes.len(), 3);
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "cancel_instance");
-    assert_eq!(response.attributes[1].key, "instance_id");
-    assert_eq!(response.attributes[1].value, "1");
-    assert_eq!(response.attributes[2].key, "canceller");
-    assert_eq!(response.attributes[2].value, user_address.to_string());
+    // Verify response events and attributes
+    assert_eq!(response.attributes.len(), 0);
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-workflow-manager/cancel_instance");
+    assert_eq!(response.events[0].attributes.len(), 2);
+    assert_eq!(response.events[0].attributes[0].key, "instance_id");
+    assert_eq!(response.events[0].attributes[0].value, "1");
+    assert_eq!(response.events[0].attributes[1].key, "canceller");
+    assert_eq!(response.events[0].attributes[1].value, user_address.to_string());
 }
 
 // ---------------------------------------------------------------------------------------
@@ -452,14 +455,15 @@ fn test_pause_recurrent_instance_ok() {
     let instance_query = query_workflow_instance(deps.as_ref(), user_address.to_string(), 1).unwrap();
     assert_eq!(instance_query.instance.state, WorkflowInstanceState::Paused);
 
-    // Verify response attributes
-    assert_eq!(response.attributes.len(), 3);
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "pause_schedule");
-    assert_eq!(response.attributes[1].key, "instance_id");
-    assert_eq!(response.attributes[1].value, "1");
-    assert_eq!(response.attributes[2].key, "pauser");
-    assert_eq!(response.attributes[2].value, user_address.to_string());
+    // Verify response events and attributes
+    assert_eq!(response.attributes.len(), 0);
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-workflow-manager/pause_schedule");
+    assert_eq!(response.events[0].attributes.len(), 2);
+    assert_eq!(response.events[0].attributes[0].key, "instance_id");
+    assert_eq!(response.events[0].attributes[0].value, "1");
+    assert_eq!(response.events[0].attributes[1].key, "pauser");
+    assert_eq!(response.events[0].attributes[1].value, user_address.to_string());
 }
 
 #[test]
@@ -616,14 +620,15 @@ fn test_resume_recurrent_instance_ok() {
     let instance_query = query_workflow_instance(deps.as_ref(), user_address.to_string(), 1).unwrap();
     assert_eq!(instance_query.instance.state, WorkflowInstanceState::Running);
     
-    // Verify response attributes
-    assert_eq!(response.attributes.len(), 3);
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "resume_schedule");
-    assert_eq!(response.attributes[1].key, "instance_id");
-    assert_eq!(response.attributes[1].value, "1");
-    assert_eq!(response.attributes[2].key, "resumer");
-    assert_eq!(response.attributes[2].value, user_address.to_string());
+    // Verify response events and attributes
+    assert_eq!(response.attributes.len(), 0);
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-workflow-manager/resume_schedule");
+    assert_eq!(response.events[0].attributes.len(), 2);
+    assert_eq!(response.events[0].attributes[0].key, "instance_id");
+    assert_eq!(response.events[0].attributes[0].value, "1");
+    assert_eq!(response.events[0].attributes[1].key, "resumer");
+    assert_eq!(response.events[0].attributes[1].value, user_address.to_string());
 }
 
 #[test]

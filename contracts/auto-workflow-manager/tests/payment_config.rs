@@ -96,16 +96,17 @@ fn test_set_user_payment_config_ok() {
     )
     .unwrap();
 
-    // Verify response attributes
-    assert_eq!(response.attributes.len(), 4);
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "set_user_payment_config");
-    assert_eq!(response.attributes[1].key, "user_address");
-    assert_eq!(response.attributes[1].value, user_address.to_string());
-    assert_eq!(response.attributes[2].key, "allowance");
-    assert_eq!(response.attributes[2].value, "1000");
-    assert_eq!(response.attributes[3].key, "source");
-    assert_eq!(response.attributes[3].value, "Wallet");
+    // Verify response events and attributes
+    assert_eq!(response.attributes.len(), 0);
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-workflow-manager/set_user_payment_config");
+    assert_eq!(response.events[0].attributes.len(), 3);
+    assert_eq!(response.events[0].attributes[0].key, "user_address");
+    assert_eq!(response.events[0].attributes[0].value, user_address.to_string());
+    assert_eq!(response.events[0].attributes[1].key, "allowance");
+    assert_eq!(response.events[0].attributes[1].value, "1000");
+    assert_eq!(response.events[0].attributes[2].key, "source");
+    assert_eq!(response.events[0].attributes[2].value, "Wallet");
 
     // Verify that the payment config was actually saved in the state
     let saved_config = query_user_payment_config(&deps, user_address.to_string()).unwrap();
@@ -179,12 +180,13 @@ fn test_remove_user_payment_config_ok() {
         remove_user_payment_config(&mut deps, env, user_address.clone())
             .unwrap();
 
-    // Verify response attributes
-    assert_eq!(response.attributes.len(), 2);
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "remove_user_payment_config");
-    assert_eq!(response.attributes[1].key, "user_address");
-    assert_eq!(response.attributes[1].value, user_address.to_string());
+    // Verify response events and attributes
+    assert_eq!(response.attributes.len(), 0);
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-workflow-manager/remove_user_payment_config");
+    assert_eq!(response.events[0].attributes.len(), 1);
+    assert_eq!(response.events[0].attributes[0].key, "user_address");
+    assert_eq!(response.events[0].attributes[0].value, user_address.to_string());
 
     // Verify it no longer exists
     let query_result = query_user_payment_config(&deps, user_address.to_string()).unwrap();
@@ -208,8 +210,16 @@ fn test_payment_config_prepaid_source() {
     .unwrap();
 
     // Verify response attributes
-    assert_eq!(response.attributes[3].key, "source");
-    assert_eq!(response.attributes[3].value, "Prepaid");
+    assert_eq!(response.attributes.len(), 0);
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-workflow-manager/set_user_payment_config");
+    assert_eq!(response.events[0].attributes.len(), 3);
+    assert_eq!(response.events[0].attributes[0].key, "user_address");
+    assert_eq!(response.events[0].attributes[0].value, user_address.to_string());
+    assert_eq!(response.events[0].attributes[1].key, "allowance");
+    assert_eq!(response.events[0].attributes[1].value, "500");
+    assert_eq!(response.events[0].attributes[2].key, "source");
+    assert_eq!(response.events[0].attributes[2].value, "Prepaid");
 
     // Query and verify the config
     let result = query_user_payment_config(&deps, user_address.to_string()).unwrap();
@@ -360,12 +370,13 @@ fn test_charge_fees_events() {
     // Execute charge_fees
     let response = charge_fees(&mut deps, env, admin_address, batch_id.clone(), prices, fees).unwrap();
 
-    // Verify main response attributes
-    assert_eq!(response.attributes.len(), 2);
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "charge_fees");
-    assert_eq!(response.attributes[1].key, "batch_id");
-    assert_eq!(response.attributes[1].value, batch_id);
+    // Verify response events and attributes
+    assert_eq!(response.attributes.len(), 0);
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-workflow-manager/charge_fees");
+    assert_eq!(response.events[0].attributes.len(), 1);
+    assert_eq!(response.events[0].attributes[0].key, "batch_id");
+    assert_eq!(response.events[0].attributes[0].value, batch_id);
 
     // Verify that submessages were created correctly
     assert_eq!(response.messages.len(), 2); // 2 submessages for 2 users (one per user)
@@ -425,24 +436,17 @@ fn test_handle_fee_manager_reply() {
     // Verify the fee-charged event
     assert_eq!(response.events.len(), 1);
     let fee_event = &response.events[0];
-    assert_eq!(fee_event.ty, "fee-charged");
+    assert_eq!(fee_event.ty, "autorujira-workflow-manager/fee-charged");
     assert_eq!(fee_event.attributes.len(), 7);
     
     // Check specific attributes
-    assert!(fee_event.attributes.iter().any(|attr| 
-        attr.key == "user_address" && attr.value == "thor1test"));
-    assert!(fee_event.attributes.iter().any(|attr| 
-        attr.key == "original_denom" && attr.value == "RUNE"));
-    assert!(fee_event.attributes.iter().any(|attr| 
-        attr.key == "original_amount_charged" && attr.value == "1000"));
-    assert!(fee_event.attributes.iter().any(|attr| 
-        attr.key == "discounted_from_allowance" && attr.value == "1000"));
-    assert!(fee_event.attributes.iter().any(|attr| 
-        attr.key == "debit_denom" && attr.value == "RUNE"));
-    assert!(fee_event.attributes.iter().any(|attr| 
-        attr.key == "fee_type" && attr.value == "execution"));
-    assert!(fee_event.attributes.iter().any(|attr| 
-        attr.key == "creator_address" && attr.value == "thor1test"));
+    assert!(fee_event.attributes.iter().any(|attr| attr.key == "user_address" && attr.value == "thor1test"));
+    assert!(fee_event.attributes.iter().any(|attr| attr.key == "original_denom" && attr.value == "RUNE"));
+    assert!(fee_event.attributes.iter().any(|attr| attr.key == "original_amount_charged" && attr.value == "1000"));
+    assert!(fee_event.attributes.iter().any(|attr| attr.key == "discounted_from_allowance" && attr.value == "1000"));
+    assert!(fee_event.attributes.iter().any(|attr| attr.key == "debit_denom" && attr.value == "RUNE"));
+    assert!(fee_event.attributes.iter().any(|attr| attr.key == "fee_type" && attr.value == "execution"));
+    assert!(fee_event.attributes.iter().any(|attr| attr.key == "creator_address" && attr.value == "thor1test"));
 }
 
 fn charge_fees(
