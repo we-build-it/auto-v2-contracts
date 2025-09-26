@@ -38,7 +38,9 @@ pub fn instantiate(
     }
 
     // Initialize ACCEPTED_DENOMS
-    ACCEPTED_DENOMS.save(deps.storage, &msg.accepted_denoms)?;
+    for (denom, value) in msg.accepted_denoms {
+        ACCEPTED_DENOMS.save(deps.storage, &denom, &value)?;
+    }
 
     let config = Config {
         execution_fees_destination_address: msg.execution_fees_destination_address,
@@ -111,7 +113,15 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         }
         QueryMsg::GetConfig {} => {
             let config = CONFIG.load(deps.storage)?;
-            let accepted_denoms = ACCEPTED_DENOMS.load(deps.storage)?;
+            // Load all accepted denoms
+            let accepted_denoms = ACCEPTED_DENOMS
+                .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
+                .map(|item| {
+                    let (key, value) = item.unwrap();
+                    (key, value)
+                })
+                .collect();
+            
             let result = InstantiateMsg {
                 accepted_denoms: accepted_denoms,
                 execution_fees_destination_address: config.execution_fees_destination_address,

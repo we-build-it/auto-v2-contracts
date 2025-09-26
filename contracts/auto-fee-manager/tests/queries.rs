@@ -1,10 +1,12 @@
+use std::collections::HashMap;
+
 use cosmwasm_std::{testing::{mock_dependencies, mock_env}};
 use cosmwasm_std::{Coin, Uint128};
 
 mod utils;
 use crate::utils::*;
 
-use auto_fee_manager::msg::{AcceptedDenom, Fee, FeeType, UserFees};
+use auto_fee_manager::msg::{AcceptedDenomValue, Fee, FeeType, UserFees};
 
 #[test]
 fn test_get_creator_fees_with_balance() {
@@ -19,11 +21,13 @@ fn test_get_creator_fees_with_balance() {
     let workflow_manager_address = api.addr_make("workflow_manager");
     let creator_address = api.addr_make("creator");
     
-    let accepted_denoms = vec![AcceptedDenom {
-        denom: "tcy".to_string(),
-        max_debt: Uint128::from(1000u128),
-        min_balance_threshold: Uint128::from(100u128),
-    }];
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "tcy".to_string(),
+        AcceptedDenomValue {
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        }
+    )].into_iter().collect();
     
     let distribution_fees_destination_address = api.addr_make("distribution_destination");
     instantiate_contract(
@@ -95,12 +99,13 @@ fn test_get_creator_fees_without_balance() {
     let workflow_manager_address = api.addr_make("workflow_manager");
     let creator_address = api.addr_make("creator");
     
-    let accepted_denoms = vec![AcceptedDenom {
-        denom: "tcy".to_string(),
-        max_debt: Uint128::from(1000u128),
-        min_balance_threshold: Uint128::from(100u128),
-    }];
-
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "tcy".to_string(),
+        AcceptedDenomValue {
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        }
+    )].into_iter().collect();
     
     let distribution_fees_destination_address = api.addr_make("distribution_destination");
     instantiate_contract(
@@ -139,11 +144,13 @@ fn test_get_user_balances() {
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
     
-    let accepted_denoms = vec![AcceptedDenom {
-        denom: "tcy".to_string(),
-        max_debt: Uint128::from(1000u128),
-        min_balance_threshold: Uint128::from(100u128),
-    }];
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "tcy".to_string(),
+        AcceptedDenomValue {
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        }
+    )].into_iter().collect();
     
     let distribution_fees_destination_address = api.addr_make("distribution_destination");
     instantiate_contract(
@@ -198,11 +205,13 @@ fn test_has_exceeded_debt_limit() {
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
     
-    let accepted_denoms = vec![AcceptedDenom {
-        denom: "tcy".to_string(),
-        max_debt: Uint128::from(1000u128),
-        min_balance_threshold: Uint128::from(100u128),
-    }];
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "tcy".to_string(),
+        AcceptedDenomValue {
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        }
+    )].into_iter().collect();
     
     let distribution_fees_destination_address = api.addr_make("distribution_destination");
     instantiate_contract(
@@ -264,11 +273,13 @@ fn test_get_non_creator_fees() {
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
     
-    let accepted_denoms = vec![AcceptedDenom {
-        denom: "tcy".to_string(),
-        max_debt: Uint128::from(1000u128),
-        min_balance_threshold: Uint128::from(100u128),
-    }];
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "tcy".to_string(),
+        AcceptedDenomValue {
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        }
+    )].into_iter().collect();
 
     let distribution_fees_destination_address = api.addr_make("distribution_destination");
     instantiate_contract(

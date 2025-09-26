@@ -1,5 +1,7 @@
+use std::collections::HashMap;
+
 use cosmwasm_std::{testing::{mock_dependencies, mock_env}};
-use auto_fee_manager::{msg::AcceptedDenom, ContractError};
+use auto_fee_manager::{msg::AcceptedDenomValue, ContractError};
 use cosmwasm_std::{Uint128};
 mod utils;
 use crate::utils::*;
@@ -14,11 +16,13 @@ fn test_crank_authorized_functions_require_authorization() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![AcceptedDenom {
-        denom: "uusdc".to_string(),
-        max_debt: Uint128::from(1000u128),
-        min_balance_threshold: Uint128::from(100u128),
-    }];
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        }
+    )].into_iter().collect();
     let distribution_fees_destination_address = api.addr_make("distribution_destination");
     instantiate_contract(
         deps.as_mut(),
@@ -121,11 +125,13 @@ fn test_workflow_manager_functions_require_authorization() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![AcceptedDenom {
-        denom: "uusdc".to_string(),
-        max_debt: Uint128::from(1000u128),
-        min_balance_threshold: Uint128::from(100u128),
-    }];
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        }
+    )].into_iter().collect();    
     let distribution_fees_destination_address = api.addr_make("distribution_destination");
     instantiate_contract(
         deps.as_mut(),
@@ -195,11 +201,13 @@ fn test_sudo_set_crank_authorized_address() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![AcceptedDenom {
-        denom: "uusdc".to_string(),
-        max_debt: Uint128::from(1000u128),
-        min_balance_threshold: Uint128::from(100u128),
-    }];
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        }
+    )].into_iter().collect();
     let distribution_fees_destination_address = api.addr_make("distribution_destination");
     instantiate_contract(
         deps.as_mut(),
@@ -255,11 +263,13 @@ fn test_sudo_set_workflow_manager_address() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![AcceptedDenom {
-        denom: "uusdc".to_string(),
-        max_debt: Uint128::from(1000u128),
-        min_balance_threshold: Uint128::from(100u128),
-    }];
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        }
+    )].into_iter().collect();
     let distribution_fees_destination_address = api.addr_make("distribution_destination");
     instantiate_contract(
         deps.as_mut(),
@@ -322,11 +332,13 @@ fn test_sudo_set_execution_fees_destination_address() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![AcceptedDenom {
-        denom: "uusdc".to_string(),
-        max_debt: Uint128::from(1000u128),
-        min_balance_threshold: Uint128::from(100u128),
-    }];
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        }
+    )].into_iter().collect();
     let distribution_fees_destination_address = api.addr_make("distribution_destination");
     instantiate_contract(
         deps.as_mut(),
@@ -364,11 +376,13 @@ fn test_sudo_set_distribution_fees_destination_address() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![AcceptedDenom {
-        denom: "uusdc".to_string(),
-        max_debt: Uint128::from(1000u128),
-        min_balance_threshold: Uint128::from(100u128),
-    }];
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        }
+    )].into_iter().collect();
     let distribution_fees_destination_address = api.addr_make("distribution_destination");
     instantiate_contract(
         deps.as_mut(),
@@ -407,11 +421,13 @@ fn test_has_exceeded_debt_limit() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![AcceptedDenom {
-        denom: "uusdc".to_string(),
-        max_debt: Uint128::from(1000u128),
-        min_balance_threshold: Uint128::from(100u128),
-    }];
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        }
+    )].into_iter().collect();
     let distribution_fees_destination_address = api.addr_make("distribution_destination");
     instantiate_contract(
         deps.as_mut(),
@@ -469,23 +485,23 @@ fn test_get_user_balances() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![
-        AcceptedDenom {
-            denom: "uusdc".to_string(),
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![
+        ("uusdc".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::from(1000u128),
             min_balance_threshold: Uint128::from(100u128),
-        },
-        AcceptedDenom {
-            denom: "uatom".to_string(),
+        }),
+        ("uatom".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::zero(),
             min_balance_threshold: Uint128::zero(),
-        },
-        AcceptedDenom {
-            denom: "uosmo".to_string(),
+        }),
+        ("uosmo".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::zero(),
             min_balance_threshold: Uint128::zero(),
-        },
-    ];
+        }),
+    ].into_iter().collect();    
 
     let distribution_fees_destination_address = api.addr_make("distribution_destination");
     instantiate_contract(

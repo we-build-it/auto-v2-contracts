@@ -1,6 +1,6 @@
 use crate::events::{balance_below_threshold, deposit_completed};
 use crate::helpers::{verify_authorization, verify_workflow_manager};
-use crate::msg::{Fee, FeeType};
+use crate::msg::{AcceptedDenomValue, Fee, FeeType};
 use crate::state::{
     CONFIG, USER_BALANCES, CREATOR_FEES, EXECUTION_FEES, DISTRIBUTION_FEES, ACCEPTED_DENOMS,
     SUBSCRIBED_CREATORS,
@@ -19,20 +19,17 @@ pub fn handle_deposit(deps: DepsMut, info: MessageInfo) -> Result<Response, Cont
         return Err(ContractError::NoFundsSent {});
     }
 
-    // Load accepted denoms
-    let accepted_denoms = ACCEPTED_DENOMS.load(deps.storage)?;
-
     // Track denoms that turned positive
     let mut balances_turned_positive = Vec::new();
 
     // Process each coin sent
     for coin in &info.funds {
         // Validate that the denom is accepted
-        if !accepted_denoms.iter().any(|d| d.denom == coin.denom) {
-            return Err(ContractError::DenomNotAccepted {
+        ACCEPTED_DENOMS
+            .may_load(deps.storage, coin.denom.as_str())? // StdResult<Option<_>>
+            .ok_or_else(|| ContractError::DenomNotAccepted {
                 denom: coin.denom.clone(),
-            });
-        }
+            })?;
 
         // Get current balance for this user and denom
         let current_balance = USER_BALANCES
@@ -84,17 +81,14 @@ pub fn handle_withdraw(
         return Err(ContractError::InvalidWithdrawalAmount {});
     }
 
-    // Load accepted denoms
-    let accepted_denoms = ACCEPTED_DENOMS.load(deps.storage)?;
-
     // Validate that the denom is accepted
-    if !accepted_denoms.iter().any(|d| d.denom == denom) {
-        return Err(ContractError::DenomNotAccepted {
+    ACCEPTED_DENOMS
+        .may_load(deps.storage, denom.as_str())?
+        .ok_or_else(|| ContractError::DenomNotAccepted {
             denom: denom.clone(),
-        });
-    }
+        })?;
 
-    // Get current balance for this user and denom
+        // Get current balance for this user and denom
     let current_balance = USER_BALANCES
         .may_load(deps.storage, (info.sender.clone(), denom.as_str()))?
         .unwrap_or(0);
@@ -146,7 +140,6 @@ pub fn handle_charge_fees_from_user_balance(
     nonpayable(&info)?;
 
     verify_workflow_manager(deps.as_ref(), &info)?;
-    let accepted_denoms = ACCEPTED_DENOMS.load(deps.storage)?;
 
     let mut users_below_threshold = Vec::new();
     let mut response = Response::new()
@@ -164,11 +157,11 @@ pub fn handle_charge_fees_from_user_balance(
     for user_fees in &batch {
         for fee in &user_fees.fees {
             // Validate denom
-            if !accepted_denoms.iter().any(|d| d.denom == fee.denom) {
-                return Err(ContractError::DenomNotAccepted {
+            ACCEPTED_DENOMS
+                .may_load(deps.storage, fee.denom.as_str())?
+                .ok_or_else(|| ContractError::DenomNotAccepted {
                     denom: fee.denom.clone(),
-                });
-            }
+                })?;
             
             match &fee.fee_type {
                 FeeType::Execution => {
@@ -227,7 +220,9 @@ pub fn handle_charge_fees_from_user_balance(
         USER_BALANCES.save(deps.storage, (user.clone(), denom.as_str()), &new_balance)?;
         
         // Check if balance is below threshold
-        if new_balance <= accepted_denoms.iter().find(|d| d.denom == denom).unwrap().min_balance_threshold.u128() as i128 {
+        if new_balance <= ACCEPTED_DENOMS
+                .may_load(deps.storage, denom.as_str())?
+                .unwrap().min_balance_threshold.u128() as i128 {
             users_below_threshold.push((user.clone(), denom.clone()));
         }
         
@@ -635,10 +630,17 @@ pub fn handle_distribute_creator_fees(
 }
 
 pub fn has_exceeded_debt_limit(deps: Deps, user: Addr) -> StdResult<bool> {
-    let accepted_denoms = ACCEPTED_DENOMS.load(deps.storage)?;
+    let accepted_denoms: Vec<(String, AcceptedDenomValue)> = ACCEPTED_DENOMS
+    .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
+    .map(|item| {
+        let (key, value) = item.unwrap();
+        (key.to_string(), value)
+    })
+    .collect();
+
     for accepted_denom in accepted_denoms {
         let user_balance = USER_BALANCES
-            .may_load(deps.storage, (user.clone(), accepted_denom.denom.as_str()))?
+            .may_load(deps.storage, (user.clone(), accepted_denom.0.as_str()))?
             .unwrap_or(0);
 
         // If the balance is negative (debt), check if it exceeds the max_debt amount
@@ -646,7 +648,7 @@ pub fn has_exceeded_debt_limit(deps: Deps, user: Addr) -> StdResult<bool> {
             // Convert the negative balance to a positive amount for comparison
             let debt_amount = (-user_balance) as u128;
             // Check if the debt exceeds the max_debt limit
-            if debt_amount > accepted_denom.max_debt.u128() {
+            if debt_amount > accepted_denom.1.max_debt.u128() {
                 return Ok(true);
             }
         }
@@ -656,18 +658,24 @@ pub fn has_exceeded_debt_limit(deps: Deps, user: Addr) -> StdResult<bool> {
 
 pub fn get_user_balances(deps: Deps, user: Addr) -> StdResult<crate::msg::UserBalancesResponse> {
     // Get accepted denoms to know which balances to check
-    let accepted_denoms = ACCEPTED_DENOMS.load(deps.storage)?;
-    
+    let accepted_denoms: Vec<String> = ACCEPTED_DENOMS
+        .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
+        .map(|item| {
+            let (key, _) = item.unwrap();
+            key.to_string()
+        })
+        .collect();
+
     let mut balances = Vec::new();
     
     // Get balance for each accepted denom
     for accepted_denom in accepted_denoms {
         let balance = USER_BALANCES
-            .may_load(deps.storage, (user.clone(), accepted_denom.denom.as_str()))?
+            .may_load(deps.storage, (user.clone(), accepted_denom.as_str()))?
             .unwrap_or(0);
         
         balances.push(crate::msg::UserBalance {
-            denom: accepted_denom.denom,
+            denom: accepted_denom,
             balance,
         });
     }
@@ -680,20 +688,26 @@ pub fn get_user_balances(deps: Deps, user: Addr) -> StdResult<crate::msg::UserBa
 
 pub fn get_creator_fees(deps: Deps, creator: Addr) -> StdResult<crate::msg::CreatorFeesResponse> {
     // Get accepted denoms to know which balances to check
-    let accepted_denoms = ACCEPTED_DENOMS.load(deps.storage)?;
+    let accepted_denoms: Vec<String> = ACCEPTED_DENOMS
+        .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
+        .map(|item| {
+            let (key, _) = item.unwrap();
+            key.to_string()
+        })
+        .collect();
     
     let mut fees = Vec::new();
     
     // Get creator fees for each accepted denom
     for accepted_denom in accepted_denoms {
         let balance = CREATOR_FEES
-            .may_load(deps.storage, (&creator, accepted_denom.denom.as_str()))?
+            .may_load(deps.storage, (&creator, accepted_denom.as_str()))?
             .unwrap_or(Uint128::zero());
         
         // Only include denoms with non-zero balance
         if balance > Uint128::zero() {
             fees.push(crate::msg::FeeBalance {
-                denom: accepted_denom.denom,
+                denom: accepted_denom,
                 balance,
             });
         }
@@ -707,7 +721,13 @@ pub fn get_creator_fees(deps: Deps, creator: Addr) -> StdResult<crate::msg::Crea
 
 pub fn get_non_creator_fees(deps: Deps) -> StdResult<crate::msg::NonCreatorFeesResponse> {
     // Get accepted denoms to know which balances to check
-    let accepted_denoms = ACCEPTED_DENOMS.load(deps.storage)?;
+    let accepted_denoms: Vec<String> = ACCEPTED_DENOMS
+        .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
+        .map(|item| {
+            let (key, _) = item.unwrap();
+            key.to_string()
+        })
+        .collect();
     
     let mut execution_fees = Vec::new();
     let mut distribution_fees = Vec::new();
@@ -716,24 +736,24 @@ pub fn get_non_creator_fees(deps: Deps) -> StdResult<crate::msg::NonCreatorFeesR
     for accepted_denom in accepted_denoms {
         // Check execution fees
         let execution_balance = EXECUTION_FEES
-            .may_load(deps.storage, accepted_denom.denom.as_str())?
+            .may_load(deps.storage, accepted_denom.as_str())?
             .unwrap_or(Uint128::zero());
         
         if execution_balance > Uint128::zero() {
             execution_fees.push(crate::msg::FeeBalance {
-                denom: accepted_denom.denom.clone(),
+                denom: accepted_denom.clone(),
                 balance: execution_balance,
             });
         }
         
         // Check distribution fees
         let distribution_balance = DISTRIBUTION_FEES
-            .may_load(deps.storage, accepted_denom.denom.as_str())?
+            .may_load(deps.storage, accepted_denom.as_str())?
             .unwrap_or(Uint128::zero());
         
         if distribution_balance > Uint128::zero() {
             distribution_fees.push(crate::msg::FeeBalance {
-                denom: accepted_denom.denom,
+                denom: accepted_denom.clone(),
                 balance: distribution_balance,
             });
         }
@@ -771,7 +791,7 @@ pub fn handle_disable_creator_fee_distribution(
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
     nonpayable(&info)?;
-    
+
     // Only the creator can disable their own fee distribution
     let creator = info.sender;
     

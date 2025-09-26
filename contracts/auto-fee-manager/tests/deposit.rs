@@ -1,5 +1,7 @@
+use std::collections::HashMap;
+
 use cosmwasm_std::{testing::{mock_dependencies, mock_env, message_info}};
-use auto_fee_manager::{msg::AcceptedDenom, ContractError};
+use auto_fee_manager::{msg::AcceptedDenomValue, ContractError};
 use cosmwasm_std::{Coin, Uint128};
 mod utils;
 use crate::utils::*;
@@ -14,11 +16,13 @@ fn test_deposit_with_valid_funds() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![AcceptedDenom {
-        denom: "uusdc".to_string(),
-        max_debt: Uint128::from(1000u128),
-        min_balance_threshold: Uint128::from(100u128),
-    }];
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        }
+    )].into_iter().collect();
     instantiate_contract(
         deps.as_mut(),
         env.clone(),
@@ -62,11 +66,13 @@ fn test_deposit_without_funds_fails() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![AcceptedDenom {
-        denom: "uusdc".to_string(),
-        max_debt: Uint128::from(1000u128),
-        min_balance_threshold: Uint128::from(100u128),
-    }];
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        }
+    )].into_iter().collect();
     instantiate_contract(
         deps.as_mut(),
         env.clone(),
@@ -104,11 +110,13 @@ fn test_deposit_with_invalid_denom_fails() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![AcceptedDenom {
-        denom: "uusdc".to_string(),
-        max_debt: Uint128::from(1000u128),
-        min_balance_threshold: Uint128::from(100u128),
-    }];
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        }
+    )].into_iter().collect();
     instantiate_contract(
         deps.as_mut(),
         env.clone(),
@@ -152,18 +160,18 @@ fn test_deposit_multiple_denoms() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![
-        AcceptedDenom {
-            denom: "uusdc".to_string(),
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::from(1000u128),
             min_balance_threshold: Uint128::from(100u128),
-        },  
-        AcceptedDenom {
-            denom: "uatom".to_string(),
+        }),
+        ("uatom".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::zero(),
             min_balance_threshold: Uint128::zero(),
         },
-    ];
+    )].into_iter().collect();
     instantiate_contract(
         deps.as_mut(),
         env.clone(),
@@ -214,11 +222,13 @@ fn test_deposit_balance_tracking() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![AcceptedDenom {
-        denom: "uusdc".to_string(),
-        max_debt: Uint128::from(1000u128),
-        min_balance_threshold: Uint128::from(100u128),
-    }];
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        }
+    )].into_iter().collect();
     instantiate_contract(
         deps.as_mut(),
         env.clone(),
@@ -271,18 +281,18 @@ fn test_deposit_event_balance_turned_positive() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![
-        AcceptedDenom {
-            denom: "uusdc".to_string(),
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::from(1000u128),
             min_balance_threshold: Uint128::from(100u128),
-        },  
-        AcceptedDenom {
-            denom: "uatom".to_string(),
+        }),
+        ("uatom".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::zero(),
             min_balance_threshold: Uint128::zero(),
-        },
-    ];
+        }),
+    ].into_iter().collect();
     instantiate_contract(
         deps.as_mut(),
         env.clone(),
@@ -337,18 +347,18 @@ fn test_deposit_event_multiple_balances_turned_positive() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![
-        AcceptedDenom {
-            denom: "uusdc".to_string(),
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::from(1000u128),
             min_balance_threshold: Uint128::from(100u128),
-        },  
-        AcceptedDenom {
-            denom: "uatom".to_string(),
+        }),
+        ("uatom".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::zero(),
             min_balance_threshold: Uint128::zero(),
-        },
-    ];
+        })
+    ].into_iter().collect();
     instantiate_contract(
         deps.as_mut(),
         env.clone(),
@@ -413,13 +423,13 @@ fn test_deposit_no_event_when_balance_stays_negative() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![
-        AcceptedDenom {
-            denom: "uusdc".to_string(),
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::from(1000u128),
             min_balance_threshold: Uint128::from(100u128),
-        },  
-    ];
+        }
+    )].into_iter().collect();
     instantiate_contract(
         deps.as_mut(),
         env.clone(),
@@ -473,12 +483,13 @@ fn test_deposit_no_event_when_balance_was_already_positive() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![
-        AcceptedDenom {
-            denom: "uusdc".to_string(),
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::from(1000u128),
             min_balance_threshold: Uint128::from(100u128),
-        },      ];
+        }
+    )].into_iter().collect();
     instantiate_contract(
         deps.as_mut(),
         env.clone(),
