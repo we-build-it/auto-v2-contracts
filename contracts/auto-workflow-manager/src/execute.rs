@@ -10,7 +10,6 @@ use auto_fee_manager::msg::ExecuteMsg as FeeManagerExecuteMsg;
 use auto_fee_manager::msg::Fee as FeeManagerFee;
 use auto_fee_manager::msg::FeeType as FeeManagerFeeType;
 use auto_fee_manager::msg::UserFees as FeeManagerUserFees;
-use cw_utils::nonpayable;
 
 use crate::{
     msg::{
@@ -58,8 +57,6 @@ pub fn publish_workflow(
     info: MessageInfo,
     input_workflow: NewWorkflowMsg,
 ) -> Result<Response, ContractError> {
-    nonpayable(&info)?;
-
     validate_sender_is_publisher(deps.storage, &info)?;
 
     // Check if workflow already exists
@@ -111,8 +108,6 @@ pub fn execute_instance(
     info: MessageInfo,
     instance: NewInstanceMsg,
 ) -> Result<Response, ContractError> {
-    nonpayable(&info)?;
-
     // Check if workflow exists
     let workflow = load_workflow(deps.storage, &instance.workflow_id).map_err(|_| {
         ContractError::WorkflowNotFound {
@@ -170,8 +165,6 @@ pub fn cancel_run(
     info: MessageInfo,
     instance_id: u64
 ) -> Result<Response, ContractError> {
-    nonpayable(&info)?;
-
     // Load the instance
     let instance =
         load_workflow_instance(deps.storage, &info.sender, &instance_id).map_err(|_| {
@@ -204,8 +197,6 @@ pub fn cancel_instance(
     info: MessageInfo,
     instance_id: u64
 ) -> Result<Response, ContractError> {
-    nonpayable(&info)?;
-
     // Load the instance
     let instance =
         load_workflow_instance(deps.storage, &info.sender, &instance_id).map_err(|_| {
@@ -238,8 +229,6 @@ pub fn pause_schedule(
     info: MessageInfo,
     instance_id: u64,
 ) -> Result<Response, ContractError> {
-    nonpayable(&info)?;
-
     // Load the instance
     let mut instance =
         load_workflow_instance(deps.storage, &info.sender, &instance_id).map_err(|_| {
@@ -280,8 +269,6 @@ pub fn resume_schedule(
     info: MessageInfo,
     instance_id: u64,
 ) -> Result<Response, ContractError> {
-    nonpayable(&info)?;
-
     // Load the instance
     let mut instance =
         load_workflow_instance(deps.storage, &info.sender, &instance_id).map_err(|_| {
@@ -617,8 +604,6 @@ pub fn purge_instances(
     info: MessageInfo,
     instance_ids: Vec<u64>,
 ) -> Result<Response, ContractError> {
-    nonpayable(&info)?;
-
     // Validate sender is admin
     validate_sender_is_admin(deps.storage, &info)?;
 
@@ -654,8 +639,6 @@ pub fn set_user_payment_config(
     info: MessageInfo,
     payment_config: PaymentConfig,
 ) -> Result<Response, ContractError> {
-    nonpayable(&info)?;
-
     // Validate user address
     let user_addr = deps.api.addr_validate(&info.sender.to_string())?;
 
@@ -674,8 +657,6 @@ pub fn remove_user_payment_config_execute(
     _env: Env,
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
-    nonpayable(&info)?;
-
     // Validate user address
     let user_addr = deps.api.addr_validate(&info.sender.to_string())?;
 
@@ -938,8 +919,6 @@ pub fn finish_instances(
     info: MessageInfo,
     instances: Vec<FinishInstanceRequest>,
 ) -> Result<Response, ContractError> {
-    nonpayable(&info)?;
-
     // Validate sender is admin
     validate_sender_is_admin(deps.storage, &info)?;
 
@@ -988,8 +967,6 @@ pub fn reset_instance(
     user_address: String,
     instance_id: InstanceId,
 ) -> Result<Response, ContractError> {
-    nonpayable(&info)?;
-
     // Validate sender is admin
     validate_sender_is_admin(deps.storage, &info)?;
 

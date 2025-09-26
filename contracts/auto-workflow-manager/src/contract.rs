@@ -4,6 +4,7 @@ use cosmwasm_std::{
     Reply,
 };
 use cw2::set_contract_version;
+use cw_utils::nonpayable;
 
 use crate::{
     error::ContractError,
@@ -65,6 +66,8 @@ pub fn execute(
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
+    nonpayable(&info)?;
+
     match msg {
         ExecuteMsg::PublishWorkflow { workflow } => publish_workflow(deps, env, info, workflow),
         ExecuteMsg::ExecuteInstance { instance } => execute_instance(deps, env, info, instance),
