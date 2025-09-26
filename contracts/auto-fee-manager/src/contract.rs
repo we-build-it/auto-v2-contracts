@@ -134,34 +134,44 @@ pub fn sudo(deps: DepsMut, _env: Env, msg: SudoMsg) -> Result<Response, Contract
             let mut config = CONFIG.load(deps.storage)?;
             config.crank_authorized_address = address;
             CONFIG.save(deps.storage, &config)?;
-            Ok(Response::new().add_attribute("method", "sudo_set_crank_authorized_address"))
+            Ok(Response::new().add_event(
+                cosmwasm_std::Event::new("autorujira-fee-manager/sudo_set_crank_authorized_address")
+            ))
         }
         SudoMsg::SetWorkflowManagerAddress { address } => {
             validate_address(&deps, &address.as_str(), "workflow_manager_address")?;
             let mut config = CONFIG.load(deps.storage)?;
             config.workflow_manager_address = Some(address);
             CONFIG.save(deps.storage, &config)?;
-            Ok(Response::new().add_attribute("method", "sudo_set_workflow_manager_address"))
+            Ok(Response::new().add_event(
+                cosmwasm_std::Event::new("autorujira-fee-manager/sudo_set_workflow_manager_address")
+            ))
         }
         SudoMsg::SetExecutionFeesDestinationAddress { address } => {
             validate_address(&deps, &address.as_str(), "execution_fees_destination_address")?;
             let mut config = CONFIG.load(deps.storage)?;
             config.execution_fees_destination_address = address;
             CONFIG.save(deps.storage, &config)?;
-            Ok(Response::new().add_attribute("method", "sudo_set_execution_fees_destination_address"))
+            Ok(Response::new().add_event(
+                cosmwasm_std::Event::new("autorujira-fee-manager/sudo_set_execution_fees_destination_address")
+            ))
         }
         SudoMsg::SetDistributionFeesDestinationAddress { address } => {
             validate_address(&deps, &address.as_str(), "distribution_fees_destination_address")?;
             let mut config = CONFIG.load(deps.storage)?;
             config.distribution_fees_destination_address = address;
             CONFIG.save(deps.storage, &config)?;
-            Ok(Response::new().add_attribute("method", "sudo_set_distribution_fees_destination_address"))
+            Ok(Response::new().add_event(
+                cosmwasm_std::Event::new("autorujira-fee-manager/sudo_set_distribution_fees_destination_address")
+            ))
         }
         SudoMsg::SetCreatorDistributionFee { fee } => {
             let mut config = CONFIG.load(deps.storage)?;
             config.creator_distribution_fee = fee;
             CONFIG.save(deps.storage, &config)?;
-            Ok(Response::new().add_attribute("method", "sudo_set_creator_distribution_fee"))
+            Ok(Response::new().add_event(
+                cosmwasm_std::Event::new("autorujira-fee-manager/sudo_set_creator_distribution_fee")
+            ))
         }
     }
 }
@@ -173,6 +183,9 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
     
     // No migration logic needed for this version
     Ok(Response::new()
-        .add_attribute("method", "migrate")
-        .add_attribute("version", crate::CONTRACT_VERSION))
+        .add_event(
+            cosmwasm_std::Event::new("autorujira-fee-manager/migrate")
+                .add_attribute("version", crate::CONTRACT_VERSION)
+        )
+    )
 }

@@ -347,10 +347,11 @@ fn test_sudo_set_execution_fees_destination_address() {
         new_execution_fees_destination_address.clone(),
     );
     assert!(result.is_ok());
-    // Verify response attributes
+    // Verify response event and attributes
     let response = result.unwrap();
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "sudo_set_execution_fees_destination_address");
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-fee-manager/sudo_set_execution_fees_destination_address");
+    assert_eq!(response.events[0].attributes.len(), 0);
 }
 
 #[test]
@@ -390,8 +391,9 @@ fn test_sudo_set_distribution_fees_destination_address() {
     assert!(result.is_ok());
     // Verify response attributes
     let response = result.unwrap();
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "sudo_set_distribution_fees_destination_address");
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-fee-manager/sudo_set_distribution_fees_destination_address");
+    assert_eq!(response.events[0].attributes.len(), 0);
 }
 
 #[test]

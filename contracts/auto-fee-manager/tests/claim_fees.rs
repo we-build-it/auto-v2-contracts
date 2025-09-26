@@ -105,12 +105,16 @@ fn test_claim_creator_fees_success() {
     ).unwrap();
     assert_eq!(uusdc_fees, None);
     assert_eq!(uatom_fees, None);
-    // Verify response attributes
+    // Verify response events and attributes
     let response = result.unwrap();
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "claim_creator_fees");
-    assert_eq!(response.attributes[1].key, "creator");
-    assert_eq!(response.attributes[1].value, creator_address.to_string());
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-fee-manager/claim_creator_fees");
+    assert_eq!(response.events[0].attributes.len(), 2);
+    assert_eq!(response.events[0].attributes[0].key, "creator");
+    assert_eq!(response.events[0].attributes[0].value, creator_address.to_string());
+    assert_eq!(response.events[0].attributes[1].key, "total_claimed");
+    assert_eq!(response.events[0].attributes[1].value, "[Coin { 300 \"uatom\" }, Coin { 500 \"uusdc\" }]");
+
     // Verify bank messages were created
     assert_eq!(response.messages.len(), 2);
     // Check messages (order is alphabetical by denom: uatom, then uusdc)

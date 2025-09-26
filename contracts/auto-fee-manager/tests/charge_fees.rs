@@ -54,12 +54,20 @@ fn test_charge_fees_from_user_balance_success() {
         workflow_manager_address,
         vec![test_user_fees],
     ).unwrap();
-    // Verify response attributes
-    assert_eq!(response.attributes.len(), 2);
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "charge_fees_from_user_balance");
-    assert_eq!(response.attributes[1].key, "batch_size");
-    assert_eq!(response.attributes[1].value, "1");
+    // Verify response events and attributes
+    assert_eq!(response.events.len(), 2);
+    assert_eq!(response.events[0].ty, "autorujira-fee-manager/charge_fees_from_user_balance");
+    assert_eq!(response.events[0].attributes.len(), 1);
+    assert_eq!(response.events[0].attributes[0].key, "batch_size");
+    assert_eq!(response.events[0].attributes[0].value, "1");
+    
+    assert_eq!(response.events[1].ty, "autorujira-fee-manager/balance_below_threshold");
+    assert_eq!(response.events[1].attributes.len(), 2);
+    assert_eq!(response.events[1].attributes[0].key, "user");
+    assert_eq!(response.events[1].attributes[0].value, user_address.to_string());
+    assert_eq!(response.events[1].attributes[1].key, "denom");
+    assert_eq!(response.events[1].attributes[1].value, "uusdc");
+    
     // Verify user balance was reduced
     let balance = auto_fee_manager::state::USER_BALANCES
         .load(deps.as_ref().storage, (user_address, "uusdc"))
@@ -225,9 +233,9 @@ fn test_charge_fees_from_user_balance_below_threshold_event() {
         vec![test_user_fees],
     ).unwrap();
     // Verify event was emitted
-    assert_eq!(response.events.len(), 1);
-    let event = &response.events[0];
-    assert_eq!(event.ty, "balance_below_threshold");
+    assert_eq!(response.events.len(), 2);
+    let event = &response.events[1];
+    assert_eq!(event.ty, "autorujira-fee-manager/balance_below_threshold");
     assert_eq!(event.attributes.len(), 2);
     assert_eq!(event.attributes[0].key, "user");
     assert_eq!(event.attributes[0].value, user_address.to_string());
@@ -417,7 +425,7 @@ fn test_distribute_non_creator_fees() {
         admin_address,
         accepted_denoms,
         execution_fees_destination_address.clone(),
-        distribution_fees_destination_address,
+        distribution_fees_destination_address.clone(),
         crank_authorized_address.clone(),
         workflow_manager_address,
         Uint128::from(5u128), // 5% distribution fee
@@ -453,10 +461,17 @@ fn test_distribute_non_creator_fees() {
     assert_eq!(uatom_fees, None);
     // Verify response attributes
     let response = result.unwrap();
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "distribute_non_creator_fees");
-    assert_eq!(response.attributes[1].key, "execution_destination");
-    assert_eq!(response.attributes[1].value, execution_fees_destination_address.to_string());
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-fee-manager/distribute_non_creator_fees");
+    assert_eq!(response.events[0].attributes.len(), 4);
+    assert_eq!(response.events[0].attributes[0].key, "execution_destination");
+    assert_eq!(response.events[0].attributes[0].value, execution_fees_destination_address.to_string());
+    assert_eq!(response.events[0].attributes[1].key, "distribution_destination");
+    assert_eq!(response.events[0].attributes[1].value, distribution_fees_destination_address.to_string());
+    assert_eq!(response.events[0].attributes[2].key, "execution_distributed");
+    assert_eq!(response.events[0].attributes[2].value, "[Coin { 300 \"uatom\" }, Coin { 500 \"uusdc\" }]");
+    assert_eq!(response.events[0].attributes[3].key, "distribution_distributed");
+    assert_eq!(response.events[0].attributes[3].value, "[]");
     // Verify bank messages were created
     assert_eq!(response.messages.len(), 2);
     // Check messages (order is alphabetical by denom: uatom, then uusdc)

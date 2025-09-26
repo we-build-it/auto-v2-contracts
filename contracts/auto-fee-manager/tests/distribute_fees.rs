@@ -158,10 +158,11 @@ fn test_distribute_creator_fees_success() {
 
     // Verify response attributes
     let response = result.unwrap();
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "distribute_creator_fees");
-    assert_eq!(response.attributes[1].key, "distribution_fee_rate");
-    assert_eq!(response.attributes[1].value, "5");
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-fee-manager/distribute_creator_fees");
+    assert_eq!(response.events[0].attributes.len(), 2);
+    assert_eq!(response.events[0].attributes[0].key, "distribution_fee_rate");
+    assert_eq!(response.events[0].attributes[0].value, "5");
     
     // Verify bank messages were created (should be 3: creator1 uusdc, creator1 uatom, creator2 uusdc)
     assert_eq!(response.messages.len(), 3);

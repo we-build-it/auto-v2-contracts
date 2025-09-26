@@ -58,17 +58,17 @@ fn test_withdraw_with_sufficient_balance() {
         },
     ).unwrap();
     // Verify response attributes
-    assert_eq!(response.attributes.len(), 5);
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "withdraw");
-    assert_eq!(response.attributes[1].key, "user");
-    assert_eq!(response.attributes[1].value, user_address.to_string());
-    assert_eq!(response.attributes[2].key, "denom");
-    assert_eq!(response.attributes[2].value, "uusdc");
-    assert_eq!(response.attributes[3].key, "amount");
-    assert_eq!(response.attributes[3].value, "100");
-    assert_eq!(response.attributes[4].key, "new_balance");
-    assert_eq!(response.attributes[4].value, "100");
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-fee-manager/withdraw");
+    assert_eq!(response.events[0].attributes.len(), 4);
+    assert_eq!(response.events[0].attributes[0].key, "user");
+    assert_eq!(response.events[0].attributes[0].value, user_address.to_string());
+    assert_eq!(response.events[0].attributes[1].key, "denom");
+    assert_eq!(response.events[0].attributes[1].value, "uusdc");
+    assert_eq!(response.events[0].attributes[2].key, "amount");
+    assert_eq!(response.events[0].attributes[2].value, "100");
+    assert_eq!(response.events[0].attributes[3].key, "new_balance");
+    assert_eq!(response.events[0].attributes[3].value, "100");
     // Verify bank message was added
     assert_eq!(response.messages.len(), 1);
     // Note: We don't verify the exact bank message content as it's complex to test

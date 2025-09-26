@@ -56,9 +56,11 @@ pub fn handle_deposit(deps: DepsMut, info: MessageInfo) -> Result<Response, Cont
 
     // Create response
     let mut response = Response::new()
-        .add_attribute("method", "deposit")
-        .add_attribute("user", info.sender.to_string())
-        .add_attribute("funds", format!("{:?}", info.funds));
+        .add_event(
+            cosmwasm_std::Event::new("autorujira-fee-manager/deposit")
+                .add_attribute("user", info.sender.to_string())
+                .add_attribute("funds", format!("{:?}", info.funds))
+        );
 
     // Add event only if any balances turned positive
     if !balances_turned_positive.is_empty() {
@@ -122,12 +124,14 @@ pub fn handle_withdraw(
     };
 
     Ok(Response::new()
-        .add_message(bank_msg)
-        .add_attribute("method", "withdraw")
-        .add_attribute("user", info.sender.to_string())
-        .add_attribute("denom", denom)
-        .add_attribute("amount", amount.to_string())
-        .add_attribute("new_balance", new_balance.to_string()))
+        .add_event(
+            cosmwasm_std::Event::new("autorujira-fee-manager/withdraw")
+                .add_attribute("user", info.sender.to_string())
+                .add_attribute("denom", denom)
+                .add_attribute("amount", amount.to_string())
+                .add_attribute("new_balance", new_balance.to_string())
+        )
+        .add_message(bank_msg))
 }
 
 pub fn handle_charge_fees_from_user_balance(
@@ -141,8 +145,10 @@ pub fn handle_charge_fees_from_user_balance(
 
     let mut users_below_threshold = Vec::new();
     let mut response = Response::new()
-        .add_attribute("method", "charge_fees_from_user_balance")
-        .add_attribute("batch_size", batch.len().to_string());
+        .add_event(
+            cosmwasm_std::Event::new("autorujira-fee-manager/charge_fees_from_user_balance")
+                .add_attribute("batch_size", batch.len().to_string())
+        );
 
     // 1. Single iteration - accumulate by (user, denom, fee_type)
     // TODO: This could be done offchain
@@ -340,8 +346,10 @@ pub fn handle_charge_fees_from_message_coins(
     }
 
     let response = Response::new()
-        .add_attribute("method", "charge_fees_from_message_coins")
-        .add_attribute("fees_count", fees.len().to_string());
+        .add_event(
+            cosmwasm_std::Event::new("autorujira-fee-manager/charge_fees_from_message_coins")
+                .add_attribute("fees_count", fees.len().to_string())
+        );
 
     Ok(response)
 }
@@ -392,9 +400,11 @@ pub fn handle_claim_creator_fees(
     }
     
     let response = Response::new()
-        .add_attribute("method", "claim_creator_fees")
-        .add_attribute("creator", creator.to_string())
-        .add_attribute("total_claimed", format!("{:?}", total_claimed))
+        .add_event(
+            cosmwasm_std::Event::new("autorujira-fee-manager/claim_creator_fees")
+                .add_attribute("creator", creator.to_string())
+                .add_attribute("total_claimed", format!("{:?}", total_claimed))
+        )
         .add_messages(bank_messages);
     
     Ok(response)
@@ -484,11 +494,13 @@ pub fn handle_distribute_non_creator_fees(
     }
     
     let response = Response::new()
-        .add_attribute("method", "distribute_non_creator_fees")
-        .add_attribute("execution_destination", config.execution_fees_destination_address.to_string())
-        .add_attribute("distribution_destination", config.distribution_fees_destination_address.to_string())
-        .add_attribute("execution_distributed", format!("{:?}", total_execution_distributed))
-        .add_attribute("distribution_distributed", format!("{:?}", total_distribution_distributed))
+        .add_event(
+            cosmwasm_std::Event::new("autorujira-fee-manager/distribute_non_creator_fees")
+                .add_attribute("execution_destination", config.execution_fees_destination_address.to_string())
+                .add_attribute("distribution_destination", config.distribution_fees_destination_address.to_string())
+                .add_attribute("execution_distributed", format!("{:?}", total_execution_distributed))
+                .add_attribute("distribution_distributed", format!("{:?}", total_distribution_distributed))
+        )
         .add_messages(bank_messages);
     
     Ok(response)
@@ -601,9 +613,11 @@ pub fn handle_distribute_creator_fees(
     }
     
     let response = Response::new()
-        .add_attribute("method", "distribute_creator_fees")
-        .add_attribute("distribution_fee_rate", config.creator_distribution_fee.to_string())
-        .add_attribute("total_distributed", format!("{:?}", total_distributed))
+        .add_event(
+            cosmwasm_std::Event::new("autorujira-fee-manager/distribute_creator_fees")
+                .add_attribute("distribution_fee_rate", config.creator_distribution_fee.to_string())
+                .add_attribute("total_distributed", format!("{:?}", total_distributed))
+        )
         .add_messages(bank_messages);
     
     Ok(response)
@@ -731,8 +745,10 @@ pub fn handle_enable_creator_fee_distribution(
     SUBSCRIBED_CREATORS.save(deps.storage, &creator, &true)?;
     
     let response = Response::new()
-        .add_attribute("method", "enable_creator_fee_distribution")
-        .add_attribute("creator", creator.to_string());
+        .add_event(
+            cosmwasm_std::Event::new("autorujira-fee-manager/enable_creator_fee_distribution")
+                .add_attribute("creator", creator.to_string())
+        );
     
     Ok(response)
 }
@@ -748,8 +764,10 @@ pub fn handle_disable_creator_fee_distribution(
     SUBSCRIBED_CREATORS.save(deps.storage, &creator, &false)?;
     
     let response = Response::new()
-        .add_attribute("method", "disable_creator_fee_distribution")
-        .add_attribute("creator", creator.to_string());
+        .add_event(
+            cosmwasm_std::Event::new("autorujira-fee-manager/disable_creator_fee_distribution")
+                .add_attribute("creator", creator.to_string())
+        );
     
     Ok(response)
 }

@@ -55,10 +55,11 @@ fn test_enable_creator_fee_distribution() {
     assert!(result.is_ok());
     
     let response = result.unwrap();
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "enable_creator_fee_distribution");
-    assert_eq!(response.attributes[1].key, "creator");
-    assert_eq!(response.attributes[1].value, creator.to_string());
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-fee-manager/enable_creator_fee_distribution");
+    assert_eq!(response.events[0].attributes.len(), 1);
+    assert_eq!(response.events[0].attributes[0].key, "creator");
+    assert_eq!(response.events[0].attributes[0].value, creator.to_string());
 }
 
 #[test]
@@ -110,10 +111,11 @@ fn test_disable_creator_fee_distribution() {
     assert!(result.is_ok());
     
     let response = result.unwrap();
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "disable_creator_fee_distribution");
-    assert_eq!(response.attributes[1].key, "creator");
-    assert_eq!(response.attributes[1].value, creator.to_string());
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-fee-manager/disable_creator_fee_distribution");
+    assert_eq!(response.events[0].attributes.len(), 1);
+    assert_eq!(response.events[0].attributes[0].key, "creator");
+    assert_eq!(response.events[0].attributes[0].value, creator.to_string());
 }
 
 #[test]
