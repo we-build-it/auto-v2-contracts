@@ -174,16 +174,7 @@ pub fn build_authz_execute_contract_msg(
     contract_addr: &Addr,
     msg_str: &String,
     funds: &Vec<Coin>
-) -> Result<CosmosMsg, ContractError> {
-    // Debug logging to inspect parameters
-    println!("=== build_authz_execute_contract_msg parameters ===");
-    println!("env.contract.address: {}", env.contract.address);
-    println!("user: {}", user);
-    println!("contract_addr: {}", contract_addr);
-    println!("msg_str: {}", msg_str);
-    println!("funds: {:?}", funds);
-    println!("================================================");
-    
+) -> Result<CosmosMsg, ContractError> {    
     // Construct the message to be wrapped in MsgExec
     let msg_anybuf = {
             // Construct MsgExecuteContract using Anybuf
