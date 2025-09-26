@@ -64,16 +64,17 @@ fn test_publish_workflow_with_whitelist() {
 
     let response = publish_workflow(deps.as_mut(), env, publisher_address.clone(), workflow_msg).unwrap();
 
-    // Verify response attributes
-    assert_eq!(response.attributes.len(), 4);
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "publish_workflow");
-    assert_eq!(response.attributes[1].key, "workflow_id");
-    assert_eq!(response.attributes[1].value, "test-whitelist-workflow");
-    assert_eq!(response.attributes[2].key, "publisher");
-    assert_eq!(response.attributes[2].value, publisher_address.to_string());
-    assert_eq!(response.attributes[3].key, "state");
-    assert_eq!(response.attributes[3].value, "approved");
+    // Verify response eattributes
+    assert_eq!(response.attributes.len(), 0);
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-workflow-manager/publish_workflow");
+    assert_eq!(response.events[0].attributes.len(), 3);
+    assert_eq!(response.events[0].attributes[0].key, "workflow_id");
+    assert_eq!(response.events[0].attributes[0].value, "test-whitelist-workflow");
+    assert_eq!(response.events[0].attributes[1].key, "publisher");
+    assert_eq!(response.events[0].attributes[1].value, publisher_address.to_string());
+    assert_eq!(response.events[0].attributes[2].key, "state");
+    assert_eq!(response.events[0].attributes[2].value, "approved");
 }
 
 #[test]
@@ -153,7 +154,7 @@ fn test_execute_action_with_whitelisted_contract() {
         instance_msg,
     ).unwrap();
 
-    let instance_id = response.attributes[1].value.parse::<u64>().unwrap();
+    let instance_id = response.events[0].attributes[0].value.parse::<u64>().unwrap();
 
     // Execute action with whitelisted contract
     let mut action_params = HashMap::new();
@@ -256,7 +257,7 @@ fn test_execute_action_with_non_whitelisted_contract() {
         instance_msg,
     ).unwrap();
 
-    let instance_id = response.attributes[1].value.parse::<u64>().unwrap();
+    let instance_id = response.events[0].attributes[0].value.parse::<u64>().unwrap();
 
     // Execute action with non-whitelisted contract
     let mut action_params = HashMap::new();

@@ -152,8 +152,6 @@ pub enum ExecuteMsg {
         user_address: String,
         instance_id: InstanceId,
     },
-    // TODO: temporal AuthZ test, remove this
-    TestAuthz { },
 }
 
 #[cw_serde]

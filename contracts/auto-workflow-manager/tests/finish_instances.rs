@@ -109,20 +109,17 @@ fn test_finish_instances_success() {
     
     let response = finish_instances(&mut deps, env.clone(), admin_address.clone(), instances).unwrap();
     
-    // Verify response attributes
-    assert_eq!(response.attributes.len(), 4);
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "finish_instances");
-    assert_eq!(response.attributes[1].key, "finished_instance_ids");
-    // Check that the finished instances contain the expected IDs
-    let finished_ids = response.attributes[1].value.clone();
-    assert!(finished_ids.contains("1"));
-    assert!(finished_ids.contains("2"));
-    assert!(finished_ids.contains("3"));
-    assert_eq!(response.attributes[2].key, "not_found_instance_ids");
-    assert_eq!(response.attributes[2].value, "");
-    assert_eq!(response.attributes[3].key, "already_finished_instance_ids");
-    assert_eq!(response.attributes[3].value, "");
+    // Verify response events and attributes
+    assert_eq!(response.attributes.len(), 0);
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-workflow-manager/finish_instances");
+    assert_eq!(response.events[0].attributes.len(), 3);
+    assert_eq!(response.events[0].attributes[0].key, "finished_instance_ids");
+    assert_eq!(response.events[0].attributes[0].value, "1,2,3");
+    assert_eq!(response.events[0].attributes[1].key, "not_found_instance_ids");
+    assert_eq!(response.events[0].attributes[1].value, "");
+    assert_eq!(response.events[0].attributes[2].key, "already_finished_instance_ids");
+    assert_eq!(response.events[0].attributes[2].value, "");
     
     // Verify instances are now Finished
     let instance1_query = query_workflow_instance(deps.as_ref(), user1.to_string(), 1).unwrap();
@@ -155,19 +152,17 @@ fn test_finish_instances_not_found() {
     
     let response = finish_instances(&mut deps, env.clone(), admin_address.clone(), instances).unwrap();
     
-    // Verify response attributes
-    assert_eq!(response.attributes.len(), 4);
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "finish_instances");
-    assert_eq!(response.attributes[1].key, "finished_instance_ids");
-    assert_eq!(response.attributes[1].value, "");
-    assert_eq!(response.attributes[2].key, "not_found_instance_ids");
-    // Check that the not found instances contain the expected IDs
-    let not_found_ids = response.attributes[2].value.clone();
-    assert!(not_found_ids.contains("999"));
-    assert!(not_found_ids.contains("1000"));
-    assert_eq!(response.attributes[3].key, "already_finished_instance_ids");
-    assert_eq!(response.attributes[3].value, "");
+    // Verify response events and attributes
+    assert_eq!(response.attributes.len(), 0);
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-workflow-manager/finish_instances");
+    assert_eq!(response.events[0].attributes.len(), 3);
+    assert_eq!(response.events[0].attributes[0].key, "finished_instance_ids");
+    assert_eq!(response.events[0].attributes[0].value, "");
+    assert_eq!(response.events[0].attributes[1].key, "not_found_instance_ids");
+    assert_eq!(response.events[0].attributes[1].value, "999,1000");
+    assert_eq!(response.events[0].attributes[2].key, "already_finished_instance_ids");
+    assert_eq!(response.events[0].attributes[2].value, "");
 }
 
 #[test]
@@ -203,18 +198,19 @@ fn test_finish_instances_already_finished() {
     
     let response = finish_instances(&mut deps, env.clone(), admin_address.clone(), instances).unwrap();
     
-    // Verify response attributes
-    assert_eq!(response.attributes.len(), 4);
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "finish_instances");
-    assert_eq!(response.attributes[1].key, "finished_instance_ids");
-    assert_eq!(response.attributes[1].value, "");
-    assert_eq!(response.attributes[2].key, "not_found_instance_ids");
-    assert_eq!(response.attributes[2].value, "");
-    assert_eq!(response.attributes[3].key, "already_finished_instance_ids");
+    // Verify response events and   attributes
+    assert_eq!(response.attributes.len(), 0);
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-workflow-manager/finish_instances");
+    assert_eq!(response.events[0].attributes.len(), 3);
+    assert_eq!(response.events[0].attributes[0].key, "finished_instance_ids");
+    assert_eq!(response.events[0].attributes[0].value, "");
+    assert_eq!(response.events[0].attributes[1].key, "not_found_instance_ids");
+    assert_eq!(response.events[0].attributes[1].value, "");
+
     // Check that the already finished instances contain the expected ID
-    let already_finished_ids = response.attributes[3].value.clone();
-    assert!(already_finished_ids.contains("1"));
+    assert_eq!(response.events[0].attributes[2].key, "already_finished_instance_ids");
+    assert_eq!(response.events[0].attributes[2].value, "1");
 }
 
 #[test]
@@ -257,23 +253,23 @@ fn test_finish_instances_mixed_scenarios() {
     
     let response = finish_instances(&mut deps, env.clone(), admin_address.clone(), instances).unwrap();
     
-    // Verify response attributes
-    assert_eq!(response.attributes.len(), 4);
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "finish_instances");
-    assert_eq!(response.attributes[1].key, "finished_instance_ids");
+    // Verify response events and attributes
+    assert_eq!(response.attributes.len(), 0);
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-workflow-manager/finish_instances");
+    assert_eq!(response.events[0].attributes.len(), 3);
+
     // Check that only instance2 was finished
-    let finished_ids = response.attributes[1].value.clone();
-    assert!(finished_ids.contains("2"));
-    assert_eq!(response.attributes[2].key, "not_found_instance_ids");
-    // Check that instance3 and 999 were not found
-    let not_found_ids = response.attributes[2].value.clone();
-    assert!(not_found_ids.contains("3"));
-    assert!(not_found_ids.contains("999"));
-    assert_eq!(response.attributes[3].key, "already_finished_instance_ids");
+    assert_eq!(response.events[0].attributes[0].key, "finished_instance_ids");
+    assert_eq!(response.events[0].attributes[0].value, "2");
+
+    // Check that instance 3 and 999 were not found
+    assert_eq!(response.events[0].attributes[1].key, "not_found_instance_ids");
+    assert_eq!(response.events[0].attributes[1].value, "3,999");
+
     // Check that instance1 was already finished
-    let already_finished_ids = response.attributes[3].value.clone();
-    assert!(already_finished_ids.contains("1"));
+    assert_eq!(response.events[0].attributes[2].key, "already_finished_instance_ids");
+    assert_eq!(response.events[0].attributes[2].value, "1");
     
     // Verify instance2 is now Finished
     let instance2_query = query_workflow_instance(deps.as_ref(), user1.to_string(), 2).unwrap();
@@ -343,20 +339,17 @@ fn test_finish_instances_large_batch() {
     
     let response = finish_instances(&mut deps, env.clone(), admin_address.clone(), instances).unwrap();
     
-    // Verify response attributes
-    assert_eq!(response.attributes.len(), 4);
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "finish_instances");
-    assert_eq!(response.attributes[1].key, "finished_instance_ids");
-    // Should contain all 10 instances
-    let finished_ids = response.attributes[1].value.clone();
-    for i in 1..=10 {
-        assert!(finished_ids.contains(&i.to_string()));
-    }
-    assert_eq!(response.attributes[2].key, "not_found_instance_ids");
-    assert_eq!(response.attributes[2].value, "");
-    assert_eq!(response.attributes[3].key, "already_finished_instance_ids");
-    assert_eq!(response.attributes[3].value, "");
+    // Verify response events and attributes
+    assert_eq!(response.attributes.len(), 0);
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-workflow-manager/finish_instances");
+    assert_eq!(response.events[0].attributes.len(), 3);
+    assert_eq!(response.events[0].attributes[0].key, "finished_instance_ids");
+    assert_eq!(response.events[0].attributes[0].value, "1,2,3,4,5,6,7,8,9,10");
+    assert_eq!(response.events[0].attributes[1].key, "not_found_instance_ids");
+    assert_eq!(response.events[0].attributes[1].value, "");
+    assert_eq!(response.events[0].attributes[2].key, "already_finished_instance_ids");
+    assert_eq!(response.events[0].attributes[2].value, "");
     
     // Verify all instances are now Finished
     for i in 1..=10 {
