@@ -1,4 +1,6 @@
-use auto_fee_manager::msg::AcceptedDenom;
+use std::collections::HashMap;
+
+use auto_fee_manager::msg::AcceptedDenomValue;
 use cosmwasm_std::testing::{mock_dependencies, mock_env};
 use cosmwasm_std::{Uint128};
 use auto_fee_manager::ContractError;
@@ -20,11 +22,13 @@ fn test_distribute_creator_fees_no_fees() {
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
     
-    let accepted_denoms = vec![AcceptedDenom {
-        denom: "uusdc".to_string(),
-        max_debt: Uint128::from(1000u128),
-        min_balance_threshold: Uint128::from(100u128),
-    }];
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        }
+    )].into_iter().collect();
     let distribution_fees_destination_address = api.addr_make("distribution_destination");
     
     instantiate_contract(
@@ -66,11 +70,13 @@ fn test_distribute_creator_fees_success() {
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
     
-    let accepted_denoms = vec![AcceptedDenom {
-        denom: "uusdc".to_string(),
-        max_debt: Uint128::from(1000u128),
-        min_balance_threshold: Uint128::from(100u128),
-    }];
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        }
+    )].into_iter().collect();
     let distribution_fees_destination_address = api.addr_make("distribution_destination");
     
     instantiate_contract(
@@ -158,10 +164,11 @@ fn test_distribute_creator_fees_success() {
 
     // Verify response attributes
     let response = result.unwrap();
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "distribute_creator_fees");
-    assert_eq!(response.attributes[1].key, "distribution_fee_rate");
-    assert_eq!(response.attributes[1].value, "5");
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-fee-manager/distribute_creator_fees");
+    assert_eq!(response.events[0].attributes.len(), 2);
+    assert_eq!(response.events[0].attributes[0].key, "distribution_fee_rate");
+    assert_eq!(response.events[0].attributes[0].value, "5");
     
     // Verify bank messages were created (should be 3: creator1 uusdc, creator1 uatom, creator2 uusdc)
     assert_eq!(response.messages.len(), 3);

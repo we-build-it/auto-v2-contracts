@@ -6,8 +6,8 @@ use cw2::set_contract_version;
 use crate::error::ContractError;
 use crate::handlers::*;
 use crate::helpers::validate_address;
-use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, SudoMsg, MigrateMsg};
-use crate::state::{ACCEPTED_DENOMS, CONFIG, Config};
+use crate::msg::{AcceptedDenomValue, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg, SudoMsg};
+use crate::state::{ACCEPTED_DENOMS, ACCEPTED_DENOMS_OLD, CONFIG, Config};
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -38,7 +38,9 @@ pub fn instantiate(
     }
 
     // Initialize ACCEPTED_DENOMS
-    ACCEPTED_DENOMS.save(deps.storage, &msg.accepted_denoms)?;
+    for (denom, value) in msg.accepted_denoms {
+        ACCEPTED_DENOMS.save(deps.storage, &denom, &value)?;
+    }
 
     let config = Config {
         execution_fees_destination_address: msg.execution_fees_destination_address,
@@ -64,9 +66,8 @@ pub fn execute(
         ExecuteMsg::ChargeFeesFromUserBalance { batch } => {
             handle_charge_fees_from_user_balance(deps, env, info, batch)
         }
-        ExecuteMsg::ChargeFeesFromMessageCoins {
-            fees,
-        } => handle_charge_fees_from_message_coins(deps, env, info, fees),
+        ExecuteMsg::ChargeFeesFromMessageCoins {fees,} => 
+            handle_charge_fees_from_message_coins(deps, env, info, fees),
         ExecuteMsg::ClaimCreatorFees {} => handle_claim_creator_fees(deps, info),
         ExecuteMsg::DistributeNonCreatorFees {} => {
             handle_distribute_non_creator_fees(deps, env, info)
@@ -112,7 +113,15 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         }
         QueryMsg::GetConfig {} => {
             let config = CONFIG.load(deps.storage)?;
-            let accepted_denoms = ACCEPTED_DENOMS.load(deps.storage)?;
+            // Load all accepted denoms
+            let accepted_denoms = ACCEPTED_DENOMS
+                .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
+                .map(|item| {
+                    let (key, value) = item.unwrap();
+                    (key, value)
+                })
+                .collect();
+            
             let result = InstantiateMsg {
                 accepted_denoms: accepted_denoms,
                 execution_fees_destination_address: config.execution_fees_destination_address,
@@ -134,34 +143,44 @@ pub fn sudo(deps: DepsMut, _env: Env, msg: SudoMsg) -> Result<Response, Contract
             let mut config = CONFIG.load(deps.storage)?;
             config.crank_authorized_address = address;
             CONFIG.save(deps.storage, &config)?;
-            Ok(Response::new().add_attribute("method", "sudo_set_crank_authorized_address"))
+            Ok(Response::new().add_event(
+                cosmwasm_std::Event::new("autorujira-fee-manager/sudo_set_crank_authorized_address")
+            ))
         }
         SudoMsg::SetWorkflowManagerAddress { address } => {
             validate_address(&deps, &address.as_str(), "workflow_manager_address")?;
             let mut config = CONFIG.load(deps.storage)?;
             config.workflow_manager_address = Some(address);
             CONFIG.save(deps.storage, &config)?;
-            Ok(Response::new().add_attribute("method", "sudo_set_workflow_manager_address"))
+            Ok(Response::new().add_event(
+                cosmwasm_std::Event::new("autorujira-fee-manager/sudo_set_workflow_manager_address")
+            ))
         }
         SudoMsg::SetExecutionFeesDestinationAddress { address } => {
             validate_address(&deps, &address.as_str(), "execution_fees_destination_address")?;
             let mut config = CONFIG.load(deps.storage)?;
             config.execution_fees_destination_address = address;
             CONFIG.save(deps.storage, &config)?;
-            Ok(Response::new().add_attribute("method", "sudo_set_execution_fees_destination_address"))
+            Ok(Response::new().add_event(
+                cosmwasm_std::Event::new("autorujira-fee-manager/sudo_set_execution_fees_destination_address")
+            ))
         }
         SudoMsg::SetDistributionFeesDestinationAddress { address } => {
             validate_address(&deps, &address.as_str(), "distribution_fees_destination_address")?;
             let mut config = CONFIG.load(deps.storage)?;
             config.distribution_fees_destination_address = address;
             CONFIG.save(deps.storage, &config)?;
-            Ok(Response::new().add_attribute("method", "sudo_set_distribution_fees_destination_address"))
+            Ok(Response::new().add_event(
+                cosmwasm_std::Event::new("autorujira-fee-manager/sudo_set_distribution_fees_destination_address")
+            ))
         }
         SudoMsg::SetCreatorDistributionFee { fee } => {
             let mut config = CONFIG.load(deps.storage)?;
             config.creator_distribution_fee = fee;
             CONFIG.save(deps.storage, &config)?;
-            Ok(Response::new().add_attribute("method", "sudo_set_creator_distribution_fee"))
+            Ok(Response::new().add_event(
+                cosmwasm_std::Event::new("autorujira-fee-manager/sudo_set_creator_distribution_fee")
+            ))
         }
     }
 }
@@ -171,8 +190,22 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
     // Update contract version
     set_contract_version(deps.storage, crate::CONTRACT_NAME, crate::CONTRACT_VERSION)?;
     
-    // No migration logic needed for this version
+    //--------------------------------------------------
+    // Migrate the old accepted denoms to the new format
+    let accepted_denoms_old = ACCEPTED_DENOMS_OLD.load(deps.storage)?;
+    for accepted_denom_old in accepted_denoms_old {
+        ACCEPTED_DENOMS.save(deps.storage, &accepted_denom_old.denom, &AcceptedDenomValue {
+            max_debt: accepted_denom_old.max_debt,
+            min_balance_threshold: accepted_denom_old.min_balance_threshold,
+        })?;
+    }
+    ACCEPTED_DENOMS_OLD.remove(deps.storage);
+    //--------------------------------------------------
+
     Ok(Response::new()
-        .add_attribute("method", "migrate")
-        .add_attribute("version", crate::CONTRACT_VERSION))
+        .add_event(
+            cosmwasm_std::Event::new("autorujira-fee-manager/migrate")
+                .add_attribute("version", crate::CONTRACT_VERSION)
+        )
+    )
 }

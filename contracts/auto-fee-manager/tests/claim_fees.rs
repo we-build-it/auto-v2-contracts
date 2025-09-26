@@ -1,4 +1,6 @@
-use auto_fee_manager::msg::AcceptedDenom;
+use std::collections::HashMap;
+
+use auto_fee_manager::msg::AcceptedDenomValue;
 use cosmwasm_std::testing::{mock_dependencies, mock_env};
 use cosmwasm_std::{Uint128};
 use auto_fee_manager::ContractError;
@@ -16,11 +18,13 @@ fn test_claim_creator_fees_no_fees() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![AcceptedDenom {
-        denom: "uusdc".to_string(),
-        max_debt: Uint128::from(1000u128),
-        min_balance_threshold: Uint128::from(100u128),
-    }];
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        }
+    )].into_iter().collect();
     let distribution_fees_destination_address = api.addr_make("distribution_destination");
     instantiate_contract(
         deps.as_mut(),
@@ -58,11 +62,13 @@ fn test_claim_creator_fees_success() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![AcceptedDenom {
-        denom: "uusdc".to_string(),
-        max_debt: Uint128::from(1000u128),
-        min_balance_threshold: Uint128::from(100u128),
-    }];
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        }
+    )].into_iter().collect();
     let distribution_fees_destination_address = api.addr_make("distribution_destination");
     instantiate_contract(
         deps.as_mut(),
@@ -105,12 +111,16 @@ fn test_claim_creator_fees_success() {
     ).unwrap();
     assert_eq!(uusdc_fees, None);
     assert_eq!(uatom_fees, None);
-    // Verify response attributes
+    // Verify response events and attributes
     let response = result.unwrap();
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "claim_creator_fees");
-    assert_eq!(response.attributes[1].key, "creator");
-    assert_eq!(response.attributes[1].value, creator_address.to_string());
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-fee-manager/claim_creator_fees");
+    assert_eq!(response.events[0].attributes.len(), 2);
+    assert_eq!(response.events[0].attributes[0].key, "creator");
+    assert_eq!(response.events[0].attributes[0].value, creator_address.to_string());
+    assert_eq!(response.events[0].attributes[1].key, "total_claimed");
+    assert_eq!(response.events[0].attributes[1].value, "[Coin { 300 \"uatom\" }, Coin { 500 \"uusdc\" }]");
+
     // Verify bank messages were created
     assert_eq!(response.messages.len(), 2);
     // Check messages (order is alphabetical by denom: uatom, then uusdc)
@@ -143,11 +153,13 @@ fn test_claim_creator_fees_partial_claim() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![AcceptedDenom {
-        denom: "uusdc".to_string(),
-        max_debt: Uint128::from(1000u128),
-        min_balance_threshold: Uint128::from(100u128),
-    }];
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        }
+    )].into_iter().collect();
     let distribution_fees_destination_address = api.addr_make("distribution_destination");
     instantiate_contract(
         deps.as_mut(),

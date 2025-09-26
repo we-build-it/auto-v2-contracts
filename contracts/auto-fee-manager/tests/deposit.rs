@@ -1,5 +1,7 @@
+use std::collections::HashMap;
+
 use cosmwasm_std::{testing::{mock_dependencies, mock_env, message_info}};
-use auto_fee_manager::{msg::AcceptedDenom, ContractError};
+use auto_fee_manager::{msg::AcceptedDenomValue, ContractError};
 use cosmwasm_std::{Coin, Uint128};
 mod utils;
 use crate::utils::*;
@@ -14,11 +16,13 @@ fn test_deposit_with_valid_funds() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![AcceptedDenom {
-        denom: "uusdc".to_string(),
-        max_debt: Uint128::from(1000u128),
-        min_balance_threshold: Uint128::from(100u128),
-    }];
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        }
+    )].into_iter().collect();
     instantiate_contract(
         deps.as_mut(),
         env.clone(),
@@ -44,13 +48,13 @@ fn test_deposit_with_valid_funds() {
         auto_fee_manager::msg::ExecuteMsg::Deposit {},
     ).unwrap();
     // Verify response
-    assert_eq!(response.attributes.len(), 3);
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "deposit");
-    assert_eq!(response.attributes[1].key, "user");
-    assert_eq!(response.attributes[1].value, user_address.to_string());
-    assert_eq!(response.attributes[2].key, "funds");
-    assert!(response.attributes[2].value.contains("uusdc"));
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-fee-manager/deposit");
+    assert_eq!(response.events[0].attributes.len(), 2);
+    assert_eq!(response.events[0].attributes[0].key, "user");
+    assert_eq!(response.events[0].attributes[0].value, user_address.to_string());
+    assert_eq!(response.events[0].attributes[1].key, "funds");
+    assert!(response.events[0].attributes[1].value.contains("uusdc"));
 }
 #[test]
 fn test_deposit_without_funds_fails() {
@@ -62,11 +66,13 @@ fn test_deposit_without_funds_fails() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![AcceptedDenom {
-        denom: "uusdc".to_string(),
-        max_debt: Uint128::from(1000u128),
-        min_balance_threshold: Uint128::from(100u128),
-    }];
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        }
+    )].into_iter().collect();
     instantiate_contract(
         deps.as_mut(),
         env.clone(),
@@ -104,11 +110,13 @@ fn test_deposit_with_invalid_denom_fails() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![AcceptedDenom {
-        denom: "uusdc".to_string(),
-        max_debt: Uint128::from(1000u128),
-        min_balance_threshold: Uint128::from(100u128),
-    }];
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        }
+    )].into_iter().collect();
     instantiate_contract(
         deps.as_mut(),
         env.clone(),
@@ -152,18 +160,18 @@ fn test_deposit_multiple_denoms() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![
-        AcceptedDenom {
-            denom: "uusdc".to_string(),
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::from(1000u128),
             min_balance_threshold: Uint128::from(100u128),
-        },  
-        AcceptedDenom {
-            denom: "uatom".to_string(),
+        }),
+        ("uatom".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::zero(),
             min_balance_threshold: Uint128::zero(),
         },
-    ];
+    )].into_iter().collect();
     instantiate_contract(
         deps.as_mut(),
         env.clone(),
@@ -195,14 +203,14 @@ fn test_deposit_multiple_denoms() {
         auto_fee_manager::msg::ExecuteMsg::Deposit {},
     ).unwrap();
     // Verify response
-    assert_eq!(response.attributes.len(), 3);
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "deposit");
-    assert_eq!(response.attributes[1].key, "user");
-    assert_eq!(response.attributes[1].value, user_address.to_string());
-    assert_eq!(response.attributes[2].key, "funds");
-    assert!(response.attributes[2].value.contains("uusdc"));
-    assert!(response.attributes[2].value.contains("uatom"));
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-fee-manager/deposit");
+    assert_eq!(response.events[0].attributes.len(), 2);
+    assert_eq!(response.events[0].attributes[0].key, "user");
+    assert_eq!(response.events[0].attributes[0].value, user_address.to_string());
+    assert_eq!(response.events[0].attributes[1].key, "funds");
+    assert!(response.events[0].attributes[1].value.contains("uusdc"));
+    assert!(response.events[0].attributes[1].value.contains("uatom"));
 }
 #[test]
 fn test_deposit_balance_tracking() {
@@ -214,11 +222,13 @@ fn test_deposit_balance_tracking() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![AcceptedDenom {
-        denom: "uusdc".to_string(),
-        max_debt: Uint128::from(1000u128),
-        min_balance_threshold: Uint128::from(100u128),
-    }];
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
+            max_debt: Uint128::from(1000u128),
+            min_balance_threshold: Uint128::from(100u128),
+        }
+    )].into_iter().collect();
     instantiate_contract(
         deps.as_mut(),
         env.clone(),
@@ -271,18 +281,18 @@ fn test_deposit_event_balance_turned_positive() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![
-        AcceptedDenom {
-            denom: "uusdc".to_string(),
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::from(1000u128),
             min_balance_threshold: Uint128::from(100u128),
-        },  
-        AcceptedDenom {
-            denom: "uatom".to_string(),
+        }),
+        ("uatom".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::zero(),
             min_balance_threshold: Uint128::zero(),
-        },
-    ];
+        }),
+    ].into_iter().collect();
     instantiate_contract(
         deps.as_mut(),
         env.clone(),
@@ -314,9 +324,9 @@ fn test_deposit_event_balance_turned_positive() {
         auto_fee_manager::msg::ExecuteMsg::Deposit {},
     ).unwrap();
     // Verify event was emitted
-    assert_eq!(response.events.len(), 1);
-    let event = &response.events[0];
-    assert_eq!(event.ty, "deposit_completed");
+    assert_eq!(response.events.len(), 2);
+    let event = &response.events[1];
+    assert_eq!(event.ty, "autorujira-fee-manager/deposit_completed");
     let user_attr = event.attributes.iter().find(|attr| attr.key == "user").unwrap();
     assert_eq!(user_attr.value, user_address.to_string());
     let balances_attr = event.attributes.iter().find(|attr| attr.key == "balances_turned_positive").unwrap();
@@ -337,18 +347,18 @@ fn test_deposit_event_multiple_balances_turned_positive() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![
-        AcceptedDenom {
-            denom: "uusdc".to_string(),
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::from(1000u128),
             min_balance_threshold: Uint128::from(100u128),
-        },  
-        AcceptedDenom {
-            denom: "uatom".to_string(),
+        }),
+        ("uatom".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::zero(),
             min_balance_threshold: Uint128::zero(),
-        },
-    ];
+        })
+    ].into_iter().collect();
     instantiate_contract(
         deps.as_mut(),
         env.clone(),
@@ -387,9 +397,9 @@ fn test_deposit_event_multiple_balances_turned_positive() {
         auto_fee_manager::msg::ExecuteMsg::Deposit {},
     ).unwrap();
     // Verify event was emitted with both denoms
-    assert_eq!(response.events.len(), 1);
-    let event = &response.events[0];
-    assert_eq!(event.ty, "deposit_completed");
+    assert_eq!(response.events.len(), 2);
+    let event = &response.events[1];
+    assert_eq!(event.ty, "autorujira-fee-manager/deposit_completed");
     let balances_attr = event.attributes.iter().find(|attr| attr.key == "balances_turned_positive").unwrap();
     // Order might vary, so check both possibilities
     assert!(balances_attr.value == "uusdc,uatom" || balances_attr.value == "uatom,uusdc");
@@ -413,13 +423,13 @@ fn test_deposit_no_event_when_balance_stays_negative() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![
-        AcceptedDenom {
-            denom: "uusdc".to_string(),
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::from(1000u128),
             min_balance_threshold: Uint128::from(100u128),
-        },  
-    ];
+        }
+    )].into_iter().collect();
     instantiate_contract(
         deps.as_mut(),
         env.clone(),
@@ -449,7 +459,14 @@ fn test_deposit_no_event_when_balance_stays_negative() {
         auto_fee_manager::msg::ExecuteMsg::Deposit {},
     ).unwrap();
     // Verify no event was emitted
-    assert_eq!(response.events.len(), 0);
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-fee-manager/deposit");
+    assert_eq!(response.events[0].attributes.len(), 2);
+    assert_eq!(response.events[0].attributes[0].key, "user");
+    assert_eq!(response.events[0].attributes[0].value, user_address.to_string());
+    assert_eq!(response.events[0].attributes[1].key, "funds");
+    assert!(response.events[0].attributes[1].value.contains("uusdc"));
+
     // Verify balance is still negative
     let balance = auto_fee_manager::state::USER_BALANCES
         .load(deps.as_ref().storage, (user_address, "uusdc"))
@@ -466,12 +483,13 @@ fn test_deposit_no_event_when_balance_was_already_positive() {
     let execution_fees_destination_address = api.addr_make("execution_destination");
     let crank_authorized_address = api.addr_make("crank_authorized");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![
-        AcceptedDenom {
-            denom: "uusdc".to_string(),
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::from(1000u128),
             min_balance_threshold: Uint128::from(100u128),
-        },      ];
+        }
+    )].into_iter().collect();
     instantiate_contract(
         deps.as_mut(),
         env.clone(),
@@ -501,7 +519,14 @@ fn test_deposit_no_event_when_balance_was_already_positive() {
         auto_fee_manager::msg::ExecuteMsg::Deposit {},
     ).unwrap();
     // Verify no event was emitted
-    assert_eq!(response.events.len(), 0);
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-fee-manager/deposit");
+    assert_eq!(response.events[0].attributes.len(), 2);
+    assert_eq!(response.events[0].attributes[0].key, "user");
+    assert_eq!(response.events[0].attributes[0].value, user_address.to_string());
+    assert_eq!(response.events[0].attributes[1].key, "funds");
+    assert!(response.events[0].attributes[1].value.contains("uusdc"));
+
     // Verify balance increased
     let balance = auto_fee_manager::state::USER_BALANCES
         .load(deps.as_ref().storage, (user_address, "uusdc"))

@@ -17,7 +17,7 @@ use auto_workflow_manager::{
 
 use auto_fee_manager::{
     contract::{execute as execute_fee_manager, instantiate as instantiate_fee_manager, query as query_fee_manager, sudo as sudo_fee_manager},
-    msg::{AcceptedDenom, ExecuteMsg as FeeManagerExecuteMsg, InstantiateMsg as FeeManagerInstantiateMsg, QueryMsg as FeeManagerQueryMsg, SudoMsg as FeeManagerSudoMsg, UserBalancesResponse as FeeManagerUserBalancesResponse},
+    msg::{AcceptedDenomValue, ExecuteMsg as FeeManagerExecuteMsg, InstantiateMsg as FeeManagerInstantiateMsg, QueryMsg as FeeManagerQueryMsg, SudoMsg as FeeManagerSudoMsg, UserBalancesResponse as FeeManagerUserBalancesResponse},
 };
 
 use cw_multi_test::{App, ContractWrapper, Executor};
@@ -43,18 +43,19 @@ fn test_charge_fees_ok() {
   let code_id_workflow_manager = app.store_code(Box::new(ContractWrapper::new(execute_workflow_manager, instantiate_workflow_manager, query_workflow_manager).with_reply(reply_workflow_manager)));
 
   // Instantiate fee manager
-  let accepted_denoms = vec![
-    AcceptedDenom {
-      denom: "uusdc".to_string(),
-      max_debt: Uint128::from(1000u128),
-      min_balance_threshold: Uint128::from(100u128),
-    },
-    AcceptedDenom {
-      denom: "uruji".to_string(),
-      max_debt: Uint128::zero(),
-      min_balance_threshold: Uint128::zero(),
-    },
-  ];
+  let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![
+    ("uusdc".to_string(),
+    AcceptedDenomValue {
+        max_debt: Uint128::from(1000u128),
+        min_balance_threshold: Uint128::from(100u128),
+    }),
+    ("uruji".to_string(),
+      AcceptedDenomValue {
+        max_debt: Uint128::zero(),
+        min_balance_threshold: Uint128::zero(),
+      })
+  ].into_iter().collect();
+
   let fees_destination_address = app.api().addr_make("fees_destination");
   let crank_address = app.api().addr_make("crank_address");
   let fee_manager_instantiate_msg = FeeManagerInstantiateMsg {

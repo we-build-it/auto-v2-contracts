@@ -5,7 +5,7 @@ use cosmwasm_std::{
 
 use auto_fee_manager::{
     contract::{execute, instantiate, sudo},
-    msg::{AcceptedDenom, ExecuteMsg, Fee, FeeType, InstantiateMsg, SudoMsg, UserFees},
+    msg::{AcceptedDenomValue, ExecuteMsg, Fee, FeeType, InstantiateMsg, SudoMsg, UserFees},
     ContractError,
 };
 
@@ -16,7 +16,7 @@ pub fn instantiate_contract(
     deps: DepsMut,
     env: Env,
     admin: Addr,
-    accepted_denoms: Vec<AcceptedDenom>,
+    accepted_denoms: HashMap<String, AcceptedDenomValue>,
     execution_fees_destination_address: Addr,
     distribution_fees_destination_address: Addr,
     crank_authorized_address: Addr,

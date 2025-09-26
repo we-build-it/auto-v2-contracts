@@ -1,10 +1,11 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Uint128};
+use std::collections::HashMap;
 
 #[cw_serde]
 pub struct InstantiateMsg {
     // Denoms that are accepted for deposits
-    pub accepted_denoms: Vec<AcceptedDenom>,
+    pub accepted_denoms: HashMap<String, AcceptedDenomValue>,
 
     // Address that will receive execution fees
     pub execution_fees_destination_address: Addr,
@@ -19,8 +20,7 @@ pub struct InstantiateMsg {
 }
 
 #[cw_serde]
-pub struct AcceptedDenom {
-    pub denom: String,
+pub struct AcceptedDenomValue {
     // Maximum debt that can be incurred by a user
     pub max_debt: Uint128,
     // Minimum balance threshold for triggering events

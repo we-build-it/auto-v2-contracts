@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use cosmwasm_std::testing::{mock_dependencies, mock_env, message_info};
 use cosmwasm_std::{Uint128, CosmosMsg, BankMsg};
 use auto_fee_manager::contract::{execute, query};
-use auto_fee_manager::msg::{AcceptedDenom, ExecuteMsg, QueryMsg};
+use auto_fee_manager::msg::{AcceptedDenomValue, ExecuteMsg, QueryMsg};
 
 mod utils;
 use crate::utils::*;
@@ -18,19 +20,19 @@ fn test_enable_creator_fee_distribution() {
     let distribution_fees_destination_address = api.addr_make("distribution_dest");
     let crank_authorized_address = api.addr_make("crank_auth");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![
-        AcceptedDenom {
-            denom: "uusdc".to_string(),
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::from(1000u128),
             min_balance_threshold: Uint128::from(100u128),
-        },
-        AcceptedDenom {
-            denom: "uatom".to_string(),
+        }),(
+        "uatom".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::zero(),
             min_balance_threshold: Uint128::zero(),
-        },
-    ];
-    
+        }
+    )].into_iter().collect();
+
     instantiate_contract(
         deps.as_mut(),
         env.clone(),
@@ -55,10 +57,11 @@ fn test_enable_creator_fee_distribution() {
     assert!(result.is_ok());
     
     let response = result.unwrap();
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "enable_creator_fee_distribution");
-    assert_eq!(response.attributes[1].key, "creator");
-    assert_eq!(response.attributes[1].value, creator.to_string());
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-fee-manager/enable_creator_fee_distribution");
+    assert_eq!(response.events[0].attributes.len(), 1);
+    assert_eq!(response.events[0].attributes[0].key, "creator");
+    assert_eq!(response.events[0].attributes[0].value, creator.to_string());
 }
 
 #[test]
@@ -73,18 +76,18 @@ fn test_disable_creator_fee_distribution() {
     let distribution_fees_destination_address = api.addr_make("distribution_dest");
     let crank_authorized_address = api.addr_make("crank_auth");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![
-        AcceptedDenom {
-            denom: "uusdc".to_string(),
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::from(1000u128),
             min_balance_threshold: Uint128::from(100u128),
-        },
-        AcceptedDenom {
-            denom: "uatom".to_string(),
+        }),(
+        "uatom".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::zero(),
             min_balance_threshold: Uint128::zero(),
-        },
-    ];
+        }
+    )].into_iter().collect();
     
     instantiate_contract(
         deps.as_mut(),
@@ -110,10 +113,11 @@ fn test_disable_creator_fee_distribution() {
     assert!(result.is_ok());
     
     let response = result.unwrap();
-    assert_eq!(response.attributes[0].key, "method");
-    assert_eq!(response.attributes[0].value, "disable_creator_fee_distribution");
-    assert_eq!(response.attributes[1].key, "creator");
-    assert_eq!(response.attributes[1].value, creator.to_string());
+    assert_eq!(response.events.len(), 1);
+    assert_eq!(response.events[0].ty, "autorujira-fee-manager/disable_creator_fee_distribution");
+    assert_eq!(response.events[0].attributes.len(), 1);
+    assert_eq!(response.events[0].attributes[0].key, "creator");
+    assert_eq!(response.events[0].attributes[0].value, creator.to_string());
 }
 
 #[test]
@@ -128,18 +132,18 @@ fn test_is_creator_subscribed() {
     let distribution_fees_destination_address = api.addr_make("distribution_dest");
     let crank_authorized_address = api.addr_make("crank_auth");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![
-        AcceptedDenom {
-            denom: "uusdc".to_string(),
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::from(1000u128),
             min_balance_threshold: Uint128::from(100u128),
-        },
-        AcceptedDenom {
-            denom: "uatom".to_string(),
+        }),(
+        "uatom".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::zero(),
             min_balance_threshold: Uint128::zero(),
-        },
-    ];
+        }
+    )].into_iter().collect();
     
     instantiate_contract(
         deps.as_mut(),
@@ -225,18 +229,18 @@ fn test_get_subscribed_creators() {
     let distribution_fees_destination_address = api.addr_make("distribution_dest");
     let crank_authorized_address = api.addr_make("crank_auth");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![
-        AcceptedDenom {
-            denom: "uusdc".to_string(),
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::from(1000u128),
             min_balance_threshold: Uint128::from(100u128),
-        },
-        AcceptedDenom {
-            denom: "uatom".to_string(),
+        }),(
+        "uatom".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::zero(),
             min_balance_threshold: Uint128::zero(),
-        },
-    ];
+        }
+    )].into_iter().collect();
     
     instantiate_contract(
         deps.as_mut(),
@@ -325,18 +329,18 @@ fn test_distribute_creator_fees_only_subscribed() {
     let distribution_fees_destination_address = api.addr_make("distribution_dest");
     let crank_authorized_address = api.addr_make("crank_auth");
     let workflow_manager_address = api.addr_make("workflow_manager");
-    let accepted_denoms = vec![
-        AcceptedDenom {
-            denom: "uusdc".to_string(),
+    let accepted_denoms: HashMap<String, AcceptedDenomValue> = vec![(
+        "uusdc".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::from(1000u128),
             min_balance_threshold: Uint128::from(100u128),
-        },
-        AcceptedDenom {
-            denom: "uatom".to_string(),
+        }),(
+        "uatom".to_string(),
+        AcceptedDenomValue {
             max_debt: Uint128::zero(),
             min_balance_threshold: Uint128::zero(),
-        },
-    ];
+        }
+    )].into_iter().collect();
     
     instantiate_contract(
         deps.as_mut(),
