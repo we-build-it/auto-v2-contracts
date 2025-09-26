@@ -64,9 +64,8 @@ pub fn execute(
         ExecuteMsg::ChargeFeesFromUserBalance { batch } => {
             handle_charge_fees_from_user_balance(deps, env, info, batch)
         }
-        ExecuteMsg::ChargeFeesFromMessageCoins {
-            fees,
-        } => handle_charge_fees_from_message_coins(deps, env, info, fees),
+        ExecuteMsg::ChargeFeesFromMessageCoins {fees,} => 
+            handle_charge_fees_from_message_coins(deps, env, info, fees),
         ExecuteMsg::ClaimCreatorFees {} => handle_claim_creator_fees(deps, info),
         ExecuteMsg::DistributeNonCreatorFees {} => {
             handle_distribute_non_creator_fees(deps, env, info)

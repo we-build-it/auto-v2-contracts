@@ -161,6 +161,7 @@ dependencies = [
  "cosmwasm-std",
  "cw-multi-test",
  "cw-storage-plus",
+ "cw-utils",
  "cw2",
  "hashbrown 0.15.4",
  "schemars",

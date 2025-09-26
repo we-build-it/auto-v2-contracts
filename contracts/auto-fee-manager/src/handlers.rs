@@ -9,6 +9,7 @@ use crate::{error::ContractError, msg::UserFees};
 use cosmwasm_std::{
     Addr, BankMsg, Coin, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128,
 };
+use cw_utils::nonpayable;
 use hashbrown::HashMap;
 use std::collections::HashSet;
 
@@ -76,6 +77,8 @@ pub fn handle_withdraw(
     denom: String,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
+    nonpayable(&info)?;
+    
     // Validate that amount is greater than zero
     if amount == Uint128::zero() {
         return Err(ContractError::InvalidWithdrawalAmount {});
@@ -140,6 +143,8 @@ pub fn handle_charge_fees_from_user_balance(
     info: MessageInfo,
     batch: Vec<UserFees>,
 ) -> Result<Response, ContractError> {
+    nonpayable(&info)?;
+
     verify_workflow_manager(deps.as_ref(), &info)?;
     let accepted_denoms = ACCEPTED_DENOMS.load(deps.storage)?;
 
@@ -358,6 +363,8 @@ pub fn handle_claim_creator_fees(
     deps: DepsMut,
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
+    nonpayable(&info)?;
+
     let creator = &info.sender;
     let mut total_claimed = Vec::new();
     let mut bank_messages = Vec::new();
@@ -415,6 +422,8 @@ pub fn handle_distribute_non_creator_fees(
     _env: Env,
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
+    nonpayable(&info)?;
+
     // Verify authorization
     verify_authorization(deps.as_ref(), &info)?;
 
@@ -511,6 +520,8 @@ pub fn handle_distribute_creator_fees(
     _env: Env,
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
+    nonpayable(&info)?;
+
     // Verify authorization
     verify_authorization(deps.as_ref(), &info)?;
 
@@ -738,6 +749,8 @@ pub fn handle_enable_creator_fee_distribution(
     deps: DepsMut,
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
+    nonpayable(&info)?;
+
     // Only the creator can enable their own fee distribution
     let creator = info.sender;
     
@@ -757,6 +770,8 @@ pub fn handle_disable_creator_fee_distribution(
     deps: DepsMut,
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
+    nonpayable(&info)?;
+    
     // Only the creator can disable their own fee distribution
     let creator = info.sender;
     
