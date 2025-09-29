@@ -6,8 +6,8 @@ use cw2::set_contract_version;
 use crate::error::ContractError;
 use crate::handlers::*;
 use crate::helpers::validate_address;
-use crate::msg::{AcceptedDenomValue, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg, SudoMsg};
-use crate::state::{ACCEPTED_DENOMS, ACCEPTED_DENOMS_OLD, CONFIG, Config};
+use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg, SudoMsg};
+use crate::state::{ACCEPTED_DENOMS, CONFIG, Config};
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -190,18 +190,6 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
     // Update contract version
     set_contract_version(deps.storage, crate::CONTRACT_NAME, crate::CONTRACT_VERSION)?;
     
-    //--------------------------------------------------
-    // Migrate the old accepted denoms to the new format
-    let accepted_denoms_old = ACCEPTED_DENOMS_OLD.load(deps.storage)?;
-    for accepted_denom_old in accepted_denoms_old {
-        ACCEPTED_DENOMS.save(deps.storage, &accepted_denom_old.denom, &AcceptedDenomValue {
-            max_debt: accepted_denom_old.max_debt,
-            min_balance_threshold: accepted_denom_old.min_balance_threshold,
-        })?;
-    }
-    ACCEPTED_DENOMS_OLD.remove(deps.storage);
-    //--------------------------------------------------
-
     Ok(Response::new()
         .add_event(
             cosmwasm_std::Event::new("autorujira-fee-manager/migrate")

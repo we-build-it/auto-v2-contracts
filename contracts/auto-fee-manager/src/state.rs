@@ -32,24 +32,3 @@ pub const ACCEPTED_DENOMS: Map<&str, AcceptedDenomValue> = Map::new("accepted_de
 
 // creator address → subscription status for fee distribution
 pub const SUBSCRIBED_CREATORS: Map<&Addr, bool> = Map::new("subscribed_creators");
-
-
-//--------------------------------------------------
-//--------------------------------------------------
-// Old accepted denoms
-// We need this to migrate the old accepted denoms to the new format
-// TODO: remove this after migration
-//--------------------------------------------------
-
-pub const ACCEPTED_DENOMS_OLD: Item<Vec<AcceptedDenomOld>> = Item::new("accepted_denoms");
-#[cw_serde]
-pub struct AcceptedDenomOld {
-    pub denom: String,
-    // Maximum debt that can be incurred by a user
-    pub max_debt: Uint128,
-    // Minimum balance threshold for triggering events
-    pub min_balance_threshold: Uint128,
-}
-//--------------------------------------------------
-//--------------------------------------------------
-//--------------------------------------------------
