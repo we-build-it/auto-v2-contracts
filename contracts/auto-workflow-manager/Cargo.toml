@@ -36,6 +36,7 @@ serde_json.workspace = true
 thiserror.workspace = true
 anybuf.workspace = true
 cw-utils = { workspace = true }
+anyhow = { workspace = true }
 
 [dev-dependencies]
 cw-multi-test.workspace = true

@@ -212,17 +212,17 @@ pub fn build_authz_execute_contract_msg(
         .append_repeated_message(2, &[msg_anybuf]); // msgs (field 2)
 
     // cosmwasm_2_0 
-    // let cosmos_msg = CosmosMsg::Any(cosmwasm_std::AnyMsg { 
-    //     type_url: "/cosmos.authz.v1beta1.MsgExec".to_string(),
-    //     value: msg_exec_buf.as_bytes().into(),
-    // }); 
-
-    // cosmwasm_1_4
-    #[allow(deprecated)]
-    let cosmos_msg = CosmosMsg::Stargate {
+    let cosmos_msg = CosmosMsg::Any(cosmwasm_std::AnyMsg { 
         type_url: "/cosmos.authz.v1beta1.MsgExec".to_string(),
         value: msg_exec_buf.as_bytes().into(),
-    };     
+    }); 
+
+    // cosmwasm_1_4
+    // #[allow(deprecated)]
+    // let cosmos_msg = CosmosMsg::Stargate {
+    //     type_url: "/cosmos.authz.v1beta1.MsgExec".to_string(),
+    //     value: msg_exec_buf.as_bytes().into(),
+    // };     
 
     Ok(cosmos_msg)
 }

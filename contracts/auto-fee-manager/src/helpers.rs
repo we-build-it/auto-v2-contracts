@@ -44,7 +44,7 @@ pub fn validate_address(deps: &DepsMut, address: &str, field_name: &str) -> Resu
 }
 
 /// Helper function to check if an address is authorized
-pub fn is_authorized(deps: Deps, address: &Addr) -> Result<bool, ContractError> {
+pub fn is_crank(deps: Deps, address: &Addr) -> Result<bool, ContractError> {
     let config: Config = CONFIG.load(deps.storage)?;
     Ok(config.crank_authorized_address == *address)
 }
@@ -56,8 +56,8 @@ pub fn is_workflow_manager(deps: Deps, address: &Addr) -> Result<bool, ContractE
 }
 
 /// Helper function to verify authorization for restricted functions
-pub fn verify_authorization(deps: Deps, info: &MessageInfo) -> Result<(), ContractError> {
-    if !is_authorized(deps, &info.sender)? {
+pub fn verify_crank(deps: Deps, info: &MessageInfo) -> Result<(), ContractError> {
+    if !is_crank(deps, &info.sender)? {
         return Err(ContractError::NotAuthorized {
             address: info.sender.to_string(),
         });

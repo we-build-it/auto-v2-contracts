@@ -1,5 +1,5 @@
 use crate::events::{balance_below_threshold, deposit_completed};
-use crate::helpers::{verify_authorization, verify_workflow_manager};
+use crate::helpers::{verify_crank, verify_workflow_manager};
 use crate::msg::{AcceptedDenomValue, Fee, FeeType};
 use crate::state::{
     CONFIG, USER_BALANCES, CREATOR_FEES, EXECUTION_FEES, DISTRIBUTION_FEES, ACCEPTED_DENOMS,
@@ -279,30 +279,31 @@ pub fn handle_charge_fees_from_message_coins(
     info: MessageInfo,
     fees: Vec<Fee>,
 ) -> Result<Response, ContractError> {
-    // Verify workflow manager authorization
-    verify_workflow_manager(deps.as_ref(), &info)?;
+    // This method is called by the workflow manager but impersonating the user
 
     // Single iteration: validate fees, accumulate expected funds and creator fees
     // TODO: This validations could be removed as we trust the workflow manager
     let mut expected_funds: HashMap<String, Uint128> = HashMap::new();
     let mut creator_fees_accum: HashMap<(Addr, String), Uint128> = HashMap::new();
+    let mut execution_fees_accum: HashMap<String, Uint128> = HashMap::new();
     
     for fee in &fees {
+        // Accumulate expected funds
+        *expected_funds
+            .entry(fee.denom.clone())
+            .or_insert(Uint128::zero()) += fee.amount;
         match &fee.fee_type {
             FeeType::Creator { creator_address } => {
-                // Accumulate expected funds
-                *expected_funds
-                    .entry(fee.denom.clone())
-                    .or_insert(Uint128::zero()) += fee.amount;
                 // Accumulate creator fees
                 *creator_fees_accum
                     .entry((creator_address.clone(), fee.denom.clone()))
                     .or_insert(Uint128::zero()) += fee.amount;
             }
             FeeType::Execution => {
-                return Err(ContractError::InvalidFeeType {
-                    reason: "Only Creator fees are allowed in ChargeFeesFromMessageCoins".to_string(),
-                });
+                // Accumulate execution fees
+                *execution_fees_accum
+                    .entry(fee.denom.clone())
+                    .or_insert(Uint128::zero()) += fee.amount;
             }
         }
     }
@@ -343,6 +344,15 @@ pub fn handle_charge_fees_from_message_coins(
             .unwrap_or(Uint128::zero());
         let new_total = current + *total_fees;
         CREATOR_FEES.save(deps.storage, (creator, denom.as_str()), &new_total)?;
+    }
+
+    // Update execution fees storage
+    for (denom, total_fees) in &execution_fees_accum {
+        let current = EXECUTION_FEES
+            .may_load(deps.storage, denom.as_str())?
+            .unwrap_or(Uint128::zero());
+        let new_total = current + *total_fees;
+        EXECUTION_FEES.save(deps.storage, denom.as_str(), &new_total)?;
     }
 
     let response = Response::new()
@@ -420,7 +430,7 @@ pub fn handle_distribute_non_creator_fees(
     nonpayable(&info)?;
 
     // Verify authorization
-    verify_authorization(deps.as_ref(), &info)?;
+    verify_crank(deps.as_ref(), &info)?;
 
     // Get config to know destination addresses
     let config = CONFIG.load(deps.storage)?;
@@ -518,7 +528,7 @@ pub fn handle_distribute_creator_fees(
     nonpayable(&info)?;
 
     // Verify authorization
-    verify_authorization(deps.as_ref(), &info)?;
+    verify_crank(deps.as_ref(), &info)?;
 
     // Get config to know destination address and distribution fee
     let config = CONFIG.load(deps.storage)?;
