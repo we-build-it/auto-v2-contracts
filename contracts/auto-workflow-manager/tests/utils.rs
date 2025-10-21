@@ -22,7 +22,6 @@ pub fn instantiate_contract(
         allowed_action_executors,
         referral_memo: "test-referral-memo".to_string(),
         fee_manager_address: fee_manager_address,
-        allowance_denom: "uusdc".to_string(),
     };
     
     let instantiate_info = message_info(&admin, &[]);

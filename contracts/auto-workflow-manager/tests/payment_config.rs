@@ -9,7 +9,7 @@ use utils::{create_simple_test_workflow, create_test_environment, publish_workfl
 use auto_workflow_manager::{
     contract::{execute, query},
     msg::{ExecuteMsg, FeeTotal, FeeType, QueryMsg, UserFee},
-    state::{PaymentConfig, PaymentSource},
+    state::{PaymentConfig},
 };
 
 use crate::utils::{create_oneshot_test_instance, execute_instance};
@@ -67,17 +67,13 @@ fn query_user_payment_config(
 }
 
 fn create_test_payment_config() -> PaymentConfig {
-    PaymentConfig {
-        allowance: Uint128::new(1000),
-        source: PaymentSource::Wallet,
+    PaymentConfig::Wallet {
+        usd_allowance: Uint128::new(1000),
     }
 }
 
 fn create_test_payment_config_prepaid() -> PaymentConfig {
-    PaymentConfig {
-        allowance: Uint128::new(500),
-        source: PaymentSource::Prepaid,
-    }
+    PaymentConfig::Prepaid
 }
 
 #[test]
@@ -100,20 +96,17 @@ fn test_set_user_payment_config_ok() {
     assert_eq!(response.attributes.len(), 0);
     assert_eq!(response.events.len(), 1);
     assert_eq!(response.events[0].ty, "autorujira-workflow-manager/set_user_payment_config");
-    assert_eq!(response.events[0].attributes.len(), 3);
+    assert_eq!(response.events[0].attributes.len(), 2);
     assert_eq!(response.events[0].attributes[0].key, "user_address");
     assert_eq!(response.events[0].attributes[0].value, user_address.to_string());
-    assert_eq!(response.events[0].attributes[1].key, "allowance");
-    assert_eq!(response.events[0].attributes[1].value, "1000");
-    assert_eq!(response.events[0].attributes[2].key, "source");
-    assert_eq!(response.events[0].attributes[2].value, "Wallet");
+    assert_eq!(response.events[0].attributes[1].key, "payment_config");
+    assert_eq!(response.events[0].attributes[1].value, "wallet_1000");
 
     // Verify that the payment config was actually saved in the state
     let saved_config = query_user_payment_config(&deps, user_address.to_string()).unwrap();
     assert!(saved_config.payment_config.is_some());
     let config = saved_config.payment_config.unwrap();
-    assert_eq!(config.allowance, Uint128::new(1000));
-    assert!(matches!(config.source, PaymentSource::Wallet));
+    assert!(matches!(config, PaymentConfig::Wallet { usd_allowance } if usd_allowance == Uint128::new(1000)));
 }
 
 #[test]
@@ -138,8 +131,7 @@ fn test_query_user_payment_config_ok() {
     // Verify the result
     assert!(result.payment_config.is_some());
     let config = result.payment_config.unwrap();
-    assert_eq!(config.allowance, Uint128::new(1000));
-    assert!(matches!(config.source, PaymentSource::Wallet));
+    assert!(matches!(config, PaymentConfig::Wallet { usd_allowance } if usd_allowance == Uint128::new(1000)));
 }
 
 #[test]
@@ -213,30 +205,17 @@ fn test_payment_config_prepaid_source() {
     assert_eq!(response.attributes.len(), 0);
     assert_eq!(response.events.len(), 1);
     assert_eq!(response.events[0].ty, "autorujira-workflow-manager/set_user_payment_config");
-    assert_eq!(response.events[0].attributes.len(), 3);
+    assert_eq!(response.events[0].attributes.len(), 2);
     assert_eq!(response.events[0].attributes[0].key, "user_address");
     assert_eq!(response.events[0].attributes[0].value, user_address.to_string());
-    assert_eq!(response.events[0].attributes[1].key, "allowance");
-    assert_eq!(response.events[0].attributes[1].value, "500");
-    assert_eq!(response.events[0].attributes[2].key, "source");
-    assert_eq!(response.events[0].attributes[2].value, "Prepaid");
+    assert_eq!(response.events[0].attributes[1].key, "payment_config");
+    assert_eq!(response.events[0].attributes[1].value, "prepaid");
 
     // Query and verify the config
     let result = query_user_payment_config(&deps, user_address.to_string()).unwrap();
     assert!(result.payment_config.is_some());
     let config = result.payment_config.unwrap();
-    assert_eq!(config.allowance, Uint128::new(500));
-    assert!(matches!(config.source, PaymentSource::Prepaid));
-
-    // Verify that the payment config was actually saved in the state
-    let saved_config = query_user_payment_config(&deps, user_address.to_string()).unwrap();
-    assert!(saved_config.payment_config.is_some());
-    let saved_config_unwrapped = saved_config.payment_config.unwrap();
-    assert_eq!(saved_config_unwrapped.allowance, Uint128::new(500));
-    assert!(matches!(
-        saved_config_unwrapped.source,
-        PaymentSource::Prepaid
-    ));
+    assert!(matches!(config, PaymentConfig::Prepaid));
 }
 
 #[test]
@@ -256,10 +235,7 @@ fn test_update_user_payment_config() {
     .unwrap();
 
     // Update with new config
-    let updated_config = PaymentConfig {
-        allowance: Uint128::new(2000),
-        source: PaymentSource::Prepaid,
-    };
+    let updated_config = PaymentConfig::Prepaid;
     set_user_payment_config(
         &mut deps,
         env,
@@ -272,18 +248,7 @@ fn test_update_user_payment_config() {
     let result = query_user_payment_config(&deps, user_address.to_string()).unwrap();
     assert!(result.payment_config.is_some());
     let config = result.payment_config.unwrap();
-    assert_eq!(config.allowance, Uint128::new(2000));
-    assert!(matches!(config.source, PaymentSource::Prepaid));
-
-    // Verify that the payment config was actually updated in the state
-    let saved_config = query_user_payment_config(&deps, user_address.to_string()).unwrap();
-    assert!(saved_config.payment_config.is_some());
-    let saved_config_unwrapped = saved_config.payment_config.unwrap();
-    assert_eq!(saved_config_unwrapped.allowance, Uint128::new(2000));
-    assert!(matches!(
-        saved_config_unwrapped.source,
-        PaymentSource::Prepaid
-    ));
+    assert!(matches!(config, PaymentConfig::Prepaid));
 }
 
 #[test]
@@ -345,11 +310,13 @@ fn test_charge_fees_events() {
             totals: vec![
                 FeeTotal {
                     denom: "RUNE".to_string(),
+                    debit_denom: "uusdc".to_string(),
                     amount: Uint128::new(100000000),
                     fee_type: FeeType::Execution,
                 },
                 FeeTotal {
                     denom: "AUTO".to_string(),
+                    debit_denom: "AUTO".to_string(),
                     amount: Uint128::new(10000000000),
                     fee_type: FeeType::Creator { instance_id: 1 },
                 },
@@ -359,6 +326,7 @@ fn test_charge_fees_events() {
             address: user2.to_string(),
             totals: vec![FeeTotal {
                 denom: "TCY".to_string(),
+                debit_denom: "TCY".to_string(),
                 amount: Uint128::new(1000000000000),
                 fee_type: FeeType::Execution,
             }],
@@ -397,10 +365,11 @@ fn test_handle_fee_manager_reply() {
     // Create test fee event data
     let fee_event_data = auto_workflow_manager::execute::FeeEventData {
         user_address: "thor1test".to_string(),
-        original_denom: "RUNE".to_string(),
-        original_amount_charged: Uint128::new(1000),
-        discounted_from_allowance: Uint128::new(1000),
+        fee_denom: "RUNE".to_string(),
+        fee_amount: Uint128::new(1000),
+        usd_amount: Uint128::new(1000),
         debit_denom: "RUNE".to_string(),
+        debit_amount: Uint128::new(1000),
         creator_address: Some("thor1test".to_string()),
         fee_type: FeeType::Execution,
     };
@@ -437,14 +406,15 @@ fn test_handle_fee_manager_reply() {
     assert_eq!(response.events.len(), 1);
     let fee_event = &response.events[0];
     assert_eq!(fee_event.ty, "autorujira-workflow-manager/fee-charged");
-    assert_eq!(fee_event.attributes.len(), 7);
+    assert_eq!(fee_event.attributes.len(), 8);
     
     // Check specific attributes
     assert!(fee_event.attributes.iter().any(|attr| attr.key == "user_address" && attr.value == "thor1test"));
-    assert!(fee_event.attributes.iter().any(|attr| attr.key == "original_denom" && attr.value == "RUNE"));
-    assert!(fee_event.attributes.iter().any(|attr| attr.key == "original_amount_charged" && attr.value == "1000"));
-    assert!(fee_event.attributes.iter().any(|attr| attr.key == "discounted_from_allowance" && attr.value == "1000"));
+    assert!(fee_event.attributes.iter().any(|attr| attr.key == "denom" && attr.value == "RUNE"));
+    assert!(fee_event.attributes.iter().any(|attr| attr.key == "amount" && attr.value == "1000"));
+    assert!(fee_event.attributes.iter().any(|attr| attr.key == "usd_amount" && attr.value == "1000"));
     assert!(fee_event.attributes.iter().any(|attr| attr.key == "debit_denom" && attr.value == "RUNE"));
+    assert!(fee_event.attributes.iter().any(|attr| attr.key == "debit_amount" && attr.value == "1000"));
     assert!(fee_event.attributes.iter().any(|attr| attr.key == "fee_type" && attr.value == "execution"));
     assert!(fee_event.attributes.iter().any(|attr| attr.key == "creator_address" && attr.value == "thor1test"));
 }

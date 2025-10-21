@@ -53,7 +53,6 @@ pub struct InstantiateMsg {
     pub allowed_action_executors: HashSet<Addr>,
     pub referral_memo: String,
     pub fee_manager_address: Addr,
-    pub allowance_denom: String,
 }
 
 pub type WorkflowId = String;
@@ -219,6 +218,7 @@ impl fmt::Display for FeeType {
 #[cw_serde]
 pub struct FeeTotal {
     pub denom: String,
+    pub debit_denom: String,
     pub amount: Uint128,
     pub fee_type: FeeType,
 }

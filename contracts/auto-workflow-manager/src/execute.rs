@@ -15,7 +15,7 @@ use crate::{
     msg::{
         ActionParamValue, ExecutionType, FeeType, FinishInstanceRequest, InstanceId, NewWorkflowMsg, UserFee, WorkflowInstanceState, WorkflowState, WorkflowVisibility
     },
-    state::{load_config, load_user_payment_config, PaymentSource},
+    state::{load_config, load_user_payment_config},
     ContractError,
 };
 use cw_storage_plus::Map;
@@ -24,10 +24,11 @@ use cw_storage_plus::Map;
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct FeeEventData {
     pub user_address: String,
-    pub original_denom: String,
-    pub original_amount_charged: Uint128,
-    pub discounted_from_allowance: Uint128,
+    pub fee_denom: String,
+    pub fee_amount: Uint128,
+    pub usd_amount: Uint128,
     pub debit_denom: String,
+    pub debit_amount: Uint128,
     pub fee_type: FeeType,
     pub creator_address: Option<String>,
 }
@@ -45,7 +46,7 @@ use crate::{
         save_workflow, save_workflow_action, save_workflow_action_contracts,
         save_workflow_action_params, save_workflow_action_templates, save_workflow_instance,
         save_workflow_instance_params, validate_contract_is_whitelisted,
-        validate_sender_is_action_executor, validate_sender_is_admin, validate_sender_is_publisher,
+        validate_sender_is_action_executor, validate_sender_is_owner, validate_sender_is_publisher,
         Action, PaymentConfig, Workflow, WorkflowInstance,
     },
     utils::build_authz_execute_contract_msg,
@@ -619,7 +620,7 @@ pub fn purge_instances(
     instance_ids: Vec<u64>,
 ) -> Result<Response, ContractError> {
     // Validate sender is admin
-    validate_sender_is_admin(deps.storage, &info)?;
+    validate_sender_is_owner(deps.storage, &info)?;
 
     let mut purged_instance_ids = Vec::new();
     let mut not_found_instance_ids = Vec::new();
@@ -665,8 +666,7 @@ pub fn set_user_payment_config(
         .add_event(
             cosmwasm_std::Event::new("autorujira-workflow-manager/set_user_payment_config")
                 .add_attribute("user_address", info.sender.to_string())
-                .add_attribute("allowance", payment_config.allowance.to_string())
-                .add_attribute("source", format!("{:?}", payment_config.source))
+                .add_attribute("payment_config", payment_config.to_string())
         ))
 }
 
@@ -688,22 +688,29 @@ pub fn remove_user_payment_config_execute(
         ))
 }
 
+pub fn override_prices_from_oracle(prices: HashMap<String, Decimal>) -> Result<HashMap<String, Decimal>, ContractError> {
+    // TODO: obtain prices from oracle and override prices received from backend.
+    //       for each everriden price, we need to emit an event with the denom and the price.
+    Ok(prices)
+}
+
 pub fn charge_fees(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     batch_id: String,
-    prices: HashMap<String, Decimal>,
+    prices_from_backend: HashMap<String, Decimal>,
     fees: Vec<UserFee>,
 ) -> Result<Response, ContractError> {
-    // Validate sender is admin
-    validate_sender_is_admin(deps.storage, &info)?;
+    validate_sender_is_owner(deps.storage, &info)?;
 
     let mut response = Response::new()
         .add_event(
             cosmwasm_std::Event::new("autorujira-workflow-manager/charge_fees")
                 .add_attribute("batch_id", batch_id.clone())
         );
+
+    let prices = override_prices_from_oracle(prices_from_backend)?;
 
     // Load config to get fee manager address
     let config = load_config(deps.storage)?;
@@ -722,57 +729,67 @@ pub fn charge_fees(
         let mut accumulated_fees = Vec::new();
         let mut accumulated_funds = Vec::new();
         let mut accumulated_fee_events = Vec::new();
-        let mut current_allowance = payment_config.allowance;
+        let (use_wallet, mut current_usd_allowance) = match payment_config {
+            PaymentConfig::Wallet { usd_allowance } => (true, usd_allowance),
+            PaymentConfig::Prepaid => (false, Uint128::zero()),
+        };
 
         for fee_total in &user_fee.totals {
-            let denom_price = prices.get(&fee_total.denom).ok_or(ContractError::GenericError(format!("Price not found for denomination: {}", fee_total.denom)))?;
+            let denom_price = match prices.get(&fee_total.denom) {
+                Some(price) => price,
+                None => {
+                    // Add error event for missing price
+                    response = response.add_event(
+                        cosmwasm_std::Event::new("autorujira-workflow-manager/fee-price-error")
+                            .add_attribute("user_address", user_fee.address.clone())
+                            .add_attribute("fee_denom", fee_total.denom.clone())
+                            .add_attribute("error", "Price not found for fee denom")
+                    );
+                    continue; // Skip to next fee_total
+                }
+            };
+            let usd_amount = (Decimal::from_atomics(fee_total.amount, 0).unwrap() * denom_price).to_uint_ceil();
 
-            // TODO: skip fee if quote not found
-            
-            let allowance_price = prices.get(&config.allowance_denom).ok_or(ContractError::GenericError(format!("Price not found for denomination: {}", config.allowance_denom)))?;
+            if use_wallet {
+                if current_usd_allowance < usd_amount {
+                    // If user has not enough allowance, set it to 0 and break as we can not charge any more fees
+                    response = response.add_event(
+                        cosmwasm_std::Event::new("autorujira-workflow-manager/fee-error")
+                            .add_attribute("user_address", user_fee.address.clone())
+                            .add_attribute("fee_denom", fee_total.denom.clone())
+                            .add_attribute("fee_amount", fee_total.amount.to_string())
+                            .add_attribute("usd_amount", usd_amount.to_string())
+                            .add_attribute("error", "Not enough allowance")
+                    );
+                    current_usd_allowance = Uint128::zero();
+                    break; // Break out of the loop as we can not charge any more fees for this user
+                }
+                current_usd_allowance -= usd_amount;
+            }
 
-            // We need to handle two cases, when fee_total.denom is config.allowance_denom and when it's not
-            let allowance_amount = if fee_total.denom == config.allowance_denom.clone() {
+            // We need to handle two cases, when fee_total.denom is debit_denom and when it's not
+            let debit_denom_amount = if fee_total.denom == fee_total.debit_denom.clone() {
                 fee_total.amount
             } else {
-                (Decimal::from_atomics(fee_total.amount, 0).unwrap() * denom_price / allowance_price).to_uint_ceil()
+                let debit_denom_price = match prices.get(&fee_total.debit_denom) {
+                    Some(price) => price,
+                    None => {
+                        // Add error event for missing price
+                        response = response.add_event(
+                            cosmwasm_std::Event::new("autorujira-workflow-manager/fee-price-error")
+                                .add_attribute("user_address", user_fee.address.clone())
+                                .add_attribute("debit_denom", fee_total.debit_denom.clone())
+                                .add_attribute("error", "Price not found for debit denom")
+                        );
+                        continue; // Skip to next fee_total
+                    }
+                };
+                (Decimal::from_atomics(fee_total.amount, 0).unwrap() * denom_price / debit_denom_price).to_uint_ceil()
             };
 
-            let (amount_to_charge, allowance_to_charge) = 
-                // Case 1: current_allowance >= allowance_amount => We have enough allowance to charge the full amount
-                if current_allowance >= allowance_amount {
-                    (fee_total.amount, allowance_amount)
-                }
-                // Case 2: 0 < current_allowance < allowance_amount => charge up to current allowance
-                else if current_allowance > Uint128::zero() {
-                    // Simplified calculation: convert allowance to denom amount
-                    // amount_to_charge = current_allowance * quote_allowance_denom / quote_denom
-                    let amount_to_charge = (Decimal::from_atomics(current_allowance, 0).unwrap() * allowance_price / denom_price).to_uint_ceil();
-                    (amount_to_charge, current_allowance)
-                }
-                // Case 3: current_allowance == 0 => charge nothing
-                else {
-                    (Uint128::zero(), Uint128::zero())
-                };
-
             // Only process if there's something to charge
-            if amount_to_charge > Uint128::zero() {
-                // Update current allowance for next iteration
-                current_allowance -= allowance_to_charge;
-
-                let (actual_amount_to_charge, actual_denom_to_charge) = match payment_config.source {
-                    PaymentSource::Wallet => {
-                        // Accumulate funds for Wallet payment source
-                        accumulated_funds.push(cosmwasm_std::Coin {
-                            denom: fee_total.denom.clone(),
-                            amount: amount_to_charge.clone(),
-                        });
-                        (amount_to_charge.clone(), fee_total.denom.clone())
-                    },
-                    PaymentSource::Prepaid => (allowance_to_charge.clone(), config.allowance_denom.clone()),
-                };
-
-                let actual_fee = FeeManagerFee {
+            if debit_denom_amount > Uint128::zero() {
+                let fee_manager_fee = FeeManagerFee {
                     fee_type: match fee_total.fee_type {
                         FeeType::Creator { instance_id } => {
                             let workflow_instance = load_workflow_instance(deps.storage, &requester.clone(), &instance_id)?;
@@ -781,20 +798,28 @@ pub fn charge_fees(
                         },
                         FeeType::Execution => FeeManagerFeeType::Execution,
                     },
-                    denom: actual_denom_to_charge.clone(),
-                    amount: actual_amount_to_charge.clone(),
+                    denom: fee_total.debit_denom.clone(),
+                    amount: debit_denom_amount.clone(),
                 };
-                accumulated_fees.push(actual_fee.clone());
+                accumulated_fees.push(fee_manager_fee.clone());
+
+                if use_wallet {
+                    accumulated_funds.push(cosmwasm_std::Coin {
+                        amount: debit_denom_amount.clone(),
+                        denom: fee_total.debit_denom.clone(),
+                    });
+                }
 
                 // Create FeeEventData for this specific fee
                 let fee_event_data = FeeEventData {
                     user_address: user_fee.address.clone(),
-                    original_denom: fee_total.denom.clone(),
-                    original_amount_charged: amount_to_charge.clone(),
-                    discounted_from_allowance: allowance_to_charge.clone(),
-                    debit_denom: actual_denom_to_charge.clone(),
+                    fee_denom: fee_total.denom.clone(),
+                    fee_amount: fee_total.amount.clone(),
+                    usd_amount: usd_amount.clone(),
+                    debit_denom: fee_total.debit_denom.clone(),
+                    debit_amount: debit_denom_amount.clone(),
                     fee_type: fee_total.fee_type.clone(),
-                    creator_address: match actual_fee.fee_type.clone() {
+                    creator_address: match fee_manager_fee.fee_type.clone() {
                         FeeManagerFeeType::Creator { creator_address } => Some(creator_address.to_string()),
                         _ => None,
                     },
@@ -803,69 +828,50 @@ pub fn charge_fees(
             }
         }
 
-        // Send single submessage per user if there are fees to process
-        if !accumulated_fees.is_empty() {
-            // Update user's allowance in storage
+        if use_wallet {
             save_user_payment_config(
                 deps.storage,
                 &requester.clone(),
-                &PaymentConfig {
-                    allowance: current_allowance,
-                    source: payment_config.source.clone(),
-                },
+                &PaymentConfig::Wallet { usd_allowance: current_usd_allowance }
             )?;
+        }
 
-            // Create the fee message based on payment source
-            let fee_msg = match payment_config.source {
-                PaymentSource::Wallet => {
-                    FeeManagerExecuteMsg::ChargeFeesFromMessageCoins {
-                        fees: accumulated_fees,
-                    }
-                },
-                PaymentSource::Prepaid => {
-                    FeeManagerExecuteMsg::ChargeFeesFromUserBalance {
-                        batch: vec![FeeManagerUserFees {
-                            user: requester.clone(),
-                            fees: accumulated_fees,
-                        }],
-                    }
-                }
-            };
-
+        // Send single submessage per user if there are fees to process
+        if !accumulated_fees.is_empty() {
             // Store accumulated fee event data for reply
             FEE_EVENT_DATA.save(deps.storage, reply_id, &accumulated_fee_events)?;
-            
+
             // Send message to fee manager with reply
-            match payment_config.source {
-                PaymentSource::Wallet => {
-                    // Build AUTHZ message in name of requester
-                    let authz_msg = build_authz_execute_contract_msg(
-                        &_env,
-                        &requester.clone(),
-                        &config.fee_manager_address,
-                        &to_json_string(&fee_msg)?,
-                        &accumulated_funds,
-                    )?;
-                    
-                    // Create submessage with reply
-                    let sub_msg = SubMsg::reply_always(authz_msg, reply_id);
-                    response = response.add_submessage(sub_msg);
-                },
-                PaymentSource::Prepaid => {
-                    // Direct call to fee manager
-                    let wasm_msg = WasmMsg::Execute {
-                        contract_addr: config.fee_manager_address.to_string(),
-                        msg: to_json_binary(&fee_msg)?,
-                        funds: vec![],
-                    };
-                    
-                    // Create submessage with reply
-                    // TODO: review if we should replay_always instead of reply_on_success
-                    let sub_msg = SubMsg::reply_on_success(wasm_msg, reply_id);
-                    response = response.add_submessage(sub_msg);
-                },
+            if use_wallet {
+                let fee_msg = FeeManagerExecuteMsg::ChargeFeesFromMessageCoins {
+                    fees: accumulated_fees,
+                };
+                // Build AUTHZ message in name of requester
+                let authz_msg = build_authz_execute_contract_msg(
+                    &_env,
+                    &requester.clone(),
+                    &config.fee_manager_address,
+                    &to_json_string(&fee_msg)?,
+                    &accumulated_funds,
+                )?;
+                let sub_msg = SubMsg::reply_always(authz_msg, reply_id);
+                response = response.add_submessage(sub_msg);
+            } else {
+                let fee_msg = FeeManagerExecuteMsg::ChargeFeesFromUserBalance {
+                    batch: vec![FeeManagerUserFees {
+                        user: requester.clone(),
+                        fees: accumulated_fees,
+                    }],
+                };
+                // Direct call to fee manager
+                let wasm_msg = WasmMsg::Execute {
+                    contract_addr: config.fee_manager_address.to_string(),
+                    msg: to_json_binary(&fee_msg)?,
+                    funds: vec![],
+                };
+                let sub_msg = SubMsg::reply_always(wasm_msg, reply_id);
+                response = response.add_submessage(sub_msg);
             }
-            
             // Increment reply_id for next user
             reply_id += 1;
         }
@@ -893,7 +899,11 @@ pub fn handle_fee_manager_reply(
             response = response.add_event(
                 cosmwasm_std::Event::new("autorujira-workflow-manager/fee-error")
                     .add_attribute("user_address", fee_event_data.user_address)
-                    .add_attribute("denom", fee_event_data.original_denom)
+                    .add_attribute("denom", fee_event_data.fee_denom)
+                    .add_attribute("amount", fee_event_data.fee_amount.to_string())
+                    .add_attribute("usd_amount", fee_event_data.usd_amount.to_string())
+                    .add_attribute("debit_denom", fee_event_data.debit_denom)
+                    .add_attribute("debit_amount", fee_event_data.debit_amount.to_string())
                     .add_attribute("fee_type", fee_event_data.fee_type.to_string())
                     .add_attribute("error", "true")
                     .add_attribute("details", error_msg.clone())
@@ -921,10 +931,11 @@ pub fn handle_fee_manager_reply(
         response = response.add_event(
             cosmwasm_std::Event::new("autorujira-workflow-manager/fee-charged")
                 .add_attribute("user_address", fee_event_data.user_address)
-                .add_attribute("original_denom", fee_event_data.original_denom)
-                .add_attribute("original_amount_charged", fee_event_data.original_amount_charged.to_string())
-                .add_attribute("discounted_from_allowance", fee_event_data.discounted_from_allowance.to_string())
+                .add_attribute("denom", fee_event_data.fee_denom)
+                .add_attribute("amount", fee_event_data.fee_amount.to_string())
+                .add_attribute("usd_amount", fee_event_data.usd_amount.to_string())
                 .add_attribute("debit_denom", fee_event_data.debit_denom)
+                .add_attribute("debit_amount", fee_event_data.debit_amount.to_string())
                 .add_attribute("fee_type", fee_event_data.fee_type.to_string())
                 .add_attribute("creator_address", fee_event_data.creator_address.unwrap_or_default()));
     }
@@ -942,7 +953,7 @@ pub fn finish_instances(
     instances: Vec<FinishInstanceRequest>,
 ) -> Result<Response, ContractError> {
     // Validate sender is admin
-    validate_sender_is_admin(deps.storage, &info)?;
+    validate_sender_is_owner(deps.storage, &info)?;
 
     let mut finished_instance_ids = Vec::new();
     let mut not_found_instance_ids = Vec::new();
@@ -992,7 +1003,7 @@ pub fn reset_instance(
     instance_id: InstanceId,
 ) -> Result<Response, ContractError> {
     // Validate sender is admin
-    validate_sender_is_admin(deps.storage, &info)?;
+    validate_sender_is_owner(deps.storage, &info)?;
 
     // Validate user address
     let user_addr = deps.api.addr_validate(&user_address)?;

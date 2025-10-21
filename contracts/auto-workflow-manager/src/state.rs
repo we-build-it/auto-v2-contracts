@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::fmt;
 
 use cosmwasm_std::{Addr, Order, StdResult, Storage, Timestamp, Uint128};
 use cw_storage_plus::{Item, Map};
@@ -16,7 +17,6 @@ pub struct Config {
     pub allowed_action_executors: HashSet<Addr>,
     pub referral_memo: String,
     pub fee_manager_address: Addr,
-    pub allowance_denom: String,
 }
 
 #[cw_serde]
@@ -44,22 +44,60 @@ pub struct WorkflowInstance {
 }
 
 #[cw_serde]
-pub struct PaymentConfig {
-    pub allowance: Uint128,
-    pub source: PaymentSource,
+pub enum PaymentConfig {
+    Wallet { usd_allowance: Uint128 },
+    Prepaid,
+}
+
+impl fmt::Display for PaymentConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PaymentConfig::Wallet { usd_allowance } => write!(f, "wallet_{}", usd_allowance),
+            PaymentConfig::Prepaid => write!(f, "prepaid"),
+        }
+    }
 }
 
 #[cw_serde]
-pub enum PaymentSource {
+pub struct LegacyPaymentConfig {
+    pub allowance: Uint128,
+    pub source: LegacyPaymentSource,
+}
+
+#[cw_serde]
+pub enum LegacyPaymentSource {
     Wallet,
     Prepaid,
+}
+
+// ==================================== 
+// ========== LEGACY PAYMENT CONFIG ===
+// ==================================== 
+
+pub const LEGACY_USER_PAYMENT_CONFIG: Map<Addr, LegacyPaymentConfig> = Map::new("upc");
+
+pub fn legacy_load_user_payment_config_keys(storage: &dyn Storage) -> StdResult<Vec<Addr>> {
+    LEGACY_USER_PAYMENT_CONFIG.keys(storage, None, None, Order::Ascending).collect::<StdResult<Vec<Addr>>>()
+}
+
+pub fn legacy_save_user_payment_config(storage: &mut dyn Storage, user: &Addr, config: &LegacyPaymentConfig) -> StdResult<()> {
+    LEGACY_USER_PAYMENT_CONFIG.save(storage, user.clone(), config)
+}
+
+pub fn legacy_load_user_payment_config(storage: &dyn Storage, user: &Addr) -> StdResult<LegacyPaymentConfig> {
+    LEGACY_USER_PAYMENT_CONFIG.load(storage, user.clone())
+}
+
+pub fn legacy_remove_user_payment_config(storage: &mut dyn Storage, user: &Addr) -> StdResult<()> {
+    LEGACY_USER_PAYMENT_CONFIG.remove(storage, user.clone());
+    Ok(())
 }
 
 // ==================================== 
 // ========== PAYMENT CONFIG ==========
 // ==================================== 
 
-pub const USER_PAYMENT_CONFIG: Map<Addr, PaymentConfig> = Map::new("upc");
+pub const USER_PAYMENT_CONFIG: Map<Addr, PaymentConfig> = Map::new("upc2");
 
 pub fn save_user_payment_config(storage: &mut dyn Storage, user: &Addr, config: &PaymentConfig) -> StdResult<()> {
     USER_PAYMENT_CONFIG.save(storage, user.clone(), config)
@@ -292,7 +330,7 @@ pub fn validate_sender_is_action_executor(
     }
 }
 
-pub fn validate_sender_is_admin(
+pub fn validate_sender_is_owner(
     storage: &dyn Storage,
     info: &cosmwasm_std::MessageInfo,
 ) -> Result<(), ContractError> {

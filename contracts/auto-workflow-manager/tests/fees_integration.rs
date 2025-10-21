@@ -26,7 +26,6 @@ use auto_workflow_manager::{
     }, 
     state::{
       PaymentConfig as WorkflowManagerPaymentConfig, 
-      PaymentSource as WorkflowManagerPaymentSource,
     },
 };
 
@@ -54,10 +53,7 @@ fn test_charge_fees_ok_prepaid() {
 
   // Set user payment config
   let set_user_payment_config_msg = WorkflowManagerExecuteMsg::SetUserPaymentConfig {
-    payment_config: WorkflowManagerPaymentConfig {
-      allowance: Uint128::from(100_000_000u128),
-      source: WorkflowManagerPaymentSource::Prepaid,
-    },
+    payment_config: WorkflowManagerPaymentConfig::Prepaid,
   };
   app.execute_contract(
     addresses.workflow_executor.clone(), 
@@ -103,11 +99,13 @@ fn test_charge_fees_ok_prepaid() {
       totals: vec![
         WorkflowManagerFeeTotal {
           denom: "uusdc".to_string(),
+          debit_denom: "uusdc".to_string(),
           amount: Uint128::from(500_000u128),
           fee_type: WorkflowManagerFeeType::Execution,
         },
         WorkflowManagerFeeTotal {
           denom: "rune".to_string(),
+          debit_denom: "uusdc".to_string(),
           amount: Uint128::from(100_000u128),
           fee_type: WorkflowManagerFeeType::Execution,
         },
@@ -129,15 +127,19 @@ fn test_charge_fees_ok_prepaid() {
 
   let uusdc_charged_fee = get_fee_charged_event_amount(&charge_fees_result.events, addresses.workflow_executor.to_string(), "uusdc".to_string(), WorkflowManagerFeeType::Execution);
   // println!("usdc_charged_fee: {:?}", uusdc_charged_fee);
-  assert_eq!(uusdc_charged_fee.clone().unwrap().original_amount_charged, "500000");
-  assert_eq!(uusdc_charged_fee.clone().unwrap().discounted_from_allowance, "500000");
+  assert_eq!(uusdc_charged_fee.clone().unwrap().fee_denom, "uusdc");
+  assert_eq!(uusdc_charged_fee.clone().unwrap().fee_amount, "500000");
+  assert_eq!(uusdc_charged_fee.clone().unwrap().usd_amount, "500000");
   assert_eq!(uusdc_charged_fee.clone().unwrap().debit_denom, "uusdc");
-
+  assert_eq!(uusdc_charged_fee.clone().unwrap().debit_amount, "500000");
+    
   let rune_charged_fee = get_fee_charged_event_amount(&charge_fees_result.events, addresses.workflow_executor.to_string(), "rune".to_string(), WorkflowManagerFeeType::Execution);
   // println!("rune_charged_fee: {:?}", rune_charged_fee);
-  assert_eq!(rune_charged_fee.clone().unwrap().original_amount_charged, "100000");
-  assert_eq!(rune_charged_fee.clone().unwrap().discounted_from_allowance, "25000");
+  assert_eq!(rune_charged_fee.clone().unwrap().fee_denom, "rune");
+  assert_eq!(rune_charged_fee.clone().unwrap().fee_amount, "100000");
+  assert_eq!(rune_charged_fee.clone().unwrap().usd_amount, "25000");
   assert_eq!(rune_charged_fee.clone().unwrap().debit_denom, "uusdc");
+  assert_eq!(rune_charged_fee.clone().unwrap().debit_amount, "25000");
 
   // println!("Charge fees done");
   // println!("--------------------------------------------------");
@@ -167,9 +169,8 @@ fn test_charge_fees_ok_wallet() {
 
   // Set user payment config
   let set_user_payment_config_msg = WorkflowManagerExecuteMsg::SetUserPaymentConfig {
-    payment_config: WorkflowManagerPaymentConfig {
-      allowance: Uint128::from(100_000_000u128),
-      source: WorkflowManagerPaymentSource::Wallet,
+    payment_config: WorkflowManagerPaymentConfig::Wallet {
+      usd_allowance: Uint128::from(100_000_000u128),
     },
   };
   app.execute_contract(
@@ -206,11 +207,13 @@ fn test_charge_fees_ok_wallet() {
       totals: vec![
         WorkflowManagerFeeTotal {
           denom: "uusdc".to_string(),
+          debit_denom: "rune".to_string(),
           amount: Uint128::from(500_000u128),
           fee_type: WorkflowManagerFeeType::Execution,
         },
         WorkflowManagerFeeTotal {
           denom: "rune".to_string(),
+          debit_denom: "rune".to_string(),
           amount: Uint128::from(100_000u128),
           fee_type: WorkflowManagerFeeType::Execution,
         },
@@ -232,17 +235,19 @@ fn test_charge_fees_ok_wallet() {
 
   let uusdc_charged_fee = get_fee_charged_event_amount(&charge_fees_result.events, addresses.workflow_executor.to_string(), "uusdc".to_string(), WorkflowManagerFeeType::Execution);
   // println!("usdc_charged_fee: {:?}", uusdc_charged_fee);
-  assert_eq!(uusdc_charged_fee.clone().unwrap().original_amount_charged, "500000");
-  assert_eq!(uusdc_charged_fee.clone().unwrap().discounted_from_allowance, "500000");
-  assert_eq!(uusdc_charged_fee.clone().unwrap().original_denom, "uusdc");
-  assert_eq!(uusdc_charged_fee.clone().unwrap().debit_denom, "uusdc");
+  assert_eq!(uusdc_charged_fee.clone().unwrap().fee_denom, "uusdc");
+  assert_eq!(uusdc_charged_fee.clone().unwrap().fee_amount, "500000");
+  assert_eq!(uusdc_charged_fee.clone().unwrap().usd_amount, "500000");
+  assert_eq!(uusdc_charged_fee.clone().unwrap().debit_denom, "rune");
+  assert_eq!(uusdc_charged_fee.clone().unwrap().debit_amount, "2000000");
 
   let rune_charged_fee = get_fee_charged_event_amount(&charge_fees_result.events, addresses.workflow_executor.to_string(), "rune".to_string(), WorkflowManagerFeeType::Execution);
   // println!("rune_charged_fee: {:?}", rune_charged_fee);
-  assert_eq!(rune_charged_fee.clone().unwrap().original_amount_charged, "100000");
-  assert_eq!(rune_charged_fee.clone().unwrap().discounted_from_allowance, "25000");
-  assert_eq!(rune_charged_fee.clone().unwrap().original_denom, "rune");
+  assert_eq!(rune_charged_fee.clone().unwrap().fee_denom, "rune");
+  assert_eq!(rune_charged_fee.clone().unwrap().fee_amount, "100000");
+  assert_eq!(rune_charged_fee.clone().unwrap().usd_amount, "25000");
   assert_eq!(rune_charged_fee.clone().unwrap().debit_denom, "rune");
+  assert_eq!(rune_charged_fee.clone().unwrap().debit_amount, "100000");
 
   // println!("Charge fees done");
   // println!("--------------------------------------------------");
@@ -329,7 +334,6 @@ fn deploy_contracts(app: &mut CustomApp) -> Addresses {
     allowed_action_executors: HashSet::from([crank_addr.clone()]),
     referral_memo: "test-referral-memo".to_string(),
     fee_manager_address: fee_manager_address.clone(),
-    allowance_denom: "uusdc".to_string(),
   };  
   let workflow_manager_address = app.instantiate_contract(code_id_workflow_manager, contracts_creator_addr.clone(), &workflow_manager_instantiate_msg, &[], "workflow_manager", None).unwrap();
 
@@ -365,11 +369,13 @@ fn deploy_contracts(app: &mut CustomApp) -> Addresses {
 #[derive(Clone)]
 #[allow(dead_code)]
 struct FeeChargedEventAmount {
-  original_amount_charged: String,
-  discounted_from_allowance: String,
-  original_denom: String,
+  fee_denom: String,
+  fee_amount: String,
+  usd_amount: String,
   debit_denom: String,
+  debit_amount: String,
 }
+
 
 fn get_fee_charged_event_amount(
   events: &Vec<Event>, 
@@ -380,17 +386,19 @@ fn get_fee_charged_event_amount(
   let fee_charged_event = events.iter()
     .find(|event| event.ty == "wasm-autorujira-workflow-manager/fee-charged"
       && event.attributes.iter().any(|attr| attr.key == "user_address" && attr.value == user_address) 
-      && event.attributes.iter().any(|attr| attr.key == "original_denom" && attr.value == denom) 
+      && event.attributes.iter().any(|attr| attr.key == "denom" && attr.value == denom) 
       && event.attributes.iter().any(|attr| attr.key == "fee_type" && attr.value == fee_type.to_string()))
   .unwrap();
-  let amount = fee_charged_event.attributes.iter().find(|attr| attr.key == "original_amount_charged").unwrap().value.clone();
-  let allowance_charged = fee_charged_event.attributes.iter().find(|attr| attr.key == "discounted_from_allowance").unwrap().value.clone();
-  let denom_charged = fee_charged_event.attributes.iter().find(|attr| attr.key == "debit_denom").unwrap().value.clone();
+  let amount = fee_charged_event.attributes.iter().find(|attr| attr.key == "amount").unwrap().value.clone();
+  let usd_amount = fee_charged_event.attributes.iter().find(|attr| attr.key == "usd_amount").unwrap().value.clone();
+  let debit_denom = fee_charged_event.attributes.iter().find(|attr| attr.key == "debit_denom").unwrap().value.clone();
+  let debit_amount = fee_charged_event.attributes.iter().find(|attr| attr.key == "debit_amount").unwrap().value.clone();
   Some(FeeChargedEventAmount { 
-    original_amount_charged: amount, 
-    discounted_from_allowance: allowance_charged, 
-    original_denom: denom, 
-    debit_denom: denom_charged 
+    fee_denom: denom,
+    fee_amount: amount,
+    usd_amount: usd_amount,
+    debit_denom: debit_denom,
+    debit_amount: debit_amount,
   })
 }
 

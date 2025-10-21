@@ -3,7 +3,7 @@ use cosmwasm_std::{
     entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
     Reply,
 };
-use cw2::set_contract_version;
+use cw2::{get_contract_version, set_contract_version};
 use cw_utils::nonpayable;
 
 use crate::{
@@ -16,7 +16,7 @@ use crate::{
         query_instances_by_requester, query_user_payment_config, query_workflow_by_id,
         query_workflow_instance,
     },
-    state::{load_config, save_config, Config}
+    state::{legacy_load_user_payment_config, legacy_load_user_payment_config_keys, legacy_remove_user_payment_config, load_config, save_config, save_user_payment_config, Config, PaymentConfig}
 };
 
 // version info for migration info
@@ -44,7 +44,6 @@ pub fn instantiate(
         allowed_action_executors: msg.allowed_action_executors,
         referral_memo: msg.referral_memo,
         fee_manager_address: msg.fee_manager_address,
-        allowance_denom: msg.allowance_denom,
     };
 
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -141,9 +140,16 @@ pub fn sudo(deps: DepsMut, _env: Env, msg: SudoMsg) -> Result<Response, Contract
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: ()) -> StdResult<Response> {
+    if get_contract_version(deps.storage)?.version == "0.1.0" {
+        // Migrate legacy payment config
+        for user in legacy_load_user_payment_config_keys(deps.storage)? {
+            let legacy_payment_config = legacy_load_user_payment_config(deps.storage, &user)?;
+            save_user_payment_config(deps.storage, &user, &PaymentConfig::Wallet { usd_allowance: legacy_payment_config.allowance })?;
+            legacy_remove_user_payment_config(deps.storage, &user)?;
+        }
+    }
     // Update version if changed
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    // Migrate HERE other parts of state when needed
     Ok(Response::default())
 }
 
@@ -169,8 +175,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
                 allowed_publishers: config.allowed_publishers.clone(),
                 allowed_action_executors: config.allowed_action_executors.clone(),
                 referral_memo: config.referral_memo,
-                fee_manager_address: config.fee_manager_address,
-                allowance_denom: config.allowance_denom,
+                fee_manager_address: config.fee_manager_address
             };
             to_json_binary(&result)
         }
