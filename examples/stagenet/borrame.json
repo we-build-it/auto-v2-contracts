@@ -1,0 +1,42 @@
+{
+    "publish_workflow": {
+      "workflow": {
+        "id": "test-fin",
+        "start_actions": [
+          "order"
+        ],
+        "end_actions": [
+          "order"
+        ],
+        "visibility": "public",
+        "actions": {
+          "order": {
+            "params": {
+              "orderList": {
+                "string": "#cp.orderList"
+              },
+              "funds": {
+                  "string": "#cp.funds"
+              },
+              "contractAddress": {
+                "string": "#ip.claimContractAddress"
+              }
+            },
+            "next_actions": [
+              "order"
+            ],
+            "templates": {
+              "daodao": {
+                "contract": "{{contractAddress}}",
+                "message": "{\"order\": [{{orderList}}, null]}\"",
+                "funds": "{{funds}}"
+              }
+            },
+            "whitelisted_contracts": [
+              "sthor15y5sgnt6tge8pkgp28lvxnw2rhsveup0stlvw0y7t9qs7ww7stpqyehp7r"
+            ]
+          }
+        }
+      }
+    }
+  }

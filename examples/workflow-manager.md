@@ -103,7 +103,7 @@ thornode query wasm contract-state smart sthor1fs54ndfnetj9aww5guxvvpryf60mft99r
 ```
 ## publish workflow
 ```
-thornode tx wasm execute sthor1gdhtg02g07v84qjvjk7w7md83ckc4xk2gmx7pe4tap0tnaghes7shlqvcu \
+thornode tx wasm execute sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huuzmqalnv9z \
 '{
 	"publish_workflow": {
 		"workflow": {

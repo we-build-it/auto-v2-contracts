@@ -1,0 +1,9 @@
+thornode tx wasm execute sthor1uml8u2hr6ukjh5wcd839l94nva7v9xhjjlvupaewq92ksfls27cshytxsh \
+'{
+	"deposit": {}
+}' \
+--amount 10000000rune \
+--from test-stagenet-gus \
+--chain-id thorchain-stagenet-2 \
+--node https://stagenet-rpc.ninerealms.com/ \
+--gas auto --gas-adjustment 1.5

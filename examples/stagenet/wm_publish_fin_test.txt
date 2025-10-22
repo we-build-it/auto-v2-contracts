@@ -1,0 +1,111 @@
+thornode tx wasm execute sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huuzmqalnv9z \
+'{
+  "publish_workflow": {
+    "workflow": {
+      "id": "test-fin",
+      "start_actions": [
+        "order"
+      ],
+      "end_actions": [
+        "order"
+      ],
+      "visibility": "public",
+      "actions": {
+        "order": {
+          "params": {
+            "orderList": {
+              "string": "#cp.orderList"
+            },
+            "funds": {
+                "string": "#cp.funds"
+            },
+            "contractAddress": {
+              "string": "#ip.claimContractAddress"
+            },
+            "amount": {
+              "string": "#cp.amount"
+            },
+            "denom": {
+              "string": "#cp.denom"
+            }
+          },
+          "next_actions": [
+            "order"
+          ],
+          "templates": {
+            "daodao": {
+              "contract": "{{contractAddress}}",
+              "message": "{\"order\": [{{orderList}}, null]}",
+              "funds": [
+                [
+                  "{{amount}}",
+                  "{{denom}}"
+                ]
+              ]
+            }
+          },
+          "whitelisted_contracts": [
+            "sthor15y5sgnt6tge8pkgp28lvxnw2rhsveup0stlvw0y7t9qs7ww7stpqyehp7r"
+          ]
+        }
+      }
+    }
+  }
+}' \
+--from test-stagenet-gus \
+--chain-id thorchain-stagenet-2 \
+--node https://stagenet-rpc.ninerealms.com:443 \
+--gas auto --gas-adjustment 1.5
+
+
+thornode tx wasm execute sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huuzmqalnv9z \
+'{
+	"execute_instance": {
+		"instance": {
+			"workflow_id": "test-fin",
+			"onchain_parameters": {
+				"claimContractAddress": { "string": "sthor15y5sgnt6tge8pkgp28lvxnw2rhsveup0stlvw0y7t9qs7ww7stpqyehp7r" }
+			},
+            "offchain_parameters": {
+            },
+			"execution_type": "one_shot",
+			"cron_expression": "*/5 * * * *",
+			"expiration_time": "1786448860000000000"
+		}
+	}
+}' \
+--from test-stagenet-gus \
+--chain-id thorchain-stagenet-2 \
+--node https://stagenet-rpc.ninerealms.com/ \
+--gas auto --gas-adjustment 1.5
+
+
+thornode tx wasm execute sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huuzmqalnv9z \
+'{
+	"execute_action": {
+		"user_address": "sthor1z6m4jukpzelp26f8k7jcua4xxsp2w2lpqzv6nr",
+		"instance_id": 56,
+		"action_id": "order",
+		"template_id": "daodao",
+		"params": {
+			"orderList": {
+				"string": "[[\"base\", { \"fixed\": \"300\" }, \"100000\"]]"
+			},
+			"funds": {
+				"string": "2816389937"
+			},
+			"amount": {
+				"string": "100000"
+			},
+			"denom": {
+				"string": "thor.auto"
+			}
+		}
+	}
+}' \
+--from test-stagenet-gus \
+--chain-id thorchain-stagenet-2 \
+--node https://stagenet-rpc.ninerealms.com/ \
+--gas auto --gas-adjustment 1.5
+
+thornode query wasm contract-state smart sthor15y5sgnt6tge8pkgp28lvxnw2rhsveup0stlvw0y7t9qs7ww7stpqyehp7r '{"orders":{"owner":"sthor1z6m4jukpzelp26f8k7jcua4xxsp2w2lpqzv6nr"}}' --node https://stagenet-rpc.ninerealms.com:443π

@@ -1,0 +1,13 @@
+thornode tx wasm execute sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huuzmqalnv9z \
+'{
+	"set_user_payment_config": {
+		"payment_config": {
+			"allowance": "10000000",
+			"source": "prepaid"
+		}
+	}
+}' \
+--from test-stagenet-gus \
+--chain-id thorchain-stagenet-2 \
+--node https://stagenet-rpc.ninerealms.com/ \
+--gas auto --gas-adjustment 1.5
