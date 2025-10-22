@@ -727,7 +727,7 @@ pub fn charge_fees(
 
         // Accumulate fees and funds for this user
         let mut accumulated_fees = Vec::new();
-        let mut accumulated_funds = Vec::new();
+        let mut accumulated_funds: HashMap<String, Uint128> = HashMap::new();
         let mut accumulated_fee_events = Vec::new();
         let (use_wallet, mut current_usd_allowance) = match payment_config {
             PaymentConfig::Wallet { usd_allowance } => (true, usd_allowance),
@@ -804,10 +804,7 @@ pub fn charge_fees(
                 accumulated_fees.push(fee_manager_fee.clone());
 
                 if use_wallet {
-                    accumulated_funds.push(cosmwasm_std::Coin {
-                        amount: debit_denom_amount.clone(),
-                        denom: fee_total.debit_denom.clone(),
-                    });
+                    *accumulated_funds.entry(fee_total.debit_denom.clone()).or_insert(Uint128::zero()) += debit_denom_amount;
                 }
 
                 // Create FeeEventData for this specific fee
@@ -852,7 +849,10 @@ pub fn charge_fees(
                     &requester.clone(),
                     &config.fee_manager_address,
                     &to_json_string(&fee_msg)?,
-                    &accumulated_funds,
+                    &accumulated_funds.iter().map(|(denom, amount)| cosmwasm_std::Coin {
+                        amount: amount.clone(),
+                        denom: denom.clone(),
+                    }).collect::<Vec<cosmwasm_std::Coin>>(),
                 )?;
                 let sub_msg = SubMsg::reply_always(authz_msg, reply_id);
                 response = response.add_submessage(sub_msg);

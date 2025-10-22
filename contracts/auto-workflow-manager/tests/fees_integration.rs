@@ -1,6 +1,6 @@
 use anybuf::Bufany;
 use cosmwasm_std::{
-  coin, testing::{MockApi, MockStorage}, Addr, AnyMsg, Api, BlockInfo, Coin, CosmosMsg, CustomMsg, CustomQuery, Decimal, Empty, Event, Storage, Uint128, WasmMsg
+  coin, testing::{MockApi, MockStorage}, Addr, AnyMsg, Api, BlockInfo, Coin, CosmosMsg, CustomMsg, CustomQuery, Decimal, Empty, Event, Storage, Timestamp, Uint128, WasmMsg
 };
 use serde::de::DeserializeOwned;
 use std::{collections::{HashMap, HashSet}, str::FromStr};
@@ -15,18 +15,9 @@ use auto_workflow_manager::{
       sudo as sudo_workflow_manager
     },
     msg::{
-      ExecuteMsg as WorkflowManagerExecuteMsg, 
-      FeeTotal as WorkflowManagerFeeTotal, 
-      FeeType as WorkflowManagerFeeType, 
-      GetUserPaymentConfigResponse, 
-      InstantiateMsg as WorkflowManagerInstantiateMsg, 
-      QueryMsg as WorkflowManagerQueryMsg, 
-      UserFee as WorkflowManagerUserFee,
-      SudoMsg as WorkflowManagerSudoMsg
+      ExecuteMsg as WorkflowManagerExecuteMsg, ExecutionType, FeeTotal as WorkflowManagerFeeTotal, FeeType as WorkflowManagerFeeType, GetUserPaymentConfigResponse, InstantiateMsg as WorkflowManagerInstantiateMsg, NewInstanceMsg, NewWorkflowMsg, QueryMsg as WorkflowManagerQueryMsg, SudoMsg as WorkflowManagerSudoMsg, UserFee as WorkflowManagerUserFee, WorkflowVisibility
     }, 
-    state::{
-      PaymentConfig as WorkflowManagerPaymentConfig, 
-    },
+    state::PaymentConfig as WorkflowManagerPaymentConfig,
 };
 
 use auto_fee_manager::{
@@ -43,7 +34,7 @@ cargo test --test fees_integration -- --nocapture
 */
 
 #[test]
-fn test_charge_fees_ok_prepaid() {
+fn test_charge_fees_ok_prepaid_execution() {
   let mut app= BasicAppBuilder::new()
     .with_stargate(CustomStargate {})
     .build(|_, _, _| {});
@@ -141,6 +132,140 @@ fn test_charge_fees_ok_prepaid() {
   assert_eq!(rune_charged_fee.clone().unwrap().debit_denom, "uusdc");
   assert_eq!(rune_charged_fee.clone().unwrap().debit_amount, "25000");
 
+  // println!("Charge fees done");
+  // println!("--------------------------------------------------");
+  
+  // Query allowance and user balances
+  // Get user payment config
+  let _user_payment_config: GetUserPaymentConfigResponse = app.wrap().query_wasm_smart(
+    addresses.contract_workflow_manager.clone(), 
+    &WorkflowManagerQueryMsg::GetUserPaymentConfig { user_address: addresses.workflow_executor.to_string() }).unwrap();
+  // println!("user_payment_config: {:#?}", user_payment_config);
+  let _user_balances: FeeManagerUserBalancesResponse = app.wrap().query_wasm_smart(
+    addresses.contract_fee_manager.clone(), 
+    &FeeManagerQueryMsg::GetUserBalances { user: addresses.workflow_executor.clone() }).unwrap();
+  // println!("user_balances: {:#?}", user_balances);
+  // println!("--------------------------------------------------");
+}
+
+#[test]
+fn test_charge_fees_ok_prepaid_creator() {
+  let mut app= BasicAppBuilder::new()
+    .with_stargate(CustomStargate {})
+    .build(|_, _, _| {});
+  let addresses = deploy_contracts(&mut app);
+  // println!("addresses: {:#?}", addresses);
+  // println!("--------------------------------------------------");
+
+  // Set user payment config
+  let set_user_payment_config_msg = WorkflowManagerExecuteMsg::SetUserPaymentConfig {
+    payment_config: WorkflowManagerPaymentConfig::Prepaid,
+  };
+  app.execute_contract(
+    addresses.workflow_executor.clone(), 
+    addresses.contract_workflow_manager.clone(), 
+    &set_user_payment_config_msg, 
+    &[]
+  ).unwrap();
+  // println!("User payment config set");
+
+  // Get user payment config
+  let _user_payment_config: GetUserPaymentConfigResponse = app.wrap().query_wasm_smart(
+    addresses.contract_workflow_manager.clone(), 
+    &WorkflowManagerQueryMsg::GetUserPaymentConfig { user_address: addresses.workflow_executor.to_string() }).unwrap();
+  // println!("user_payment_config: {:#?}", user_payment_config);
+  // println!("--------------------------------------------------");
+
+  // Deposit to fee manager
+  let deposit_msg = FeeManagerExecuteMsg::Deposit {};
+  app.execute_contract(
+    addresses.workflow_executor.clone(), 
+    addresses.contract_fee_manager.clone(), 
+    &deposit_msg, 
+    &[Coin {
+      denom: "uusdc".to_string(),
+      amount: Uint128::from(100_000_000u128),
+    }]
+  ).unwrap();
+  // println!("Deposit to fee manager done");
+
+  // Query user balances
+  let _user_balances: FeeManagerUserBalancesResponse = app.wrap().query_wasm_smart(addresses.contract_fee_manager.clone(), &FeeManagerQueryMsg::GetUserBalances { user: addresses.workflow_executor.clone() }).unwrap();
+  // println!("user_balances: {:#?}", user_balances);
+  // println!("--------------------------------------------------");
+
+  // Publish workflow
+  let publish_workflow_msg = WorkflowManagerExecuteMsg::PublishWorkflow {
+    workflow: NewWorkflowMsg {
+      id: "workflow_id_1".to_string(),
+      start_actions: HashSet::new(),
+      end_actions: HashSet::new(),
+      visibility: WorkflowVisibility::Public,
+      actions: HashMap::new(),
+    },
+  };
+  app.execute_contract(addresses.workflow_publisher.clone(), addresses.contract_workflow_manager.clone(), &publish_workflow_msg, &[]).unwrap();
+
+  // Create instance
+  let execute_instance_msg = WorkflowManagerExecuteMsg::ExecuteInstance {
+    instance: NewInstanceMsg {
+      workflow_id: "workflow_id_1".to_string(),
+      onchain_parameters: HashMap::new(),
+      offchain_parameters: HashMap::new(),
+      execution_type: ExecutionType::OneShot,
+      expiration_time: Timestamp::from_seconds(1000000000),
+      cron_expression: None,
+    },
+  };
+  let execute_instance_result = app.execute_contract(addresses.workflow_executor.clone(), addresses.contract_workflow_manager.clone(), &execute_instance_msg, &[]).unwrap();
+  let instance_id = execute_instance_result.events.iter()
+    .find(|event| event.ty == "wasm-autorujira-workflow-manager/execute_instance").unwrap().attributes.iter()
+    .find(|attribute| attribute.key == "instance_id").unwrap().value.clone();
+  assert_eq!(instance_id, "1".to_string());
+
+  // println!("Workflow published");
+  // Call ChargeFees
+  let prices = HashMap::from([
+    ("uusdc".to_string(), Decimal::from_str("1.0").unwrap()),
+    ("rune".to_string(), Decimal::from_str("0.25").unwrap()),
+  ]);  
+  let fees = vec![
+    WorkflowManagerUserFee {
+      address: addresses.workflow_executor.to_string(),
+      totals: vec![
+        WorkflowManagerFeeTotal {
+          denom: "rune".to_string(),
+          debit_denom: "uusdc".to_string(),
+          amount: Uint128::from(100_000u128),
+          fee_type: WorkflowManagerFeeType::Creator { instance_id: instance_id.parse::<u64>().unwrap() },
+        },
+      ],
+    },
+  ];
+  let charge_fees_msg = WorkflowManagerExecuteMsg::ChargeFees {
+    batch_id: "1".to_string(),
+    prices: prices,
+    fees: fees,
+  };
+  let charge_fees_result = app.execute_contract(
+    addresses.crank.clone(), 
+    addresses.contract_workflow_manager.clone(), 
+    &charge_fees_msg, 
+    &[]
+  ).unwrap();
+  // println!("charge_fees_result: {:#?}", charge_fees_result);
+
+  let uusdc_charged_fee = get_fee_charged_event_amount(&charge_fees_result.events, 
+    addresses.workflow_executor.to_string(), 
+    "rune".to_string(), 
+    WorkflowManagerFeeType::Creator { instance_id: instance_id.parse::<u64>().unwrap() });
+  // println!("usdc_charged_fee: {:?}", uusdc_charged_fee);
+  assert_eq!(uusdc_charged_fee.clone().unwrap().fee_denom, "rune");
+  assert_eq!(uusdc_charged_fee.clone().unwrap().fee_amount, "100000");
+  assert_eq!(uusdc_charged_fee.clone().unwrap().usd_amount, "25000");
+  assert_eq!(uusdc_charged_fee.clone().unwrap().debit_denom, "uusdc");
+  assert_eq!(uusdc_charged_fee.clone().unwrap().debit_amount, "25000");
+    
   // println!("Charge fees done");
   // println!("--------------------------------------------------");
   
@@ -262,6 +387,150 @@ fn test_charge_fees_ok_wallet() {
     addresses.contract_fee_manager.clone(), 
     &FeeManagerQueryMsg::GetUserBalances { user: addresses.workflow_executor.clone() }).unwrap();
   // println!("user_balances: {:#?}", user_balances);
+  // println!("--------------------------------------------------");
+}
+
+#[test]
+fn test_charge_fees_ok_wallet_creator() {
+  let mut app= BasicAppBuilder::new()
+    .with_stargate(CustomStargate {})
+    .build(|_, _, _| {});
+
+  let addresses = deploy_contracts(&mut app);
+  // println!("addresses: {:#?}", addresses);
+  // println!("--------------------------------------------------");
+
+  // Set user payment config
+  let set_user_payment_config_msg = WorkflowManagerExecuteMsg::SetUserPaymentConfig {
+    payment_config: WorkflowManagerPaymentConfig::Wallet {
+      usd_allowance: Uint128::from(100_000_000u128),
+    },
+  };
+  app.execute_contract(
+    addresses.workflow_executor.clone(), 
+    addresses.contract_workflow_manager.clone(), 
+    &set_user_payment_config_msg, 
+    &[]
+  ).unwrap();
+  // println!("User payment config set");
+
+  // Get user payment config
+  let _user_payment_config: GetUserPaymentConfigResponse = app.wrap().query_wasm_smart(
+    addresses.contract_workflow_manager.clone(), 
+    &WorkflowManagerQueryMsg::GetUserPaymentConfig { user_address: addresses.workflow_executor.to_string() }).unwrap();
+  // println!("user_payment_config: {:#?}", user_payment_config);
+  // println!("--------------------------------------------------");
+
+  // Deposit to fee manager
+  // println!("No deposit to fee manager needed as we are using wallet");
+
+  // Query user balances
+  let _user_balance_uusdc = app.wrap().query_balance(addresses.workflow_executor.to_string(), "uusdc".to_string()).unwrap();
+  let _user_balance_rune = app.wrap().query_balance(addresses.workflow_executor.to_string(), "rune".to_string()).unwrap();
+  // println!("user_balance (uusdc): {:#?}, user_balance (rune): {:#?}", user_balance_uusdc, user_balance_rune);
+  // println!("--------------------------------------------------");
+
+  // Publish workflow
+  let publish_workflow_msg = WorkflowManagerExecuteMsg::PublishWorkflow {
+    workflow: NewWorkflowMsg {
+      id: "workflow_id_1".to_string(),
+      start_actions: HashSet::new(),
+      end_actions: HashSet::new(),
+      visibility: WorkflowVisibility::Public,
+      actions: HashMap::new(),
+    },
+  };
+  app.execute_contract(addresses.workflow_publisher.clone(), addresses.contract_workflow_manager.clone(), &publish_workflow_msg, &[]).unwrap();
+
+  // Create instance
+  let execute_instance_msg = WorkflowManagerExecuteMsg::ExecuteInstance {
+    instance: NewInstanceMsg {
+      workflow_id: "workflow_id_1".to_string(),
+      onchain_parameters: HashMap::new(),
+      offchain_parameters: HashMap::new(),
+      execution_type: ExecutionType::OneShot,
+      expiration_time: Timestamp::from_seconds(1000000000),
+      cron_expression: None,
+    },
+  };
+  let execute_instance_result = app.execute_contract(addresses.workflow_executor.clone(), addresses.contract_workflow_manager.clone(), &execute_instance_msg, &[]).unwrap();
+  let instance_id = execute_instance_result.events.iter()
+    .find(|event| event.ty == "wasm-autorujira-workflow-manager/execute_instance").unwrap().attributes.iter()
+    .find(|attribute| attribute.key == "instance_id").unwrap().value.clone();
+  assert_eq!(instance_id, "1".to_string());
+
+  // println!("Workflow published");
+  // Call ChargeFees
+  let prices = HashMap::from([
+    ("rune".to_string(), Decimal::from_str("0.8375").unwrap()),
+    ("uruji".to_string(), Decimal::from_str("0.016301450000000002").unwrap()),
+  ]);  
+  let fees = vec![
+    WorkflowManagerUserFee {
+      address: addresses.workflow_executor.to_string(),
+      totals: vec![
+        WorkflowManagerFeeTotal {
+          denom: "rune".to_string(),
+          debit_denom: "rune".to_string(),
+          amount: Uint128::from(2u128),
+          fee_type: WorkflowManagerFeeType::Execution,
+        },
+        WorkflowManagerFeeTotal {
+          denom: "uruji".to_string(),
+          debit_denom: "rune".to_string(),
+          amount: Uint128::from(1_647_083u128),
+          fee_type: WorkflowManagerFeeType::Creator { instance_id: instance_id.parse::<u64>().unwrap() },
+        },
+      ],
+    },
+  ];
+  let charge_fees_msg = WorkflowManagerExecuteMsg::ChargeFees {
+    batch_id: "1".to_string(),
+    prices: prices,
+    fees: fees,
+  };
+  let charge_fees_result = app.execute_contract(
+    addresses.crank.clone(), 
+    addresses.contract_workflow_manager.clone(), 
+    &charge_fees_msg, 
+    &[]
+  ).unwrap();
+  // println!("charge_fees_result: {:#?}", charge_fees_result);
+
+  let rune_charged_fee = get_fee_charged_event_amount(&charge_fees_result.events, 
+    addresses.workflow_executor.to_string(), 
+    "rune".to_string(), 
+    WorkflowManagerFeeType::Execution);
+  // println!("usdc_charged_fee: {:?}", uusdc_charged_fee);
+  assert_eq!(rune_charged_fee.clone().unwrap().fee_denom, "rune");
+  assert_eq!(rune_charged_fee.clone().unwrap().fee_amount, "2");
+  assert_eq!(rune_charged_fee.clone().unwrap().usd_amount, "2");
+  assert_eq!(rune_charged_fee.clone().unwrap().debit_denom, "rune");
+  assert_eq!(rune_charged_fee.clone().unwrap().debit_amount, "2");
+
+  let uruji_charged_fee = get_fee_charged_event_amount(&charge_fees_result.events, 
+    addresses.workflow_executor.to_string(), 
+    "uruji".to_string(), 
+    WorkflowManagerFeeType::Creator { instance_id: instance_id.parse::<u64>().unwrap() });
+  // println!("usdc_charged_fee: {:?}", uusdc_charged_fee);
+  assert_eq!(uruji_charged_fee.clone().unwrap().fee_denom, "uruji");
+  assert_eq!(uruji_charged_fee.clone().unwrap().fee_amount, "1647083");
+  assert_eq!(uruji_charged_fee.clone().unwrap().usd_amount, "26850");
+  assert_eq!(uruji_charged_fee.clone().unwrap().debit_denom, "rune");
+  assert_eq!(uruji_charged_fee.clone().unwrap().debit_amount, "32060");
+    
+  // println!("Charge fees done");
+  // println!("--------------------------------------------------");
+  
+  // Query allowance and user balances
+  // Get user payment config
+  let _user_payment_config: GetUserPaymentConfigResponse = app.wrap().query_wasm_smart(
+    addresses.contract_workflow_manager.clone(), 
+    &WorkflowManagerQueryMsg::GetUserPaymentConfig { user_address: addresses.workflow_executor.to_string() }).unwrap();
+  // println!("user_payment_config: {:#?}", user_payment_config);
+  let _user_balance_uusdc = app.wrap().query_balance(addresses.workflow_executor.to_string(), "uusdc".to_string()).unwrap();
+  let _user_balance_rune = app.wrap().query_balance(addresses.workflow_executor.to_string(), "rune".to_string()).unwrap();
+  // println!("user_balance (uusdc): {:#?}, user_balance (rune): {:#?}", user_balance_uusdc, user_balance_rune);
   // println!("--------------------------------------------------");
 }
 
