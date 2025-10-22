@@ -1,0 +1,37 @@
+thornode tx wasm execute sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huuzmqalnv9z \
+'{
+    "charge_fees": {
+        "fees": [
+            {
+                "totals": [
+                    {
+                        "denom": "rune",
+                        "amount": "2",
+                        "fee_type": "execution",
+                        "debit_denom": "rune"
+                    },
+                    {
+                        "denom": "x/sthor1trgd94z4j8gyw98eeyq98tm9qzlkvkhjrcyjy8smv8hgvmsz7vwqflutqh/auto",
+                        "amount": "1647083",
+                        "fee_type": {
+                            "creator": {
+                                "instance_id": 66
+                            }
+                        },
+                        "debit_denom": "rune"
+                    }
+                ],
+                "address": "sthor1z6m4jukpzelp26f8k7jcua4xxsp2w2lpqzv6nr"
+            }
+        ],
+        "prices": {
+            "rune": "0.8375",
+            "x/sthor1trgd94z4j8gyw98eeyq98tm9qzlkvkhjrcyjy8smv8hgvmsz7vwqflutqh/auto": "0.016301450000000002"
+        },
+        "batch_id": "cdfbe2bf56b832e495c61131aa25fe0fe1eedfedc31d68b87f784ff98541a70a"
+    }
+}' \
+--from test-stagenet-gus \
+--chain-id thorchain-stagenet-2 \
+--node https://stagenet-rpc.ninerealms.com/ \
+--gas auto --gas-adjustment 1.5

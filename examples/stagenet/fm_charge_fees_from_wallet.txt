@@ -1,0 +1,27 @@
+thornode tx wasm execute sthor1uml8u2hr6ukjh5wcd839l94nva7v9xhjjlvupaewq92ksfls27cshytxsh \
+'{
+    "charge_fees_from_message_coins": {
+       "fees": [
+            {
+                "denom": "rune",
+                "amount": "2",
+                "fee_type": "execution",
+                "debit_denom": "rune"
+            },
+            {
+                "denom": "rune",
+                "amount": "32059",
+                "fee_type": {
+                    "creator": {
+                        "creator_address": "sthor1z6m4jukpzelp26f8k7jcua4xxsp2w2lpqzv6nr"
+                    }
+                }
+            }
+        ]
+     }
+}' \
+--amount 32061rune \
+--from test-stagenet-gus \
+--chain-id thorchain-stagenet-2 \
+--node https://stagenet-rpc.ninerealms.com/ \
+--gas auto --gas-adjustment 1.5
