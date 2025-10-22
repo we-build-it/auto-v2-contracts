@@ -16,7 +16,7 @@ use crate::{
         query_instances_by_requester, query_user_payment_config, query_workflow_by_id,
         query_workflow_instance,
     },
-    state::{legacy_load_user_payment_config, legacy_load_user_payment_config_keys, legacy_remove_user_payment_config, load_config, save_config, save_user_payment_config, Config, PaymentConfig}
+    state::{legacy_load_user_payment_config, legacy_load_user_payment_config_keys, legacy_remove_user_payment_config, load_config, save_config, save_user_payment_config, Config, LegacyPaymentSource, PaymentConfig}
 };
 
 // version info for migration info
@@ -144,7 +144,11 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: ()) -> StdResult<Response> {
         // Migrate legacy payment config
         for user in legacy_load_user_payment_config_keys(deps.storage)? {
             let legacy_payment_config = legacy_load_user_payment_config(deps.storage, &user)?;
-            save_user_payment_config(deps.storage, &user, &PaymentConfig::Wallet { usd_allowance: legacy_payment_config.allowance })?;
+            let payment_config = match legacy_payment_config.source {
+                LegacyPaymentSource::Wallet => PaymentConfig::Wallet { usd_allowance: legacy_payment_config.allowance },
+                LegacyPaymentSource::Prepaid => PaymentConfig::Prepaid,
+            };
+            save_user_payment_config(deps.storage, &user, &payment_config)?;
             legacy_remove_user_payment_config(deps.storage, &user)?;
         }
     }
