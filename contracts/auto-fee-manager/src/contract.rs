@@ -7,7 +7,7 @@ use crate::error::ContractError;
 use crate::handlers::*;
 use crate::helpers::validate_address;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg, SudoMsg};
-use crate::state::{ACCEPTED_DENOMS, CONFIG, Config};
+use crate::state::{DEPOSIT_ACCEPTED_DENOMS, CONFIG, Config};
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -39,7 +39,7 @@ pub fn instantiate(
 
     // Initialize ACCEPTED_DENOMS
     for (denom, value) in msg.accepted_denoms {
-        ACCEPTED_DENOMS.save(deps.storage, &denom, &value)?;
+        DEPOSIT_ACCEPTED_DENOMS.save(deps.storage, &denom, &value)?;
     }
 
     let config = Config {
@@ -114,7 +114,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::GetConfig {} => {
             let config = CONFIG.load(deps.storage)?;
             // Load all accepted denoms
-            let accepted_denoms = ACCEPTED_DENOMS
+            let accepted_denoms = DEPOSIT_ACCEPTED_DENOMS
                 .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
                 .map(|item| {
                     let (key, value) = item.unwrap();

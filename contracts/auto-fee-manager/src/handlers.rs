@@ -2,7 +2,7 @@ use crate::events::{balance_below_threshold, deposit_completed};
 use crate::helpers::{verify_crank, verify_workflow_manager};
 use crate::msg::{AcceptedDenomValue, Fee, FeeType};
 use crate::state::{
-    CONFIG, USER_BALANCES, CREATOR_FEES, EXECUTION_FEES, DISTRIBUTION_FEES, ACCEPTED_DENOMS,
+    CONFIG, USER_BALANCES, CREATOR_FEES, EXECUTION_FEES, DISTRIBUTION_FEES, DEPOSIT_ACCEPTED_DENOMS,
     SUBSCRIBED_CREATORS,
 };
 use crate::{error::ContractError, msg::UserFees};
@@ -25,7 +25,7 @@ pub fn handle_deposit(deps: DepsMut, info: MessageInfo) -> Result<Response, Cont
     // Process each coin sent
     for coin in &info.funds {
         // Validate that the denom is accepted
-        ACCEPTED_DENOMS
+        DEPOSIT_ACCEPTED_DENOMS
             .may_load(deps.storage, coin.denom.as_str())? // StdResult<Option<_>>
             .ok_or_else(|| ContractError::DenomNotAccepted {
                 denom: coin.denom.clone(),
@@ -82,13 +82,13 @@ pub fn handle_withdraw(
     }
 
     // Validate that the denom is accepted
-    ACCEPTED_DENOMS
+    DEPOSIT_ACCEPTED_DENOMS
         .may_load(deps.storage, denom.as_str())?
         .ok_or_else(|| ContractError::DenomNotAccepted {
             denom: denom.clone(),
         })?;
 
-        // Get current balance for this user and denom
+    // Get current balance for this user and denom
     let current_balance = USER_BALANCES
         .may_load(deps.storage, (info.sender.clone(), denom.as_str()))?
         .unwrap_or(0);
@@ -157,7 +157,7 @@ pub fn handle_charge_fees_from_user_balance(
     for user_fees in &batch {
         for fee in &user_fees.fees {
             // Validate denom
-            ACCEPTED_DENOMS
+            DEPOSIT_ACCEPTED_DENOMS
                 .may_load(deps.storage, fee.denom.as_str())?
                 .ok_or_else(|| ContractError::DenomNotAccepted {
                     denom: fee.denom.clone(),
@@ -220,7 +220,7 @@ pub fn handle_charge_fees_from_user_balance(
         USER_BALANCES.save(deps.storage, (user.clone(), denom.as_str()), &new_balance)?;
         
         // Check if balance is below threshold
-        if new_balance <= ACCEPTED_DENOMS
+        if new_balance <= DEPOSIT_ACCEPTED_DENOMS
                 .may_load(deps.storage, denom.as_str())?
                 .unwrap().min_balance_threshold.u128() as i128 {
             users_below_threshold.push((user.clone(), denom.clone()));
@@ -640,7 +640,7 @@ pub fn handle_distribute_creator_fees(
 }
 
 pub fn has_exceeded_debt_limit(deps: Deps, user: Addr) -> StdResult<bool> {
-    let accepted_denoms: Vec<(String, AcceptedDenomValue)> = ACCEPTED_DENOMS
+    let accepted_denoms: Vec<(String, AcceptedDenomValue)> = DEPOSIT_ACCEPTED_DENOMS
     .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
     .map(|item| {
         let (key, value) = item.unwrap();
@@ -668,7 +668,7 @@ pub fn has_exceeded_debt_limit(deps: Deps, user: Addr) -> StdResult<bool> {
 
 pub fn get_user_balances(deps: Deps, user: Addr) -> StdResult<crate::msg::UserBalancesResponse> {
     // Get accepted denoms to know which balances to check
-    let accepted_denoms: Vec<String> = ACCEPTED_DENOMS
+    let accepted_denoms: Vec<String> = DEPOSIT_ACCEPTED_DENOMS
         .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
         .map(|item| {
             let (key, _) = item.unwrap();
@@ -697,30 +697,27 @@ pub fn get_user_balances(deps: Deps, user: Addr) -> StdResult<crate::msg::UserBa
 }
 
 pub fn get_creator_fees(deps: Deps, creator: Addr) -> StdResult<crate::msg::CreatorFeesResponse> {
-    // Get accepted denoms to know which balances to check
-    let accepted_denoms: Vec<String> = ACCEPTED_DENOMS
+    // Get all creator fees for this creator using prefix
+    let creator_fees_iter = CREATOR_FEES
+        .prefix(&creator)
         .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
-        .map(|item| {
-            let (key, _) = item.unwrap();
-            key.to_string()
-        })
-        .collect();
-    
+        .filter_map(|result| {
+            result.ok().and_then(|(denom, amount)| {
+                if amount > Uint128::zero() {
+                    Some((denom.to_string(), amount))
+                } else {
+                    None
+                }
+            })
+        });
+
     let mut fees = Vec::new();
-    
-    // Get creator fees for each accepted denom
-    for accepted_denom in accepted_denoms {
-        let balance = CREATOR_FEES
-            .may_load(deps.storage, (&creator, accepted_denom.as_str()))?
-            .unwrap_or(Uint128::zero());
-        
-        // Only include denoms with non-zero balance
-        if balance > Uint128::zero() {
-            fees.push(crate::msg::FeeBalance {
-                denom: accepted_denom,
-                balance,
-            });
-        }
+
+    for (denom, balance) in creator_fees_iter {
+        fees.push(crate::msg::FeeBalance {
+            denom: denom,
+            balance: balance,
+        });
     }
     
     Ok(crate::msg::CreatorFeesResponse {
@@ -730,49 +727,39 @@ pub fn get_creator_fees(deps: Deps, creator: Addr) -> StdResult<crate::msg::Crea
 }
 
 pub fn get_non_creator_fees(deps: Deps) -> StdResult<crate::msg::NonCreatorFeesResponse> {
-    // Get accepted denoms to know which balances to check
-    let accepted_denoms: Vec<String> = ACCEPTED_DENOMS
+    let execution_fees = EXECUTION_FEES
         .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
-        .map(|item| {
-            let (key, _) = item.unwrap();
-            key.to_string()
+        .filter_map(|result| {
+            result.ok().and_then(|(denom, amount)| {
+                if amount > Uint128::zero() {
+                    Some(crate::msg::FeeBalance {
+                        denom: denom.to_string(),
+                        balance: amount,
+                    })
+                } else {
+                    None
+                }
+            })
         })
         .collect();
     
-    let mut execution_fees = Vec::new();
-    let mut distribution_fees = Vec::new();
+    let distribution_fees = DISTRIBUTION_FEES
+        .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
+        .filter_map(|result| {
+            result.ok().and_then(|(denom, amount)| {
+                if amount > Uint128::zero() {
+                    Some(crate::msg::FeeBalance {
+                        denom: denom.to_string(),
+                        balance: amount,
+                    })
+                } else {
+                    None
+                }
+            })
+        })
+        .collect();
     
-    // Get execution and distribution fees for each accepted denom
-    for accepted_denom in accepted_denoms {
-        // Check execution fees
-        let execution_balance = EXECUTION_FEES
-            .may_load(deps.storage, accepted_denom.as_str())?
-            .unwrap_or(Uint128::zero());
-        
-        if execution_balance > Uint128::zero() {
-            execution_fees.push(crate::msg::FeeBalance {
-                denom: accepted_denom.clone(),
-                balance: execution_balance,
-            });
-        }
-        
-        // Check distribution fees
-        let distribution_balance = DISTRIBUTION_FEES
-            .may_load(deps.storage, accepted_denom.as_str())?
-            .unwrap_or(Uint128::zero());
-        
-        if distribution_balance > Uint128::zero() {
-            distribution_fees.push(crate::msg::FeeBalance {
-                denom: accepted_denom.clone(),
-                balance: distribution_balance,
-            });
-        }
-    }
-    
-    Ok(crate::msg::NonCreatorFeesResponse {
-        execution_fees,
-        distribution_fees,
-    })
+    Ok(crate::msg::NonCreatorFeesResponse { execution_fees, distribution_fees })
 }
 
 pub fn handle_enable_creator_fee_distribution(

@@ -28,7 +28,7 @@ pub const EXECUTION_FEES: Map<&str, Uint128> = Map::new("execution_fees");
 pub const DISTRIBUTION_FEES: Map<&str, Uint128> = Map::new("distribution_fees");
 
 // Defines which tokens are accepted for deposits
-pub const ACCEPTED_DENOMS: Map<&str, AcceptedDenomValue> = Map::new("accepted_denoms_new");
+pub const DEPOSIT_ACCEPTED_DENOMS: Map<&str, AcceptedDenomValue> = Map::new("accepted_denoms_new");
 
 // creator address → subscription status for fee distribution
 pub const SUBSCRIBED_CREATORS: Map<&Addr, bool> = Map::new("subscribed_creators");
