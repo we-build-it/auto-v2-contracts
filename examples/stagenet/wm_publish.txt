@@ -1,0 +1,85 @@
+thornode tx wasm execute sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huuzmqalnv9z \
+'{
+  "publish_workflow": {
+    "workflow": {
+      "id": "8b5c4b398fc286ee5259052ddcf7ce99f65b4666b4b8c5ba1b437d34bf639906",
+      "start_actions": [
+        "claim"
+      ],
+      "end_actions": [
+        "stake"
+      ],
+      "visibility": "public",
+      "actions": {
+        "claim": {
+          "params": {
+            "templateId": {
+              "string": "#ip.claimTemplateId"
+            },
+            "contractAddress": {
+              "string": "#ip.claimContractAddress"
+            },
+            "userAddress": {
+              "string": "#ip.requester"
+            },
+            "distributionId": {
+              "string": "#ip.distributionId"
+            }
+          },
+          "next_actions": [
+            "stake"
+          ],
+          "templates": {
+            "daodao": {
+              "contract": "{{contractAddress}}",
+              "message": "{\"claim\":{ \"id\": {{distributionId}} }}",
+              "funds": []
+            }
+          },
+          "whitelisted_contracts": [
+            "sthor1du9dd7w44dqnadt76dr6pks6m3lma40fttfqxfyz4nm5l7npfg6qx9mqfz"
+          ]
+        },
+        "stake": {
+          "params": {
+            "templateId": {
+              "string": "#ip.stakeTemplateId"
+            },
+            "contractAddress": {
+              "string": "#ip.stakeContractAddress"
+            },
+            "userAddress": {
+              "string": "#ip.requester"
+            },
+            "amount": {
+              "string": "#cp.amount"
+            },
+            "denom": {
+              "string": "#cp.denom"
+            }
+          },
+          "next_actions": [],
+          "templates": {
+            "daodao": {
+              "contract": "{{contractAddress}}",
+              "message": "{\"stake\":{ }}",
+              "funds": [
+                [
+                  "{{amount}}",
+                  "{{denom}}"
+                ]
+              ]
+            }
+          },
+          "whitelisted_contracts": [
+            "sthor17yxuu3762ccgq93dsxf2r8r4lwjz5mqz4ztz26e6dljfh0gkqjwq3xug06"
+          ]
+        }
+      }
+    }
+  }
+}' \
+--from test-stagenet-gus \
+--chain-id thorchain-stagenet-2 \
+--node https://stagenet-rpc.ninerealms.com:443 \
+--gas auto --gas-adjustment 1.5

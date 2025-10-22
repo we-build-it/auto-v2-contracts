@@ -1,0 +1,85 @@
+thornode tx wasm execute thor15xwa4y4wucma9gmcakjjg7mw36skpuhenhwlh9nkjn8vjguz6xzs8nc8np \
+'{
+  "publish_workflow": {
+    "workflow": {
+      "id": "6325688145866fb93091849824189477d675602e55579ed16d536f143abad5dd",
+      "start_actions": [
+        "claim"
+      ],
+      "end_actions": [
+        "stake"
+      ],
+      "visibility": "public",
+      "actions": {
+        "claim": {
+          "params": {
+            "templateId": {
+              "string": "#ip.claimTemplateId"
+            },
+            "contractAddress": {
+              "string": "#ip.claimContractAddress"
+            },
+            "userAddress": {
+              "string": "#ip.requester"
+            },
+            "distributionId": {
+              "string": "#ip.distributionId"
+            }
+          },
+          "next_actions": [
+            "stake"
+          ],
+          "templates": {
+            "daodao": {
+              "contract": "{{contractAddress}}",
+              "message": "{\"claim\":{ \"id\": {{distributionId}} }}",
+              "funds": []
+            }
+          },
+          "whitelisted_contracts": [
+            "thor1lt42m82qhyav6ks5cweayfuvaqqttf47ya9t78zvdyr74acpxeasqrhk4d", "thor1eu5u9adxzmsu0j20sqxc3jv4ly9lp09cc2t0ml3pmwj5374jg0hq44k7q0"
+          ]
+        },
+        "stake": {
+          "params": {
+            "templateId": {
+              "string": "#ip.stakeTemplateId"
+            },
+            "contractAddress": {
+              "string": "#ip.stakeContractAddress"
+            },
+            "userAddress": {
+              "string": "#ip.requester"
+            },
+            "amount": {
+              "string": "#cp.amount"
+            },
+            "denom": {
+              "string": "#cp.denom"
+            }
+          },
+          "next_actions": [],
+          "templates": {
+            "daodao": {
+              "contract": "{{contractAddress}}",
+              "message": "{\"stake\":{ }}",
+              "funds": [
+                [
+                  "{{amount}}",
+                  "{{denom}}"
+                ]
+              ]
+            }
+          },
+          "whitelisted_contracts": [
+            "thor1av89fjer9netmd7428r8hgr3l03l0vk5z5j9k74uunhtusw50r2q535eed", "thor12gz2ur0g4hfqvelvlmplql4z4knxnqwugq4l5dycg5gfsahm2s3qv82072"
+          ]
+        }
+      }
+    }
+  }
+}' \
+--from ??? \
+--chain-id thorchain-1 \
+--node rpc.ninerealms.com:443 \
+--gas auto --gas-adjustment 1.5

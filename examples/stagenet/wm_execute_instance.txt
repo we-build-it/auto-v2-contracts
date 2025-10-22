@@ -1,0 +1,28 @@
+thornode tx wasm execute sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huuzmqalnv9z \
+'{
+        "execute_instance": {
+                "instance": {
+                        "workflow_id": "8b5c4b398fc286ee5259052ddcf7ce99f65b4666b4b8c5ba1b437d34bf639906",
+                        "onchain_parameters": {
+                                "claimTemplateId": { "string": "daodao" },
+                                "claimContractAddress": { "string": "sthor1du9dd7w44dqnadt76dr6pks6m3lma40fttfqxfyz4nm5l7npfg6qx9mqfz" },
+                                "stakeTemplateId": { "string": "daodao" },
+                                "stakeContractAddress": { "string": "sthor17yxuu3762ccgq93dsxf2r8r4lwjz5mqz4ztz26e6dljfh0gkqjwq3xug06" },
+                                "distributionId": { "string": "1" }
+                        },
+                        "offchain_parameters": {
+                                "checkProvider": { "string": "daodao" },
+                                "minAmountToClaim": { "string": "1" },
+                                "protocolName": { "string": "AUTO" },
+                                "notificationType": { "string": "telegram" }
+                        },
+                        "execution_type": "one_shot",
+                        "cron_expression": "*/5 * * * *",
+                        "expiration_time": "1786448860000000000"
+                }
+        }
+}' \
+--from test-stagenet-gus \
+--chain-id thorchain-stagenet-2 \
+--node https://stagenet-rpc.ninerealms.com/ \
+--gas auto --gas-adjustment 1.5
