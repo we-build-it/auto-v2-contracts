@@ -25,8 +25,8 @@ thornode tx wasm execute sthor1fs54ndfnetj9aww5guxvvpryf60mft99ra5zh4ezzypa35huu
             }
         ],
         "prices": {
-            "rune": "0.8375",
-            "x/sthor1trgd94z4j8gyw98eeyq98tm9qzlkvkhjrcyjy8smv8hgvmsz7vwqflutqh/auto": "0.016301450000000002"
+            "rune": ["RUNE", "0.8375"],
+            "x/sthor1trgd94z4j8gyw98eeyq98tm9qzlkvkhjrcyjy8smv8hgvmsz7vwqflutqh/auto": ["", "0.01630145"]
         },
         "batch_id": "cdfbe2bf56b832e495c61131aa25fe0fe1eedfedc31d68b87f784ff98541a70a"
     }
