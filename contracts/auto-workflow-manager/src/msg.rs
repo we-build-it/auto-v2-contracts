@@ -141,7 +141,7 @@ pub enum ExecuteMsg {
     },
     ChargeFees {
         batch_id: String,
-        prices: HashMap<String, Decimal>,
+        prices: HashMap<String, (String, Decimal)>,
         fees: Vec<UserFee>,
     },
     FinishInstances {

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, str::FromStr};
 
-use cosmwasm_std::{to_json_string};
+use cosmwasm_std::{to_json_string, Event, QuerierWrapper};
 use cosmwasm_std::{
     to_json_binary, Addr, Binary, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response, Uint128, WasmMsg,
     Reply, SubMsg
@@ -10,6 +10,7 @@ use auto_fee_manager::msg::ExecuteMsg as FeeManagerExecuteMsg;
 use auto_fee_manager::msg::Fee as FeeManagerFee;
 use auto_fee_manager::msg::FeeType as FeeManagerFeeType;
 use auto_fee_manager::msg::UserFees as FeeManagerUserFees;
+use rujira_rs::Oracle;
 
 use crate::{
     msg::{
@@ -688,10 +689,33 @@ pub fn remove_user_payment_config_execute(
         ))
 }
 
-pub fn override_prices_from_oracle(prices: HashMap<String, Decimal>) -> Result<HashMap<String, Decimal>, ContractError> {
-    // TODO: obtain prices from oracle and override prices received from backend.
-    //       for each everriden price, we need to emit an event with the denom and the price.
-    Ok(prices)
+pub fn override_prices_from_oracle(prices: HashMap<String, (String, Decimal)>, querier: QuerierWrapper) -> Result<(HashMap<String, Decimal>, Vec<Event>), ContractError> {
+    // Ok(prices.iter().map(|(denom, data)| (denom.clone(), data.1)).collect())
+    let mut events = Vec::new();
+    let prices = prices.iter()
+        .map(|(denom, data)| {
+            let (symbol, backend_price) = data;
+            let price = if symbol.is_empty() {
+                backend_price.clone()
+            } else {
+                match symbol.oracle_price(querier) {
+                    Ok(price) => {
+                        events.push(
+                            cosmwasm_std::Event::new("autorujira-workflow-manager/price-override")
+                                .add_attribute("denom", denom.clone())
+                                .add_attribute("price", price.to_string())
+                        );
+                        price
+                    },
+                    Err(_e) => {
+                        // We must keep the price from the backend if the oracle price is not available
+                        backend_price.clone()
+                    }
+                }
+            };
+            (denom.clone(), price)
+        }).collect::<HashMap<String, Decimal>>();        
+    Ok((prices, events))
 }
 
 pub fn charge_fees(
@@ -699,7 +723,7 @@ pub fn charge_fees(
     _env: Env,
     info: MessageInfo,
     batch_id: String,
-    prices_from_backend: HashMap<String, Decimal>,
+    prices_from_backend: HashMap<String, (String, Decimal)>,
     fees: Vec<UserFee>,
 ) -> Result<Response, ContractError> {
     validate_sender_is_owner(deps.storage, &info)?;
@@ -710,7 +734,8 @@ pub fn charge_fees(
                 .add_attribute("batch_id", batch_id.clone())
         );
 
-    let prices = override_prices_from_oracle(prices_from_backend)?;
+    let (prices, events) = override_prices_from_oracle(prices_from_backend, deps.querier)?;
+    response = response.add_events(events);
 
     // Load config to get fee manager address
     let config = load_config(deps.storage)?;

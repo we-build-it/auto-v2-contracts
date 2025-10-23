@@ -289,10 +289,10 @@ fn test_charge_fees_events() {
 
     // Prices to use for the fees
     let prices = HashMap::from([
-        ("RUNE".to_string(), Decimal::from_str("0.5").unwrap()),
-        ("AUTO".to_string(), Decimal::from_str("0.5").unwrap()),
-        ("TCY".to_string(), Decimal::from_str("0.5").unwrap()),
-        ("uusdc".to_string(), Decimal::from_str("0.5").unwrap()),
+        ("RUNE".to_string(), ("rune".to_string(), Decimal::from_str("0.5").unwrap())),
+        ("AUTO".to_string(), ("auto".to_string(), Decimal::from_str("0.5").unwrap())),
+        ("TCY".to_string(), ("tcy".to_string(), Decimal::from_str("0.5").unwrap())),
+        ("uusdc".to_string(), ("uusdc".to_string(), Decimal::from_str("0.5").unwrap())),
     ]);
 
     // Execute instance
@@ -429,7 +429,7 @@ fn charge_fees(
     env: cosmwasm_std::Env,
     admin: Addr,
     batch_id: String,
-    prices: HashMap<String, Decimal>,
+    prices: HashMap<String, (String, Decimal)>,
     fees: Vec<UserFee>,
 ) -> Result<cosmwasm_std::Response, auto_workflow_manager::error::ContractError> {
     let execute_msg = ExecuteMsg::ChargeFees { batch_id, prices, fees };

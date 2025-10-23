@@ -81,8 +81,8 @@ fn test_charge_fees_ok_prepaid_execution() {
 
   // Call ChargeFees
   let prices = HashMap::from([
-    ("uusdc".to_string(), Decimal::from_str("1.0").unwrap()),
-    ("rune".to_string(), Decimal::from_str("0.25").unwrap()),
+    ("uusdc".to_string(), ("uusdc".to_string(), Decimal::from_str("1.0").unwrap())),
+    ("rune".to_string(), ("rune".to_string(), Decimal::from_str("0.25").unwrap())),
   ]);  
   let fees = vec![
     WorkflowManagerUserFee {
@@ -226,8 +226,8 @@ fn test_charge_fees_ok_prepaid_creator() {
   // println!("Workflow published");
   // Call ChargeFees
   let prices = HashMap::from([
-    ("uusdc".to_string(), Decimal::from_str("1.0").unwrap()),
-    ("rune".to_string(), Decimal::from_str("0.25").unwrap()),
+    ("uusdc".to_string(), ("uusdc".to_string(), Decimal::from_str("1.0").unwrap())),
+    ("rune".to_string(), ("rune".to_string(), Decimal::from_str("0.25").unwrap())),
   ]);  
   let fees = vec![
     WorkflowManagerUserFee {
@@ -323,8 +323,8 @@ fn test_charge_fees_ok_wallet() {
 
   // Call ChargeFees
   let prices = HashMap::from([
-    ("uusdc".to_string(), Decimal::from_str("1.0").unwrap()),
-    ("rune".to_string(), Decimal::from_str("0.25").unwrap()),
+    ("uusdc".to_string(), ("uusdc".to_string(), Decimal::from_str("1.0").unwrap())),
+    ("rune".to_string(), ("rune".to_string(), Decimal::from_str("0.25").unwrap())),
   ]);  
   let fees = vec![
     WorkflowManagerUserFee {
@@ -462,8 +462,8 @@ fn test_charge_fees_ok_wallet_creator() {
   // println!("Workflow published");
   // Call ChargeFees
   let prices = HashMap::from([
-    ("rune".to_string(), Decimal::from_str("0.8375").unwrap()),
-    ("uruji".to_string(), Decimal::from_str("0.016301450000000002").unwrap()),
+    ("rune".to_string(), ("rune".to_string(), Decimal::from_str("0.8375").unwrap())),
+    ("uruji".to_string(), ("uruji".to_string(), Decimal::from_str("0.016301450000000002").unwrap())),
   ]);  
   let fees = vec![
     WorkflowManagerUserFee {
